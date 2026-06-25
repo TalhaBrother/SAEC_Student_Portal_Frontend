@@ -7,6 +7,7 @@ import {
 import DashboardLayout from "../layouts/DashboardLayout";
 import MetricCard from "../components/MetricCard";
 import DonutChart from "../components/charts/DonutChart";
+import useAuthStore from "../store/authStore";
 
 const attendance = {
   labels: ["Present", "Absent", "Late"],
@@ -19,7 +20,10 @@ const gradeDistribution = {
   colors: ["#0056D2", "#F9BC15", "#FE4A65", "#1A253C"],
 };
 
+
 export default function StudentDashboard() {
+  const user=useAuthStore((state)=>state.user)
+console.log("Zustand User",user)
   return (
     <DashboardLayout title="My dashboard">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

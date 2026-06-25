@@ -2,31 +2,41 @@ import React from 'react';
 import api from '../api/axios';
 import { useState } from 'react';
 import {useNavigate} from 'react-router';
+import useAuthStore from '../store/authStore';
 
 const Login = () => {
 const [username, setUsername] = useState('');
 const [password, setPassword] = useState('');
 const [loading, setLoading] = useState(false);
 const navigate = useNavigate()
+const login=useAuthStore((state)=>state.login)
+const user=useAuthStore((state)=>state.user)
 const handleLogin = async (e) => {
   e.preventDefault();
   setLoading(true);
   try {
-    const response = await api.post('/auth/login/', { username, password });
-    console.log('Login successful:', response.data);
-    localStorage.setItem('Access Token', response.data.access);
-    localStorage.setItem('Refresh Token', response.data.refresh);
-    navigate('/')
+    const res = await api.post('/auth/login/', { username, password });
+    console.log('Login successful:', res.data);
+    login(res.data)
+    // localStorage.setItem('Access Token', response.data.access);
+    // localStorage.setItem('Refresh Token', response.data.refresh);
+    if(res.data.user?.role==="admin"){
+      navigate("/admin",{replace:true})
+    }
+    else{
+      
+      navigate('/',{replace:true})
+    }
 
   } catch (error) {
-    console.error('Login failed:', error.response ? error.response.data : error.message);
+   console.error('Login failed:', error.message);
   
   } finally {
     setLoading(false);
   }
 };
   return (
-    <div className="min-h-screen w-full flex flex-col md:flex-row-reverse bg-[var(--background)] text-white font-sans">
+    <div className="min-h-screen w-full flex flex-col md:flex-row-reverse bg-[var(--secondary)] text-white font-sans">
       
       {/* Right Side: Welcome Banner / Image Side */}
       <div className="hidden md:flex md:w-1/2 bg-[var(--primary)] p-12 flex-col justify-between items-center relative overflow-hidden select-none">
@@ -75,7 +85,7 @@ const handleLogin = async (e) => {
                 placeholder="Enter your username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full bg-transparent border-none outline-none text-white placeholder-gray-600 text-sm py-1 focus:ring-0"
+                className="w-full bg-transparent border-none outline-none text-black placeholder-gray-600 text-sm py-1 focus:ring-0"
               />
             </div>
 
@@ -90,7 +100,7 @@ const handleLogin = async (e) => {
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-transparent border-none outline-none text-white placeholder-gray-600 text-sm py-1 focus:ring-0"
+                  className="w-full bg-transparent border-none outline-none text-black placeholder-gray-600 text-sm py-1 focus:ring-0"
                 />
                 <button type="button" className="text-[var(--muted)] hover:text-white transition-colors ml-2 focus:outline-none">
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">

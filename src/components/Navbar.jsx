@@ -1,6 +1,15 @@
 import { HiOutlineMagnifyingGlass, HiOutlineBell, HiOutlineEnvelope, HiChevronDown } from "react-icons/hi2";
-
+import useAuthStore from "../store/authStore";
+import { useNavigate } from "react-router";
 export default function Navbar({ title = "Dashboard" }) {
+  const logout=useAuthStore((state)=>state.logout)
+  const Navigate=useNavigate()
+
+const handleLogout=()=>{
+  logout();
+  <Navigate to="/login" replace/>
+}
+
   return (
     <header className="w-full h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6">
       <div>
@@ -33,6 +42,9 @@ export default function Navbar({ title = "Dashboard" }) {
           <span className="hidden sm:block text-sm font-medium text-[var(--quinary)]">Admin</span>
           <HiChevronDown className="text-gray-400 text-sm" />
         </button>
+      </div>
+      <div>
+        <button onClick={handleLogout} className="text-[var(--secondary)] bg-[var(--quinary)] text-1xl p-1.5 cursor-pointer" >Logout</button>
       </div>
     </header>
   );
