@@ -4,7 +4,7 @@ import {
   HiOutlineCalendarDays,
   HiOutlineBanknotes,
 } from "react-icons/hi2";
-import DashboardLayout from "../layouts/DashboardLayout";
+// import DashboardLayout from "../layouts/DashboardLayout";
 import MetricCard from "../components/MetricCard";
 import BarChart from "../components/charts/BarChart";
 import DonutChart from "../components/charts/DonutChart";
@@ -29,7 +29,8 @@ const feesBreakdown = {
 
 export default function AdminDashboard() {
   return (
-    <DashboardLayout title="Dashboard overview">
+    // <DashboardLayout title="Dashboard overview">
+    <>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <MetricCard
           icon={HiOutlineUsers}
@@ -104,6 +105,7 @@ export default function AdminDashboard() {
           Recent activity / table goes here
         </div>
       </div>
-    </DashboardLayout>
+    {/* // </DashboardLayout> */}
+    </>
   );
 }

@@ -3,11 +3,11 @@ import useAuthStore from "../store/authStore";
 import { useNavigate } from "react-router";
 export default function Navbar({ title = "Dashboard" }) {
   const logout=useAuthStore((state)=>state.logout)
-  const Navigate=useNavigate()
+  const navigate=useNavigate()
 
 const handleLogout=()=>{
   logout();
-  <Navigate to="/login" replace/>
+  navigate("/login",{replace:true})
 }
 
   return (

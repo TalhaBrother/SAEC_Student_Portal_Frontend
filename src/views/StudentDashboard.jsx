@@ -4,7 +4,7 @@ import {
   HiOutlineStar,
   HiOutlineClock,
 } from "react-icons/hi2";
-import DashboardLayout from "../layouts/DashboardLayout";
+
 import MetricCard from "../components/MetricCard";
 import DonutChart from "../components/charts/DonutChart";
 import useAuthStore from "../store/authStore";
@@ -25,7 +25,7 @@ export default function StudentDashboard() {
   const user=useAuthStore((state)=>state.user)
 console.log("Zustand User",user)
   return (
-    <DashboardLayout title="My dashboard">
+    <>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <MetricCard
           icon={HiOutlineBookOpen}
@@ -78,6 +78,6 @@ console.log("Zustand User",user)
           />
         </div>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

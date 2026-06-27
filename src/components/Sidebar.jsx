@@ -1,4 +1,6 @@
 import { useState } from "react";
+import useAuthStore from "../store/authStore"
+import { NavLink } from "react-router";
 import {
   HiOutlineSquares2X2,
   HiOutlineUsers,
@@ -9,18 +11,23 @@ import {
   HiOutlineBuildingLibrary,
 } from "react-icons/hi2";
 
-const NAV_ITEMS = [
-  { label: "Dashboard", icon: HiOutlineSquares2X2 },
-  { label: "Students", icon: HiOutlineUsers },
-  { label: "Courses", icon: HiOutlineAcademicCap },
-  { label: "Attendance", icon: HiOutlineCalendarDays },
-  { label: "Fees", icon: HiOutlineBanknotes },
-  { label: "Settings", icon: HiOutlineCog6Tooth },
-];
+
 
 export default function Sidebar() {
   const [active, setActive] = useState("Dashboard");
-
+  const user=useAuthStore((state)=>state.user)
+  const role=user?.role
+  
+  const NAV_ITEMS = [
+    { label: "Dashboard", icon: HiOutlineSquares2X2 ,roles:['student','admin'], path: role === "admin"? '/admin':"/" },
+    { label: "Students", icon: HiOutlineUsers,roles:['student','admin'] },
+    { label: "Courses", icon: HiOutlineAcademicCap ,roles:['student','admin']},
+    { label: "Attendance", icon: HiOutlineCalendarDays ,roles:['admin']},
+    { label: "Fees", icon: HiOutlineBanknotes ,roles:['student','admin']},
+    { label: "Add Student", icon: HiOutlineUsers,roles:['admin'], path:'/add-student' },
+    { label: "Settings", icon: HiOutlineCog6Tooth ,roles:['student','admin']},
+  ];
+  
   return (
     <aside className="w-full h-full bg-[var(--quinary)] text-white flex flex-col">
       <div className="flex items-center gap-2 px-6 h-16 border-b border-white/10">
@@ -28,25 +35,29 @@ export default function Sidebar() {
         <span className="font-semibold text-lg tracking-tight">Student Portal</span>
       </div>
 
-      <nav className="flex-1 px-3 py-4 space-y-1">
-        {NAV_ITEMS.map(({ label, icon: Icon }) => {
-          const isActive = active === label;
-          return (
-            <button
-              key={label}
-              onClick={() => setActive(label)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors
-                ${isActive
-                  ? "bg-[var(--primary)] text-white font-medium"
-                  : "text-gray-300 hover:bg-white/5 hover:text-white"
-                }`}
-            >
-              <Icon className="text-lg shrink-0" />
-              <span>{label}</span>
-            </button>
-          );
-        })}
-      </nav>
+     <nav className="flex-1 px-3 py-4 space-y-1">
+  {NAV_ITEMS
+    .filter((item) => item.roles.includes(role))
+    .map(({ label, icon: Icon, path }) => {
+      const isActive = active === label;
+
+      return (
+        <NavLink
+          key={label}
+          to={path}
+          onClick={() => setActive(label)}
+          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
+            isActive
+              ? "bg-[var(--primary)] text-white font-medium"
+              : "text-gray-300 hover:bg-white/5 hover:text-white"
+          }`}
+        >
+          <Icon className="text-lg shrink-0" />
+          <span>{label}</span>
+        </NavLink>
+      );
+    })}
+</nav>
 
       <div className="px-3 py-4 border-t border-white/10">
         <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-white/5">

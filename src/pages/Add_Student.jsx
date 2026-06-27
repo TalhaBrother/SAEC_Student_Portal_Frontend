@@ -1,6 +1,6 @@
 import React from 'react';
 
-const Signup = () => {
+const Add_Student = () => {
   return (
     <div className="min-h-screen w-full flex flex-col md:flex-row-reverse bg-[var(--background)] text-white font-sans">
       
@@ -110,12 +110,12 @@ const Signup = () => {
           </form>
 
           {/* Footer Navigation */}
-          <div className="mt-8 text-center md:text-left flex items-center justify-center md:justify-start gap-2">
+          {/* <div className="mt-8 text-center md:text-left flex items-center justify-center md:justify-start gap-2">
             <span className="text-xs text-[var(--muted)]">Already have an account?</span>
             <button className="bg-zinc-800 hover:bg-zinc-700 text-white text-xs px-4 py-1.5 rounded-lg border border-zinc-700 transition-colors duration-200">
               Login
             </button>
-          </div>
+          </div> */}
 
         </div>
       </div>
@@ -124,4 +124,4 @@ const Signup = () => {
   );
 };
 
-export default Signup;
+export default Add_Student;
