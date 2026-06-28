@@ -22,7 +22,7 @@ export default function Sidebar() {
     { label: "Dashboard", icon: HiOutlineSquares2X2 ,roles:['student','admin'], path: role === "admin"? '/admin':"/" },
     { label: "Students", icon: HiOutlineUsers,roles:['student','admin'] },
     { label: "Courses", icon: HiOutlineAcademicCap ,roles:['student','admin']},
-    { label: "Attendance", icon: HiOutlineCalendarDays ,roles:['admin']},
+    { label: "Attendance", icon: HiOutlineCalendarDays ,roles:['admin'], path:'/attendance'},
     { label: "Fees", icon: HiOutlineBanknotes ,roles:['student','admin']},
     { label: "Add Student", icon: HiOutlineUsers,roles:['admin'], path:'/add-student' },
     { label: "Settings", icon: HiOutlineCog6Tooth ,roles:['student','admin']},

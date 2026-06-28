@@ -1,9 +1,61 @@
-import React from 'react';
+import React, { useState } from 'react';
+import axios from 'axios';
+import api from '../api/axios';
+import useAuthStore from '../store/authStore';
 
 const Add_Student = () => {
+  
+  const [fullName, setFullName] = useState("");
+  const [studentId, setStudentId] = useState("");
+  const [studentClass, setStudentClass] = useState("");
+  const [phone, setPhone] = useState("");
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const token = useAuthStore((state) => state.accessToken);
+  // console.log("Token: ", token);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+     
+      const res = await api.post(
+        "/students/",
+        {
+          full_name: fullName,
+          student_id: studentId,
+          student_class: studentClass,
+          phone: phone,
+          username: username,
+          email: email,
+          password: password
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      console.log("Student Added Successfully!", res.data);
+
+      
+      setFullName("");
+      setStudentId("");
+      setStudentClass("");
+      setPhone("");
+      setUsername("");
+      setEmail("");
+      setPassword("");
+    } catch (error) {
+      console.error("Add Student Error!")
+      console.log("Status:", error.response?.status);
+      console.log("Data:", error.response?.data);
+      console.error(error);
+    }
+  };
+
   return (
     <div className="min-h-screen w-full flex flex-col md:flex-row-reverse bg-[var(--background)] text-white font-sans">
-      
+
       {/* Right Side: Welcome Banner / Image Side */}
       <div className="hidden md:flex md:w-1/2 bg-[var(--primary)] p-12 flex-col justify-between items-center relative overflow-hidden select-none">
         <div className="absolute top-[-10%] left-[-10%] w-72 h-72 bg-[var(--secondary)] rounded-full filter blur-3xl opacity-30 animate-pulse"></div>
@@ -30,7 +82,7 @@ const Add_Student = () => {
       {/* Left Side: Form Side */}
       <div className="w-full md:w-1/2 flex flex-col justify-center px-6 sm:px-16 lg:px-24 py-12">
         <div className="max-w-md w-full mx-auto">
-          
+
           {/* Header */}
           <div className="mb-8">
             <h2 className="text-3xl font-semibold tracking-wide mb-2">Create Account</h2>
@@ -38,17 +90,80 @@ const Add_Student = () => {
           </div>
 
           {/* Form */}
-          <form className="space-y-5" onSubmit={(e) => e.preventDefault()}>
-            
-            {/* Full Name Field */}
+          <form className="space-y-5" onSubmit={handleSubmit}>
+
+            {/* Full Name */}
             <div className="relative border-b border-gray-700 focus-within:border-[var(--primary)] transition-colors duration-300 py-1">
               <label className="block text-xs uppercase tracking-wider text-[var(--muted)] mb-1">
                 Full Name
               </label>
-              <input 
-                type="text" 
-                placeholder="John Doe"
-                className="w-full bg-transparent border-none outline-none text-white placeholder-gray-600 text-sm py-1 focus:ring-0"
+              <input
+                type="text"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Shayan Khan"
+                required
+                className="w-full bg-transparent border-none outline-none text-black placeholder-gray-600 text-sm py-1 focus:ring-0"
+              />
+            </div>
+
+            {/* Username */}
+            <div className="relative border-b border-gray-700 focus-within:border-[var(--primary)] transition-colors duration-300 py-1">
+              <label className="block text-xs uppercase tracking-wider text-[var(--muted)] mb-1">
+                Username
+              </label>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="shayankhan123"
+                required
+                className="w-full bg-transparent border-none outline-none text-black placeholder-gray-600 text-sm py-1 focus:ring-0"
+              />
+            </div>
+
+            {/* Student ID */}
+            <div className="relative border-b border-gray-700 focus-within:border-[var(--primary)] transition-colors duration-300 py-1">
+              <label className="block text-xs uppercase tracking-wider text-[var(--muted)] mb-1">
+                Student ID
+              </label>
+              <input
+                type="text"
+                value={studentId}
+                onChange={(e) => setStudentId(e.target.value)}
+                placeholder="STU-2026-001"
+                required
+                className="w-full bg-transparent border-none outline-none text-black placeholder-gray-600 text-sm py-1 focus:ring-0"
+              />
+            </div>
+
+            {/* Student Class */}
+            <div className="relative border-b border-gray-700 focus-within:border-[var(--primary)] transition-colors duration-300 py-1">
+              <label className="block text-xs uppercase tracking-wider text-[var(--muted)] mb-1">
+                Class / Grade
+              </label>
+              <input
+                type="text"
+                value={studentClass}
+                onChange={(e) => setStudentClass(e.target.value)}
+                placeholder="Grade 10"
+                required
+                className="w-full bg-transparent border-none outline-none text-black placeholder-gray-600 text-sm py-1 focus:ring-0"
+              />
+            </div>
+
+            {/* Phone */}
+            <div className="relative border-b border-gray-700 focus-within:border-[var(--primary)] transition-colors duration-300 py-1">
+              <label className="block text-xs uppercase tracking-wider text-[var(--muted)] mb-1">
+                Phone Number
+              </label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+1234567890"
+                required
+                className="w-full bg-transparent border-none outline-none text-black placeholder-gray-600 text-sm py-1 focus:ring-0"
               />
             </div>
 
@@ -57,22 +172,13 @@ const Add_Student = () => {
               <label className="block text-xs uppercase tracking-wider text-[var(--muted)] mb-1">
                 Email Address
               </label>
-              <input 
-                type="email" 
-                placeholder="student@university.edu"
-                className="w-full bg-transparent border-none outline-none text-white placeholder-gray-600 text-sm py-1 focus:ring-0"
-              />
-            </div>
-
-            {/* Username Field */}
-            <div className="relative border-b border-gray-700 focus-within:border-[var(--primary)] transition-colors duration-300 py-1">
-              <label className="block text-xs uppercase tracking-wider text-[var(--muted)] mb-1">
-                Choose Username
-              </label>
-              <input 
-                type="text" 
-                placeholder="johndoe123"
-                className="w-full bg-transparent border-none outline-none text-white placeholder-gray-600 text-sm py-1 focus:ring-0"
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="shayan@gmail.com"
+                required
+                className="w-full bg-transparent border-none outline-none text-black placeholder-gray-600 text-sm py-1 focus:ring-0"
               />
             </div>
 
@@ -81,41 +187,24 @@ const Add_Student = () => {
               <label className="block text-xs uppercase tracking-wider text-[var(--muted)] mb-1">
                 Password
               </label>
-              <input 
-                type="password" 
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full bg-transparent border-none outline-none text-white placeholder-gray-600 text-sm py-1 focus:ring-0"
+                required
+                className="w-full bg-transparent border-none outline-none text-black placeholder-gray-600 text-sm py-1 focus:ring-0"
               />
-            </div>
-
-            {/* Terms Checkbox */}
-            <div className="flex items-center gap-2 pt-1">
-              <input 
-                type="checkbox" 
-                id="terms"
-                className="rounded bg-[var(--background)] border-zinc-700 text-[var(--primary)] focus:ring-[var(--primary)] focus:ring-offset-[var(--background)] w-4 h-4 cursor-pointer"
-              />
-              <label htmlFor="terms" className="text-xs text-[var(--muted)] cursor-pointer select-none">
-                I agree to the <span className="text-[var(--primary)] hover:underline">Terms & Conditions</span>
-              </label>
             </div>
 
             {/* Submit Button */}
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               className="w-full bg-[var(--primary)] hover:bg-[var(--secondary)] text-white font-medium py-3 px-4 rounded-xl transition-all duration-300 shadow-lg shadow-purple-900/20 transform active:scale-[0.98] mt-2"
             >
               Sign Up
             </button>
           </form>
-
-          {/* Footer Navigation */}
-          {/* <div className="mt-8 text-center md:text-left flex items-center justify-center md:justify-start gap-2">
-            <span className="text-xs text-[var(--muted)]">Already have an account?</span>
-            <button className="bg-zinc-800 hover:bg-zinc-700 text-white text-xs px-4 py-1.5 rounded-lg border border-zinc-700 transition-colors duration-200">
-              Login
-            </button>
-          </div> */}
 
         </div>
       </div>

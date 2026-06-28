@@ -10,6 +10,7 @@ import AdminDashboard from './views/AdminDashboard'
 import ProtectedRoute from './components/ProtectedRoute'
 import ProtectedAdmin from "./components/ProtectedAdmin"
 import DashboardLayout from './layouts/DashboardLayout'
+import Attendance from './pages/Attendance'
 import { Routes, Route } from 'react-router'
 
 function App() {
@@ -18,10 +19,13 @@ function App() {
   return (
     <>
       <Routes>
+
           <Route path='/' element={<ProtectedRoute><DashboardLayout/></ProtectedRoute>}>
             <Route index element={<StudentDashboard/>}/>
             <Route path='/admin' element={<ProtectedRoute><ProtectedAdmin><AdminDashboard /></ProtectedAdmin></ProtectedRoute>}/>
-             <Route path='/add-student' element={<ProtectedRoute><ProtectedAdmin><Add_Student /></ProtectedAdmin></ProtectedRoute>}/>
+            <Route path='/add-student' element={<ProtectedRoute><ProtectedAdmin><Add_Student /></ProtectedAdmin></ProtectedRoute>}/>
+            <Route path='/attendance' element={<ProtectedRoute><ProtectedAdmin><Attendance/></ProtectedAdmin></ProtectedRoute>}/>
+
           </Route>
         <Route path="/login" element={<Login />} />              
       </Routes>
