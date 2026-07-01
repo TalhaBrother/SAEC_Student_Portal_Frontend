@@ -7,7 +7,7 @@ export default function Navbar({ title = "Dashboard" }) {
 
 const handleLogout=()=>{
   logout();
-  navigate("/login",{replace:true})
+  navigate("/auth/login",{replace:true})
 }
 
   return (

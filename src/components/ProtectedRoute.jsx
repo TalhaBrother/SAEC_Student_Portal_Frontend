@@ -5,7 +5,7 @@ const ProtectedRoute=({children})=>{
   const user=useAuthStore((state)=>state.user)
  
   if(!accessToken){
-    return <Navigate to="/login" replace/>
+    return <Navigate to="/auth/login" replace/>
   }
 
       return children

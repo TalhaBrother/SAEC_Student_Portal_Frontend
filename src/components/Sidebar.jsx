@@ -9,6 +9,10 @@ import {
   HiOutlineBanknotes,
   HiOutlineCog6Tooth,
   HiOutlineBuildingLibrary,
+  HiOutlineDocumentText,
+  HiOutlinePencil,
+  HiOutlineBookOpen,
+  
 } from "react-icons/hi2";
 
 
@@ -20,12 +24,12 @@ export default function Sidebar() {
   
   const NAV_ITEMS = [
     { label: "Dashboard", icon: HiOutlineSquares2X2 ,roles:['student','admin'], path: role === "admin"? '/admin':"/" },
-    { label: "Students", icon: HiOutlineUsers,roles:['student','admin'] },
-    { label: "Courses", icon: HiOutlineAcademicCap ,roles:['student','admin']},
-    { label: "Attendance", icon: HiOutlineCalendarDays ,roles:['admin'], path:'/attendance'},
+    { label: "Assign Marks", icon: HiOutlinePencil ,roles:['student','admin'], path:'/admin/assign-marks' },
+    { label: "Courses", icon: HiOutlineBookOpen ,roles:['student','admin']},
+    { label: "Attendance", icon: HiOutlineCalendarDays ,roles:['admin'], path:'/admin/attendance'},
     { label: "Fees", icon: HiOutlineBanknotes ,roles:['student','admin']},
-    { label: "Add Student", icon: HiOutlineUsers,roles:['admin'], path:'/add-student' },
-    { label: "Settings", icon: HiOutlineCog6Tooth ,roles:['student','admin']},
+    { label: "Add Student", icon: HiOutlineUsers,roles:['admin'], path:'/admin/add-student' },
+    { label: "Result", icon: HiOutlineAcademicCap ,roles:['student','admin'], path:'/admin/result'},
   ];
   
   return (

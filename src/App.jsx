@@ -11,6 +11,8 @@ import ProtectedRoute from './components/ProtectedRoute'
 import ProtectedAdmin from "./components/ProtectedAdmin"
 import DashboardLayout from './layouts/DashboardLayout'
 import Attendance from './pages/Attendance'
+import Assign_Marks from './pages/Assign_Marks'
+import Result from './pages/Result'
 import { Routes, Route } from 'react-router'
 
 function App() {
@@ -23,11 +25,14 @@ function App() {
           <Route path='/' element={<ProtectedRoute><DashboardLayout/></ProtectedRoute>}>
             <Route index element={<StudentDashboard/>}/>
             <Route path='/admin' element={<ProtectedRoute><ProtectedAdmin><AdminDashboard /></ProtectedAdmin></ProtectedRoute>}/>
-            <Route path='/add-student' element={<ProtectedRoute><ProtectedAdmin><Add_Student /></ProtectedAdmin></ProtectedRoute>}/>
-            <Route path='/attendance' element={<ProtectedRoute><ProtectedAdmin><Attendance/></ProtectedAdmin></ProtectedRoute>}/>
+            <Route path='/admin/add-student' element={<ProtectedRoute><ProtectedAdmin><Add_Student /></ProtectedAdmin></ProtectedRoute>}/>
+            <Route path='/admin/attendance' element={<ProtectedRoute><ProtectedAdmin><Attendance/></ProtectedAdmin></ProtectedRoute>}/>
+            <Route path='/admin/assign-marks' element={<ProtectedRoute><ProtectedAdmin><Assign_Marks/></ProtectedAdmin></ProtectedRoute>}/>
+             <Route path='/admin/result' element={<ProtectedRoute><ProtectedAdmin><Result/></ProtectedAdmin></ProtectedRoute>}/>
+
 
           </Route>
-        <Route path="/login" element={<Login />} />              
+        <Route path="/auth/login" element={<Login />} />              
       </Routes>
     </>
   )
