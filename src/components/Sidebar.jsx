@@ -27,7 +27,7 @@ export default function Sidebar() {
     { label: "Assign Marks", icon: HiOutlinePencil ,roles:['student','admin'], path:'/admin/assign-marks' },
     { label: "Courses", icon: HiOutlineBookOpen ,roles:['student','admin']},
     { label: "Attendance", icon: HiOutlineCalendarDays ,roles:['admin'], path:'/admin/attendance'},
-    { label: "Fees", icon: HiOutlineBanknotes ,roles:['student','admin']},
+    { label: "Create Test", icon: HiOutlineDocumentText ,roles:['student','admin'], path:"/admin/create-test"},
     { label: "Add Student", icon: HiOutlineUsers,roles:['admin'], path:'/admin/add-student' },
     { label: "Result", icon: HiOutlineAcademicCap ,roles:['student','admin'], path:'/admin/result'},
   ];

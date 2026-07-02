@@ -13,6 +13,7 @@ import DashboardLayout from './layouts/DashboardLayout'
 import Attendance from './pages/Attendance'
 import Assign_Marks from './pages/Assign_Marks'
 import Result from './pages/Result'
+import Create_Test from './pages/Create_Test'
 import { Routes, Route } from 'react-router'
 
 function App() {
@@ -28,6 +29,7 @@ function App() {
             <Route path='/admin/add-student' element={<ProtectedRoute><ProtectedAdmin><Add_Student /></ProtectedAdmin></ProtectedRoute>}/>
             <Route path='/admin/attendance' element={<ProtectedRoute><ProtectedAdmin><Attendance/></ProtectedAdmin></ProtectedRoute>}/>
             <Route path='/admin/assign-marks' element={<ProtectedRoute><ProtectedAdmin><Assign_Marks/></ProtectedAdmin></ProtectedRoute>}/>
+            <Route path='/admin/create-test' element={<ProtectedRoute><ProtectedAdmin><Create_Test/></ProtectedAdmin></ProtectedRoute>}/>
              <Route path='/admin/result' element={<ProtectedRoute><ProtectedAdmin><Result/></ProtectedAdmin></ProtectedRoute>}/>
 
 
