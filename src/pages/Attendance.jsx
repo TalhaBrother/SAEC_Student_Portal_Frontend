@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../api/axios";
 import useAuthStore from "../store/authStore";
+import Swal from "sweetalert2";
 
 const Attendance = () => {
     const token = useAuthStore((state) => state.accessToken);
@@ -55,7 +56,15 @@ const Attendance = () => {
                 },
             });
 
-            alert("Attendance Saved Successfully!");
+            Swal.fire({
+                title: "Success!",
+                text: "Attendance Submitted Successfully!",
+                icon: "success",
+                confirmButtonText: "OK",
+                confirmButtonColor: "#0056D2", // --primary
+                background: "#F4F7FC",         // --secondary
+                color: "#1A253C",              // --quinary
+            });
         } catch (err) {
             console.error("Failed to save bulk attendance:", err);
             alert("Error sending record payload data to backend server.");
@@ -142,23 +151,21 @@ const Attendance = () => {
                                     <button
                                         type="button"
                                         onClick={() => markAttendance(student.id, "PRESENT")}
-                                        className={`px-4 py-2 text-xs uppercase font-bold tracking-wider rounded-xl border transition-all duration-200 cursor-pointer ${
-                                            currentStatus === "PRESENT"
+                                        className={`px-4 py-2 text-xs uppercase font-bold tracking-wider rounded-xl border transition-all duration-200 cursor-pointer ${currentStatus === "PRESENT"
                                                 ? "bg-green-500 border-green-500 text-white shadow-sm"
                                                 : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
-                                        }`}
+                                            }`}
                                     >
                                         Present
                                     </button>
-                                    
+
                                     <button
                                         type="button"
                                         onClick={() => markAttendance(student.id, "ABSENT")}
-                                        className={`px-4 py-2 text-xs uppercase font-bold tracking-wider rounded-xl border transition-all duration-200 cursor-pointer ${
-                                            currentStatus === "ABSENT"
+                                        className={`px-4 py-2 text-xs uppercase font-bold tracking-wider rounded-xl border transition-all duration-200 cursor-pointer ${currentStatus === "ABSENT"
                                                 ? "bg-red-500 border-red-500 text-white shadow-sm"
                                                 : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
-                                        }`}
+                                            }`}
                                     >
                                         Absent
                                     </button>

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import useAuthStore from '../store/authStore';
+import Swal from "sweetalert2";
 
 const Add_Student = () => {
   const [fullName, setFullName] = useState("");
@@ -10,6 +11,7 @@ const Add_Student = () => {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [Classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const token = useAuthStore((state) => state.accessToken);
@@ -34,7 +36,15 @@ const Add_Student = () => {
         }
       );
       console.log("Student Added Successfully!", res.data);
-      alert("Student Profile Registered Successfully!");
+      Swal.fire({
+        title: "Success!",
+        text: "Student Profile Registered Successfully!",
+        icon: "success",
+        confirmButtonText: "OK",
+        confirmButtonColor: "#0056D2", // --primary
+        background: "#F4F7FC",         // --secondary
+        color: "#1A253C",              // --quinary
+      });
 
       // Reset state form fields
       setFullName("");
@@ -52,7 +62,32 @@ const Add_Student = () => {
     } finally {
       setLoading(false);
     }
+
+
+
   };
+
+  useEffect(() => {
+    const fetchClasses = async () => {
+      try {
+        const res = await api.get("/classes/", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        setClasses(res.data);
+        console.log(res.data)
+      } catch (err) {
+        console.log(err);
+      }
+    };
+
+    if (token) {
+      fetchClasses();
+    }
+  }, [token]);
+
 
   return (
     <div className="p-6 bg-[var(--secondary)] text-[var(--quinary)] min-h-screen font-sans">
@@ -67,7 +102,7 @@ const Add_Student = () => {
       {/* Main Form Box Container */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 max-w-3xl">
         <form onSubmit={handleSubmit} className="space-y-6">
-          
+
           {/* Section: Personal Profiles */}
           <div>
             <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
@@ -130,14 +165,19 @@ const Add_Student = () => {
                 <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
                   Class / Grade Assigned
                 </label>
-                <input
-                  type="text"
+                <select
                   value={studentClass}
                   onChange={(e) => setStudentClass(e.target.value)}
-                  placeholder="Grade 10"
+
                   required
                   className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm"
-                />
+                >
+                  <option value="">Select Class</option>
+                  {Classes.map((cls) => (
+                    <option key={cls.id} value={cls.id} >{cls.display_name}</option>
+                  ))}
+
+                </select>
               </div>
             </div>
           </div>

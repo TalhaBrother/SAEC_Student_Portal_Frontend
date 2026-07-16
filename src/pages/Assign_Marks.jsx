@@ -1,6 +1,7 @@
 import useAuthStore from "../store/authStore";
 import { useEffect, useState } from "react";
 import api from "../api/axios";
+import Swal from "sweetalert2";
 
 const Assign_Marks = () => {
     const token = useAuthStore((state) => state.accessToken);
@@ -10,7 +11,7 @@ const Assign_Marks = () => {
     const [Subjects, setSubjects] = useState([]);
     const [Tests, setTests] = useState([]);
     const [Marks, setMarks] = useState([]);
-    
+
     const [SelectedClass, setSelectedClass] = useState("");
     const [SelectedTest, setSelectedTest] = useState("");
     const [globalTotalMarks, setGlobalTotalMarks] = useState("100");
@@ -20,7 +21,7 @@ const Assign_Marks = () => {
     const filteredStudents = Students.filter(
         (student) => (student.student_class?.id === Number(SelectedClass) || student.student_class === Number(SelectedClass))
     );
-    
+
     const filteredSubjects = Subjects.filter(
         (subject) => (subject.student_class?.id === Number(SelectedClass) || subject.student_class === Number(SelectedClass))
     );
@@ -74,7 +75,7 @@ const Assign_Marks = () => {
         if (SelectedTest && Marks.length > 0) {
             const initialScores = {};
             const testMarks = Marks.filter(m => Number(m.test?.id || m.test) === Number(SelectedTest));
-            
+
             testMarks.forEach(mark => {
                 const studentId = mark.student?.id || mark.student;
                 const subjectId = mark.subject?.id || mark.subject;
@@ -90,7 +91,7 @@ const Assign_Marks = () => {
 
     const handleClassChange = (e) => {
         setSelectedClass(e.target.value);
-        setSelectedTest(""); 
+        setSelectedTest("");
     };
 
     const handleScoreChange = (studentId, subjectId, val) => {
@@ -109,7 +110,7 @@ const Assign_Marks = () => {
         setLoading(true);
         try {
             const marksArray = Object.entries(scoresInput)
-                .filter(([_, score]) => score !== "") 
+                .filter(([_, score]) => score !== "")
                 .map(([key, score]) => {
                     const [studentId, subjectId] = key.split("_");
                     return {
@@ -128,9 +129,17 @@ const Assign_Marks = () => {
             await api.post("/marks/bulk/", bulkPayload, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            
-            alert("Bulk marks stored safely!");
-            
+
+            Swal.fire({
+                title: "Success!",
+                text: "Marks Submitted Successfully!",
+                icon: "success",
+                confirmButtonText: "OK",
+                confirmButtonColor: "#0056D2", // --primary
+                background: "#F4F7FC",         // --secondary
+                color: "#1A253C",              // --quinary
+            });
+
             const updatedMarks = await api.get("/marks/", { headers: { Authorization: `Bearer ${token}` } });
             setMarks(updatedMarks.data);
         } catch (err) {
@@ -174,7 +183,7 @@ const Assign_Marks = () => {
 
                 <div className="flex flex-col w-full sm:w-28">
                     <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">Total Marks</label>
-                    <input 
+                    <input
                         type="number"
                         min="1"
                         value={globalTotalMarks}
@@ -195,9 +204,9 @@ const Assign_Marks = () => {
                                     return (
                                         <div key={subject.id} className="flex items-center gap-2 bg-[var(--secondary)] px-3 py-1.5 rounded-xl border border-gray-200">
                                             <span className="text-xs uppercase text-gray-600 font-bold">{subject.name}:</span>
-                                            <input 
-                                                type="number" 
-                                                placeholder="Score" 
+                                            <input
+                                                type="number"
+                                                placeholder="Score"
                                                 min="0"
                                                 max={globalTotalMarks}
                                                 value={scoresInput[inputKey] || ""}
@@ -221,7 +230,7 @@ const Assign_Marks = () => {
 
             {SelectedClass && filteredStudents.length > 0 && (
                 <div className="mt-6 flex justify-end">
-                    <button 
+                    <button
                         type="button"
                         onClick={handleSaveMarks}
                         disabled={loading || !SelectedTest}

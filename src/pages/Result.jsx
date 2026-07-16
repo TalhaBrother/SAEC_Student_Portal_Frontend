@@ -60,7 +60,7 @@ const handleFetchReportCard = async (studentId, studentName) => {
     
     try {
         // CRITICAL: responseType: 'blob' tells Axios to handle raw file binaries
-        const res = await api.get(`reports/report-card/${studentId}/${SelectedTest}/`, {
+        const res = await api.get(`reports/report-card/${studentId}/`, {
             headers: { Authorization: `Bearer ${token}` },
             responseType: 'blob' 
         });

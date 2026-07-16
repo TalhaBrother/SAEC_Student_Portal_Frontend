@@ -43,9 +43,14 @@ const handleLogout=()=>{
           <HiChevronDown className="text-gray-400 text-sm" />
         </button>
       </div>
-      <div>
-        <button onClick={handleLogout} className="text-[var(--secondary)] bg-[var(--quinary)] text-1xl p-1.5 cursor-pointer" >Logout</button>
-      </div>
+    <div className="flex justify-end">
+  <button
+    onClick={handleLogout}
+    className="flex items-center gap-2 bg-[var(--quinary)] hover:bg-red-600 text-[var(--secondary)] font-semibold px-5 py-2.5 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 cursor-pointer active:scale-95"
+  >
+    Logout
+  </button>
+</div>
     </header>
   );
 }
