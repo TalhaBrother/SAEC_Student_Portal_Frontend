@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import api from '../api/axios';
 import { useNavigate } from 'react-router';
 import useAuthStore from '../store/authStore';
+import logo from "../assets/logo.jpeg"
 
 const Login = () => {
   const [username, setUsername] = useState('');
@@ -137,7 +138,7 @@ const Login = () => {
         {/* Branding Messaging */}
         <div className="w-full text-left z-10 mt-10 max-w-md mx-auto">
           <h1 className="text-4xl lg:text-5xl font-extrabold tracking-tight mb-3 text-white leading-tight">
-            Centralized Academic <br /> Management.
+            The Nedians <br /> Institute
           </h1>
           <p className="text-indigo-100 text-sm opacity-80 leading-relaxed">
             Monitor dynamic grading distributions, process real-time bulk attendance metrics, and orchestrate institutional operational pipelines cleanly.
@@ -147,7 +148,8 @@ const Login = () => {
         {/* Dynamic Abstract Framed Graphic */}
         <div className="w-full max-w-md aspect-square flex items-center justify-center z-10 relative mb-10 mx-auto">
           <div className="w-full h-full border border-white/10 rounded-2xl flex flex-col items-center justify-center p-6 bg-white/5 backdrop-blur-md shadow-2xl">
-            <div className="flex gap-2 mb-4 w-full justify-start items-center border-b border-white/10 pb-3">
+                  <img src={logo}></img>
+            {/* <div className="flex gap-2 mb-4 w-full justify-start items-center border-b border-white/10 pb-3">
               <div className="w-3 h-3 rounded-full bg-red-400"></div>
               <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
               <div className="w-3 h-3 rounded-full bg-green-400"></div>
@@ -156,7 +158,7 @@ const Login = () => {
             <span className="text-indigo-200 text-xs font-mono text-center leading-loose">
               [ Optimized Platform Visualization Interface ] <br />
               <span className="text-white/30 text-[10px]">Real-Time Sync Activated</span>
-            </span>
+            </span> */}
           </div>
         </div>
       </div>
