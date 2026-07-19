@@ -10,6 +10,7 @@ const Attendance = () => {
     const [Classes, setClasses] = useState([]);
     const [SelectedClass, setSelectedClass] = useState(""); // Fixed from [] to ""
     const [AttendanceData, setAttendanceData] = useState({});
+    const [AttendanceDate, setAttendanceDate] = useState(new Date().toISOString().split("T")[0]); // Defaults to today
     const [loading, setLoading] = useState(false);
 
     // Safe filtering checking nested object structures
@@ -32,6 +33,11 @@ const Attendance = () => {
             return;
         }
 
+        if (!AttendanceDate) {
+            alert("Please select a date before saving attendance!");
+            return;
+        }
+
         const validRecords = Object.entries(AttendanceData).map(([student_id, status]) => ({
             student_id: Number(student_id),
             status,
@@ -46,7 +52,7 @@ const Attendance = () => {
         try {
             const payload = {
                 class_id: Number(SelectedClass),
-                date: new Date().toISOString().split("T")[0],
+                date: AttendanceDate,
                 records: validRecords,
             };
 
@@ -129,6 +135,16 @@ const Attendance = () => {
                         ))}
                     </select>
                 </div>
+
+                <div className="flex flex-col min-w-[200px] w-full sm:w-auto">
+                    <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">Date</label>
+                    <input
+                        type="date"
+                        value={AttendanceDate}
+                        onChange={(e) => setAttendanceDate(e.target.value)}
+                        className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm cursor-pointer"
+                    />
+                </div>
             </div>
 
             {/* Student Grid Section */}
@@ -145,6 +161,7 @@ const Attendance = () => {
                                 <div className="font-semibold text-base text-[var(--quinary)] min-w-[220px]">
                                     {student.full_name}
                                 </div>
+
 
                                 {/* Status Selection Buttons Container */}
                                 <div className="flex items-center gap-3">

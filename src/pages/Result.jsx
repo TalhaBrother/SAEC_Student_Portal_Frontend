@@ -9,7 +9,7 @@ const Result = () => {
     const [Students, setStudents] = useState([]);
     const [Classes, setClasses] = useState([]);
     const [Tests, setTests] = useState([]);
-    
+
     // Filtering & Selections
     const [SelectedClass, setSelectedClass] = useState("");
     const [SelectedTest, setSelectedTest] = useState("");
@@ -42,6 +42,8 @@ const Result = () => {
                 setStudents(studRes.data);
                 setClasses(clsRes.data);
                 setTests(testRes.data);
+
+              
             } catch (err) {
                 console.error("Failed to load initial directory datasets:", err);
             }
@@ -49,59 +51,98 @@ const Result = () => {
         if (token) fetchInitialData();
     }, [token]);
 
-   // FETCH & VIEW: Individual Test Report Card (Generates and opens PDF)
-const handleFetchReportCard = async (studentId, studentName) => {
-    if (!SelectedTest) {
-        alert("Please select a target evaluation test framework first!");
-        return;
-    }
-    setLoadingReport(true);
-    setSelectedStudentName(studentName);
-    
-    try {
-        // CRITICAL: responseType: 'blob' tells Axios to handle raw file binaries
-        const res = await api.get(`reports/report-card/${studentId}/`, {
-            headers: { Authorization: `Bearer ${token}` },
-            responseType: 'blob' 
-        });
+    // FETCH & VIEW: Individual Test Report Card (Generates and opens PDF)
+    const handleFetchReportCard = async (studentId, studentName) => {
+        if (!SelectedTest) {
+            alert("Please select a target evaluation test framework first!");
+            return;
+        }
+        setLoadingReport(true);
+        setSelectedStudentName(studentName);
 
-        // 1. Create a local temporary URL for the binary PDF data
-        const file = new Blob([res.data], { type: 'application/pdf' });
-        const fileURL = URL.createObjectURL(file);
+        try {
+            // CRITICAL: responseType: 'blob' tells Axios to handle raw file binaries
+            const res = await api.get(`reports/report-card/${studentId}/`, {
+                headers: { Authorization: `Bearer ${token}` },
+                responseType: 'blob'
+            });
 
-        // 2. Open the PDF in a new browser tab for professional viewing/printing
-        window.open(fileURL, '_blank');
+            // 1. Create a local temporary URL for the binary PDF data
+            const file = new Blob([res.data], { type: 'application/pdf' });
+            const fileURL = URL.createObjectURL(file);
 
-    } catch (err) {
-        console.error("PDF Compilation Error:", err);
-        alert("Could not retrieve Report Card. Make sure marks are assigned for this test.");
-    } finally {
-        setLoadingReport(false);
-    }
-};
+            // 2. Open the PDF in a new browser tab for professional viewing/printing
+            window.open(fileURL, '_blank');
 
-// FETCH & VIEW: Full History Report (Assuming this might also be a PDF layout)
-const handleFetchHistory = async (studentId, studentName) => {
-    setLoadingReport(true);
-    setSelectedStudentName(studentName);
-    
-    try {
-        const res = await api.get(`reports/student/${studentId}/`, {
-            headers: { Authorization: `Bearer ${token}` },
-            responseType: 'blob' // Keeps backend file consistency
-        });
+        } catch (err) {
+            console.error("PDF Compilation Error:", err);
+            alert("Could not retrieve Report Card. Make sure marks are assigned for this test.");
+        } finally {
+            setLoadingReport(false);
+        }
+    };
 
-        const file = new Blob([res.data], { type: 'application/pdf' });
-        const fileURL = URL.createObjectURL(file);
-        window.open(fileURL, '_blank');
+    // FETCH & VIEW: Full History Report (Assuming this might also be a PDF layout)
+    const handleFetchHistory = async (studentId, studentName) => {
+        setLoadingReport(true);
+        setSelectedStudentName(studentName);
 
-    } catch (err) {
-        console.error("History Stream Error:", err);
-        alert("Failed to track down timeline history profiles for this student entry.");
-    } finally {
-        setLoadingReport(false);
-    }
-};
+        try {
+            const res = await api.get(`reports/student/${studentId}/`, {
+                headers: { Authorization: `Bearer ${token}` },
+                responseType: 'blob' // Keeps backend file consistency
+            });
+
+            const file = new Blob([res.data], { type: 'application/pdf' });
+            const fileURL = URL.createObjectURL(file);
+            window.open(fileURL, '_blank');
+
+        } catch (err) {
+            console.error("History Stream Error:", err);
+            alert("Failed to track down timeline history profiles for this student entry.");
+        } finally {
+            setLoadingReport(false);
+        }
+    };
+
+    const handleSendWhatsAppText = async (studentId) => {
+        if (!SelectedTest) {
+            alert("Please select a target evaluation test framework first!");
+            return;
+        }
+
+        try {
+            // Fetch the compiled text message from Django backend
+            const res = await api.get(`reports/whatsapp-text/${studentId}/${SelectedTest}/`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            const { phone, message } = res.data;
+
+            if (!phone) {
+                alert("This student profile doesn't have a phone number attached.");
+                return;
+            }
+
+            // Clean any non-digit characters from the phone number string
+            let cleanPhone = phone.replace(/\D/g, '');
+
+            // If the number starts with standard local zero (e.g. 0300...), swap it with the country code (e.g. 92)
+            if (cleanPhone.startsWith('0')) {
+                cleanPhone = '92' + cleanPhone.substring(1);
+            }
+
+            // Formulate the redirect string link with safety encoding
+            const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+
+            // Open the native app window or web portal seamlessly
+            window.open(whatsappUrl, '_blank');
+
+        } catch (err) {
+            console.error("WhatsApp Dispatch Failure:", err);
+            alert(err.response?.data?.error || "Failed to generate text template layout.");
+        }
+    };
 
     return (
         <div className="p-6 bg-[var(--secondary)] text-[var(--quinary)] min-h-screen font-sans">
@@ -139,15 +180,15 @@ const handleFetchHistory = async (studentId, studentName) => {
 
             {/* Split Screen Panel Grid */}
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
-                
+
                 {/* Roster Selection Block */}
                 <div className="xl:col-span-1 bg-white rounded-2xl border border-gray-200 shadow-sm p-5 space-y-4">
                     <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-2">Class Registry List</h3>
-                    
+
                     {SelectedClass && filteredStudents.length > 0 ? (
                         filteredStudents.map((student) => (
                             <div key={student.id} className="border-b border-gray-100 pb-4 last:border-0 last:pb-0 space-y-2">
-                                <div className="font-semibold text-[var(--quinary)] text-sm">{student.full_name}</div>
+                                <div className="font-semibold text-[var(--quinary)] text-sm">{student.full_name}<span>{student.phone}</span></div>
                                 <div className="flex gap-2">
                                     <button
                                         onClick={() => handleFetchReportCard(student.id, student.full_name)}
@@ -162,6 +203,14 @@ const handleFetchHistory = async (studentId, studentName) => {
                                     >
                                         Full History
                                     </button>
+                                    <button
+                                        onClick={() => handleSendWhatsAppText(student.id)}
+                                        disabled={!SelectedTest}
+                                        className="text-xs bg-emerald-50 hover:bg-emerald-600 hover:text-white text-emerald-600 font-bold py-2 px-3 rounded-xl transition-all cursor-pointer border border-emerald-200 disabled:opacity-40 disabled:hover:bg-emerald-50 disabled:hover:text-emerald-600"
+                                    >
+                                        💬 WhatsApp Text
+                                    </button>
+
                                 </div>
                             </div>
                         ))
@@ -172,7 +221,7 @@ const handleFetchHistory = async (studentId, studentName) => {
 
                 {/* Display Analytics Terminal Window */}
                 <div className="xl:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-sm p-6 min-h-[400px] flex flex-col justify-between">
-                    
+
                     {loadingReport ? (
                         <div className="flex flex-col items-center justify-center my-auto space-y-2 py-20">
                             <div className="w-8 h-8 border-4 border-t-[var(--primary)] border-gray-200 rounded-full animate-spin"></div>

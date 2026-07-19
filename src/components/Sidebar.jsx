@@ -25,7 +25,7 @@ export default function Sidebar() {
   const NAV_ITEMS = [
     { label: "Dashboard", icon: HiOutlineSquares2X2 ,roles:['student','admin'], path: role === "admin"? '/admin':"/" },
     { label: "Assign Marks", icon: HiOutlinePencil ,roles:['student','admin'], path:'/admin/assign-marks' },
-    { label: "Courses", icon: HiOutlineBookOpen ,roles:['student','admin']},
+    { label: "Add Subject", icon: HiOutlineBookOpen ,roles:['admin'], path: '/admin/add-subject'},
     { label: "Attendance", icon: HiOutlineCalendarDays ,roles:['admin'], path:'/admin/attendance'},
     { label: "Create Test", icon: HiOutlineDocumentText ,roles:['student','admin'], path:"/admin/create-test"},
     { label: "Add Student", icon: HiOutlineUsers,roles:['admin'], path:'/admin/add-student' },
