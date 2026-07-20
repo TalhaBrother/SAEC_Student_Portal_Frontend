@@ -2,17 +2,16 @@ import React, { useState } from 'react';
 import api from '../api/axios';
 import { useNavigate } from 'react-router';
 import useAuthStore from '../store/authStore';
-import logo from "../assets/logo.jpeg"
+import logo from "../assets/logo.webp";
 
 const Login = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false); // Added toggle visibility state
+  const [showPassword, setShowPassword] = useState(false);
 
   const navigate = useNavigate();
   const login = useAuthStore((state) => state.login);
-  const user = useAuthStore((state) => state.user);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -36,12 +35,27 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col md:flex-row bg-[var(--secondary)] text-[var(--quinary)] font-sans">
+    <div className="min-h-screen w-full flex flex-col md:flex-row bg-[var(--secondary)] text-[var(--quinary)] font-sans antialiased">
       
       {/* Left Side: Clean Professional SaaS Form Panel */}
-      <div className="w-full md:w-1/2 flex flex-col justify-center px-6 sm:px-16 lg:px-24 py-12 bg-[var(--secondary)]">
-        <div className="max-w-md w-full mx-auto">
-          
+      <div className="w-full md:w-1/2 flex flex-col justify-between px-6 sm:px-16 lg:px-24 py-8 md:py-12 bg-[var(--secondary)]">
+        
+        {/* Responsive Top Branding Header */}
+        <div className="flex items-center gap-3 max-w-md w-full mx-auto mb-10 md:mb-0">
+          <div className="h-10 w-16 overflow-hidden rounded-lg shadow-sm border border-gray-100 flex items-center justify-center">
+            <img 
+              src={logo} 
+              alt="The Nedians Institute" 
+              className="h-full w-full object-cover scale-110"
+            />
+          </div>
+          <span className="text-lg font-bold tracking-tight text-[var(--quinary)] uppercase">
+            The Nedians Institute
+          </span>
+        </div>
+
+        {/* Core Interactive Login Box */}
+        <div className="max-w-md w-full mx-auto my-auto w-full">
           {/* Header Description */}
           <div className="mb-8">
             <h2 className="text-3xl font-bold tracking-tight mb-2 text-[var(--quinary)]">
@@ -117,16 +131,16 @@ const Login = () => {
               {loading ? "Verifying Credentials..." : "Sign In to Portal"}
             </button>
           </form>
-
-          {/* Footer Navigation Redirection */}
-          <div className="mt-8 pt-6 border-t border-gray-200 text-center flex items-center justify-center gap-2">
-            <span className="text-xs text-gray-500">Don't have an institutional account?</span>
-            <button className="bg-white hover:bg-gray-50 text-[var(--quinary)] font-medium text-xs px-4 py-2 rounded-xl border border-gray-300 transition-all cursor-pointer shadow-sm">
-              Sign up
-            </button>
-          </div>
-
         </div>
+
+        {/* Footer Navigation Redirection */}
+        <div className="mt-8 pt-4 border-t border-gray-200 text-center flex items-center justify-center gap-2 max-w-md w-full mx-auto">
+          <span className="text-xs text-gray-500">Don't have an institutional account?</span>
+          <button className="bg-white hover:bg-gray-50 text-[var(--quinary)] font-medium text-xs px-4 py-2 rounded-xl border border-gray-300 transition-all cursor-pointer shadow-sm">
+            Sign up
+          </button>
+        </div>
+
       </div>
 
       {/* Right Side: High-End Marketing Banner Aspect */}
@@ -145,20 +159,24 @@ const Login = () => {
           </p>
         </div>
 
-        {/* Dynamic Abstract Framed Graphic */}
-        <div className="w-full max-w-md aspect-square flex items-center justify-center z-10 relative mb-10 mx-auto">
-          <div className="w-full h-full border border-white/10 rounded-2xl flex flex-col items-center justify-center p-6 bg-white/5 backdrop-blur-md shadow-2xl">
-                  <img src={logo}></img>
-            {/* <div className="flex gap-2 mb-4 w-full justify-start items-center border-b border-white/10 pb-3">
-              <div className="w-3 h-3 rounded-full bg-red-400"></div>
-              <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
-              <div className="w-3 h-3 rounded-full bg-green-400"></div>
-              <div className="text-xs text-white/40 ml-2 font-mono">system_analytics.sh</div>
+        {/* Dynamic Abstract Framed Graphic - Now contains the logo cleanly */}
+        <div className="w-full max-w-md aspect-video flex items-center justify-center z-10 relative mb-10 mx-auto">
+          <div className="w-full h-full border border-white/15 rounded-2xl flex flex-col items-center justify-center p-6 bg-white/10 backdrop-blur-xl shadow-2xl overflow-hidden group">
+            <div className="w-3/4 max-w-[240px] aspect-[1.6] rounded-xl overflow-hidden shadow-lg border border-white/10 transition-transform duration-500 group-hover:scale-105  flex items-center justify-center">
+              <img 
+                src={logo} 
+                alt="Academy Emblem" 
+                className="w-full h-full object-cover scale-110" 
+              />
             </div>
-            <span className="text-indigo-200 text-xs font-mono text-center leading-loose">
-              [ Optimized Platform Visualization Interface ] <br />
-              <span className="text-white/30 text-[10px]">Real-Time Sync Activated</span>
-            </span> */}
+            <div className="mt-4 text-center">
+              <span className="text-white font-medium text-xs tracking-wider uppercase block">
+                Official Institutional Portal
+              </span>
+              <span className="text-indigo-200/50 text-[10px] block mt-0.5">
+                Secured Environment • Live Sync
+              </span>
+            </div>
           </div>
         </div>
       </div>
