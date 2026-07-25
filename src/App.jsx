@@ -15,6 +15,7 @@ import Assign_Marks from './pages/Assign_Marks'
 import Result from './pages/Result'
 import Create_Test from './pages/Create_Test'
 import Add_Subject from './pages/Add_Subject'
+import Create_Class from "./pages/Create_Class"
 import { Routes, Route } from 'react-router'
 
 function App() {
@@ -33,6 +34,7 @@ function App() {
             <Route path='/admin/create-test' element={<ProtectedRoute><ProtectedAdmin><Create_Test/></ProtectedAdmin></ProtectedRoute>}/>
              <Route path='/admin/result' element={<ProtectedRoute><ProtectedAdmin><Result/></ProtectedAdmin></ProtectedRoute>}/>
              <Route path='/admin/add-subject' element={<ProtectedRoute><ProtectedAdmin><Add_Subject/></ProtectedAdmin></ProtectedRoute>}/>
+              <Route path='/admin/create-class' element={<ProtectedRoute><ProtectedAdmin><Create_Class/></ProtectedAdmin></ProtectedRoute>}/>
 
 
           </Route>

@@ -12,13 +12,15 @@ import {
   HiOutlineDocumentText,
   HiOutlinePencil,
   HiOutlineBookOpen,
+  HiOutlineCloudArrowUp,
   
 } from "react-icons/hi2";
 
 
 
-export default function Sidebar() {
+export default function Sidebar({closeMobileMenu}) {
   const [active, setActive] = useState("Dashboard");
+  
   const user=useAuthStore((state)=>state.user)
   const role=user?.role
   
@@ -28,9 +30,17 @@ export default function Sidebar() {
     { label: "Add Subject", icon: HiOutlineBookOpen ,roles:['admin'], path: '/admin/add-subject'},
     { label: "Attendance", icon: HiOutlineCalendarDays ,roles:['admin'], path:'/admin/attendance'},
     { label: "Create Test", icon: HiOutlineDocumentText ,roles:['student','admin'], path:"/admin/create-test"},
+    { label: "Create Class", icon: HiOutlineCloudArrowUp ,roles:['admin'], path:'/admin/create-class' },
     { label: "Add Student", icon: HiOutlineUsers,roles:['admin'], path:'/admin/add-student' },
     { label: "Result", icon: HiOutlineAcademicCap ,roles:['student','admin'], path:'/admin/result'},
   ];
+
+  const handleNavClick = (label) => {
+    // setActive(label);
+   if (closeMobileMenu) {
+      closeMobileMenu();
+  }
+}
   
   return (
     <aside className="w-full h-full bg-[var(--quinary)] text-white flex flex-col">
@@ -49,7 +59,7 @@ export default function Sidebar() {
         <NavLink
           key={label}
           to={path}
-          onClick={() => setActive(label)}
+          onClick={() => handleNavClick(label)}
           className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
             isActive
               ? "bg-[var(--primary)] text-white font-medium"

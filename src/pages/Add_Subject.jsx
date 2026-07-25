@@ -58,80 +58,74 @@ const Add_Subject = () => {
     };
 
     return (
-        <div className="min-h-screen w-full flex flex-col md:flex-row-reverse bg-[var(--secondary)] text-[var(--quinary)] font-sans">
+        <div className="p-6 bg-[var(--secondary)] text-[var(--quinary)] min-h-screen font-sans">
+            <div className="text-3xl font-bold tracking-tight mb-2 text-[var(--quinary)]">Add New Subject</div>
+            <p className="text-gray-500 text-sm mb-6">Assign a subject to a class section below.</p>
 
-            {/* Left Side: Form Side */}
-            <div className="w-full  flex flex-col justify-center px-6 sm:px-16 lg:px-24 py-12">
-                <div className="max-w-md w-full mx-auto">
+            {/* Status Message Display */}
+            {message.text && (
+                <div
+                    className={`p-3 rounded-xl text-sm mb-6 text-center border max-w-xl ${
+                        message.type === "success"
+                            ? "bg-green-50 text-green-700 border-green-200"
+                            : "bg-red-50 text-red-700 border-red-200"
+                    }`}
+                >
+                    {message.text}
+                </div>
+            )}
 
-                    {/* Header */}
-                    <div className="mb-8">
-                        <h2 className="text-3xl font-semibold tracking-wide mb-2 text-[var(--quinary)]">Add New Subject</h2>
-                        <p className="text-gray-500 text-sm">Assign a subject to a class</p>
+            {/* Form Card Container */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 max-w-xl">
+                <form className="space-y-6" onSubmit={handleSubmit}>
+
+                    {/* Subject Name Input */}
+                    <div className="flex flex-col w-full">
+                        <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">
+                            Subject Name
+                        </label>
+                        <input
+                            type="text"
+                            value={subjectName}
+                            onChange={(e) => setSubjectName(e.target.value)}
+                            placeholder="e.g., Mathematics"
+                            required
+                            className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm placeholder-gray-400"
+                        />
                     </div>
 
-                    {/* Status Message Display */}
-                    {message.text && (
-                        <div className={`p-3 rounded-xl text-sm mb-4 text-center border ${
-                            message.type === "success"
-                                ? "bg-green-50 text-green-700 border-green-200"
-                                : "bg-red-50 text-red-700 border-red-200"
-                        }`}>
-                            {message.text}
-                        </div>
-                    )}
+                    {/* Class Selector Dropdown */}
+                    <div className="flex flex-col w-full">
+                        <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">
+                            Assign to Class
+                        </label>
+                        <select
+                            value={selectedClass}
+                            onChange={(e) => setSelectedClass(e.target.value)}
+                            required
+                            className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm cursor-pointer"
+                        >
+                            <option value="">Select Class</option>
+                            {classes.map((cls) => (
+                                <option key={cls.id} value={cls.id}>
+                                    {cls.display_name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
 
-                    {/* Form matching your specific line styling layout */}
-                    <form className="space-y-6" onSubmit={handleSubmit}>
-
-                        {/* Subject Name Input */}
-                        <div className="relative border-b border-gray-300 focus-within:border-[var(--primary)] transition-colors duration-300 py-1">
-                            <label className="block text-xs uppercase tracking-wider text-gray-500 mb-1 font-semibold">
-                                Subject Name
-                            </label>
-                            <input
-                                type="text"
-                                value={subjectName}
-                                onChange={(e) => setSubjectName(e.target.value)}
-                                placeholder="e.g., Mathematics"
-                                required
-                                className="w-full bg-transparent border-none outline-none text-[var(--quinary)] placeholder-gray-400 text-sm py-1 focus:ring-0"
-                            />
-                        </div>
-
-                        {/* Class Selector Dropdown */}
-                        <div className="relative border-b border-gray-300 focus-within:border-[var(--primary)] transition-colors duration-300 py-1">
-                            <label className="block text-xs uppercase tracking-wider text-gray-500 mb-1 font-semibold">
-                                Assign to Class
-                            </label>
-                            <select
-                                value={selectedClass}
-                                onChange={(e) => setSelectedClass(e.target.value)}
-                                required
-                                className="w-full bg-transparent border-none outline-none text-[var(--quinary)] text-sm py-1 focus:ring-0 cursor-pointer"
-                            >
-                                <option value="" className="text-gray-400">Select Class</option>
-                                {classes.map((cls) => (
-                                    <option key={cls.id} value={cls.id} className="text-[var(--quinary)]">
-                                        {cls.name}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        {/* Submit Button */}
+                    {/* Submit Button */}
+                    <div className="flex justify-end">
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full bg-[var(--primary)] hover:bg-[var(--quinary)] disabled:opacity-50 text-white font-medium py-3 px-4 rounded-xl transition-all duration-300 shadow-lg shadow-blue-900/10 transform active:scale-[0.98] mt-4"
+                            className="bg-[var(--primary)] hover:bg-[var(--quinary)] disabled:opacity-50 text-white font-medium py-3 px-6 rounded-xl transition-all duration-300 shadow-md transform active:scale-[0.98]"
                         >
                             {loading ? "Adding..." : "Add Subject"}
                         </button>
-                    </form>
-
-                </div>
+                    </div>
+                </form>
             </div>
-
         </div>
     );
 };

@@ -160,7 +160,7 @@ const Result = () => {
                         className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] text-sm cursor-pointer font-medium"
                     >
                         <option value="">Select Class</option>
-                        {Classes.map((cls) => <option key={cls.id} value={cls.id}>{cls.name}</option>)}
+                        {Classes.map((cls) => <option key={cls.id} value={cls.id}>{cls.display_name}</option>)}
                     </select>
                 </div>
 
