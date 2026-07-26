@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import api from '../api/axios';
 import { useNavigate } from 'react-router';
 import useAuthStore from '../store/authStore';
-import logo from "../assets/logo.jpeg";
+import logo from "../assets/logo.webp";
 
 const Login = () => {
   const [username, setUsername] = useState('');
@@ -45,12 +45,12 @@ const Login = () => {
           <div className="h-10 w-16 overflow-hidden rounded-lg shadow-sm border border-gray-100 flex items-center justify-center">
             <img 
               src={logo} 
-              alt="SAEC Coaching" 
+              alt="The Nedians Institute" 
               className="h-full w-full object-cover scale-110"
             />
           </div>
           <span className="text-lg font-bold tracking-tight text-[var(--quinary)] uppercase">
-            SAEC Coaching Center
+            The Nedians Institute
           </span>
         </div>
 
@@ -152,7 +152,7 @@ const Login = () => {
         {/* Branding Messaging */}
         <div className="w-full text-left z-10 mt-10 max-w-md mx-auto">
           <h1 className="text-4xl lg:text-5xl font-extrabold tracking-tight mb-3 text-white leading-tight">
-           SAEC Coaching <br /> Center
+            The Nedians <br /> Institute
           </h1>
           <p className="text-indigo-100 text-sm opacity-80 leading-relaxed">
             Monitor dynamic grading distributions, process real-time bulk attendance metrics, and orchestrate institutional operational pipelines cleanly.
