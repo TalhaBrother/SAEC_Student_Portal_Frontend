@@ -5,6 +5,7 @@ import Swal from "sweetalert2";
 
 const Add_Student = () => {
   const [fullName, setFullName] = useState("");
+  const [fatherName, setfatherName]= useState("");
   const [studentId, setStudentId] = useState("");
   const [studentClass, setStudentClass] = useState("");
   const [phone, setPhone] = useState("");
@@ -14,23 +15,37 @@ const Add_Student = () => {
   const [Classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(false);
 
+  // Group-related state
+  const [groups, setGroups] = useState([]);
+  const [groupId, setGroupId] = useState("");
+  const [groupsLoading, setGroupsLoading] = useState(false);
+
   const token = useAuthStore((state) => state.accessToken);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
+      const payload = {
+        full_name: fullName,
+        father_name: fatherName,
+        student_id: studentId,
+        student_class: studentClass,
+        phone: phone,
+        username: username,
+        email: email,
+        password: password
+      };
+
+      // Only include `group` when the selected class actually has groups.
+      // Sending it for a groupless class is rejected by the backend.
+      if (groups.length > 0) {
+        payload.group = groupId;
+      }
+
       const res = await api.post(
         "/students/",
-        {
-          full_name: fullName,
-          student_id: studentId,
-          student_class: studentClass,
-          phone: phone,
-          username: username,
-          email: email,
-          password: password
-        },
+        payload,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -48,12 +63,15 @@ const Add_Student = () => {
 
       // Reset state form fields
       setFullName("");
+      setfatherName("")
       setStudentId("");
       setStudentClass("");
       setPhone("");
       setUsername("");
       setEmail("");
       setPassword("");
+      setGroupId("");
+      setGroups([]);
     } catch (error) {
       console.error("Add Student Error!");
       console.log("Status:", error.response?.status);
@@ -88,6 +106,34 @@ const Add_Student = () => {
     }
   }, [token]);
 
+  // Fetch groups whenever the selected class changes.
+  // If the class has no groups, hide the field and clear any selection.
+  useEffect(() => {
+    const fetchGroups = async () => {
+      setGroupsLoading(true);
+      try {
+        const res = await api.get(`/groups/?class_id=${studentClass}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setGroups(res.data);
+      } catch (err) {
+        console.log(err);
+        setGroups([]);
+      } finally {
+        setGroupsLoading(false);
+      }
+    };
+
+    // Reset group selection whenever the class changes
+    setGroupId("");
+
+    if (token && studentClass) {
+      fetchGroups();
+    } else {
+      setGroups([]);
+    }
+  }, [studentClass, token]);
+
 
   return (
     <div className="p-6 bg-[var(--secondary)] text-[var(--quinary)] min-h-screen font-sans">
@@ -118,6 +164,20 @@ const Add_Student = () => {
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder="Shayan Khan"
+                  required
+                  className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm"
+                />
+              </div>
+
+               <div className="flex flex-col">
+                <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
+                  Father Name
+                </label>
+                <input
+                  type="text"
+                  value={fatherName}
+                  onChange={(e) => setfatherName(e.target.value)}
+                  placeholder="Shafat Khan"
                   required
                   className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm"
                 />
@@ -179,6 +239,35 @@ const Add_Student = () => {
 
                 </select>
               </div>
+
+              {/* Group is conditional: only shown when the selected class has groups defined */}
+              {studentClass && groupsLoading && (
+                <div className="flex flex-col">
+                  <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
+                    Group
+                  </label>
+                  <div className="text-sm text-gray-400 p-3">Loading groups...</div>
+                </div>
+              )}
+
+              {studentClass && !groupsLoading && groups.length > 0 && (
+                <div className="flex flex-col">
+                  <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
+                    Group
+                  </label>
+                  <select
+                    value={groupId}
+                    onChange={(e) => setGroupId(e.target.value)}
+                    required
+                    className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm"
+                  >
+                    <option value="">Select Group</option>
+                    {groups.map((grp) => (
+                      <option key={grp.id} value={grp.id}>{grp.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
           </div>
 

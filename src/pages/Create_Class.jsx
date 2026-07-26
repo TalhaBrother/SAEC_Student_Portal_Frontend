@@ -15,6 +15,7 @@ const Create_Class = () => {
     // Form States
     const [className, setClassName] = useState("");
     const [board, setBoard] = useState("");
+    const [section, setSection] = useState("");
 
     // Groups are optional — a class can be created with zero groups (e.g. O-Levels)
     const [groups, setGroups] = useState([""]);
@@ -45,7 +46,7 @@ const Create_Class = () => {
             // Step 1: create the class
             const classRes = await api.post(
                 "/classes/",
-                { name: className, board },
+                { name: className, board, section },
                 { headers }
             );
 
@@ -67,11 +68,12 @@ const Create_Class = () => {
 
             setClassName("");
             setBoard("");
+            setSection("");
             setGroups([""]);
         } catch (error) {
             console.error("Error creating class:", error);
 
-            // Duplicate name + board combo returns 400 with non_field_errors, not a field-specific error
+            // Duplicate name + board + section combo returns 400 with non_field_errors, not a field-specific error
             const nonFieldError = error.response?.data?.non_field_errors?.[0];
 
             setMessage({
@@ -138,6 +140,23 @@ const Create_Class = () => {
                                 </option>
                             ))}
                         </select>
+                    </div>
+
+                    {/* Section Input */}
+                    <div className="flex flex-col w-full">
+                        <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">
+                            Section (Optional)
+                        </label>
+                        <input
+                            type="text"
+                            value={section}
+                            onChange={(e) => setSection(e.target.value)}
+                            placeholder="e.g., A"
+                            className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm placeholder-gray-400"
+                        />
+                        <p className="text-gray-400 text-xs mt-1">
+                            Leave blank for classes that don't use sections.
+                        </p>
                     </div>
 
                     {/* Groups / Specializations */}

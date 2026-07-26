@@ -13,6 +13,7 @@ import {
   HiOutlinePencil,
   HiOutlineBookOpen,
   HiOutlineCloudArrowUp,
+  HiOutlineNewspaper,
   
 } from "react-icons/hi2";
 
@@ -32,6 +33,8 @@ export default function Sidebar({closeMobileMenu}) {
     { label: "Create Test", icon: HiOutlineDocumentText ,roles:['student','admin'], path:"/admin/create-test"},
     { label: "Create Class", icon: HiOutlineCloudArrowUp ,roles:['admin'], path:'/admin/create-class' },
     { label: "Add Student", icon: HiOutlineUsers,roles:['admin'], path:'/admin/add-student' },
+    { label: "Fee Structure", icon: HiOutlineBanknotes,roles:['admin'], path:'/admin/fee-structure' },
+    { label: "Generate Vouchers", icon: HiOutlineNewspaper,roles:['admin'], path:'/admin/generate-vouchers' },
     { label: "Result", icon: HiOutlineAcademicCap ,roles:['student','admin'], path:'/admin/result'},
   ];
 
