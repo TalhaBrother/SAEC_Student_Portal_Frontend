@@ -1,3 +1,5 @@
+// SAEC
+
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import useAuthStore from '../store/authStore';
@@ -14,6 +16,11 @@ const Add_Subject = () => {
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState({ type: "", text: "" });
 
+    // Group-related state
+    const [groups, setGroups] = useState([]);
+    const [groupId, setGroupId] = useState("");
+    const [groupsLoading, setGroupsLoading] = useState(false);
+
     // Fetch classes list for dropdown
     useEffect(() => {
         const fetchClasses = async () => {
@@ -29,6 +36,33 @@ const Add_Subject = () => {
         if (token) fetchClasses();
     }, [token]);
 
+    // Fetch groups whenever the selected class changes.
+    useEffect(() => {
+        const fetchGroups = async () => {
+            setGroupsLoading(true);
+            try {
+                const res = await api.get(`/groups/?class_id=${selectedClass}`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                setGroups(res.data);
+            } catch (err) {
+                console.log(err);
+                setGroups([]);
+            } finally {
+                setGroupsLoading(false);
+            }
+        };
+
+        // Reset group selection whenever the class changes
+        setGroupId("");
+
+        if (token && selectedClass) {
+            fetchGroups();
+        } else {
+            setGroups([]);
+        }
+    }, [selectedClass, token]);
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
@@ -38,6 +72,11 @@ const Add_Subject = () => {
             name: subjectName,
             student_class: Number(selectedClass),
         };
+
+        // Only include `group` when the selected class actually has groups.
+        if (groups.length > 0 && groupId) {
+            subjectPayload.group = groupId;
+        }
 
         try {
             const res = await api.post("/subjects/", subjectPayload, {
@@ -49,6 +88,8 @@ const Add_Subject = () => {
 
             setSubjectName("");
             setSelectedClass("");
+            setGroupId("");
+            setGroups([]);
         } catch (error) {
             console.error("Error creating subject:", error);
             setMessage({ type: "error", text: "Failed to add subject. Please try again." });
@@ -113,6 +154,35 @@ const Add_Subject = () => {
                             ))}
                         </select>
                     </div>
+
+                    {/* Group is conditional: only shown when the selected class has groups defined */}
+                    {selectedClass && groupsLoading && (
+                        <div className="flex flex-col w-full">
+                            <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">
+                                Group
+                            </label>
+                            <div className="text-sm text-gray-400 p-3">Loading groups...</div>
+                        </div>
+                    )}
+
+                    {selectedClass && !groupsLoading && groups.length > 0 && (
+                        <div className="flex flex-col w-full">
+                            <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">
+                                Group
+                            </label>
+                            <select
+                                value={groupId}
+                                onChange={(e) => setGroupId(e.target.value)}
+                                required
+                                className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm cursor-pointer"
+                            >
+                                <option value="">Select Group</option>
+                                {groups.map((grp) => (
+                                    <option key={grp.id} value={grp.id}>{grp.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
 
                     {/* Submit Button */}
                     <div className="flex justify-end">

@@ -18,9 +18,25 @@ const Assign_Marks = () => {
     const [scoresInput, setScoresInput] = useState({});
     const [loading, setLoading] = useState(false);
 
-    const filteredStudents = Students.filter(
-        (student) => (student.student_class?.id === Number(SelectedClass) || student.student_class === Number(SelectedClass))
-    );
+    // Group-related state
+    const [groups, setGroups] = useState([]);
+    const [selectedGroup, setSelectedGroup] = useState("");
+    const [groupsLoading, setGroupsLoading] = useState(false);
+
+    // Filter students by selected class AND group (if specified)
+    const filteredStudents = Students.filter((student) => {
+        const matchesClass =
+            student.student_class?.id === Number(SelectedClass) ||
+            student.student_class === Number(SelectedClass);
+
+        if (!matchesClass) return false;
+
+        // If no specific group is selected (or "All Groups" is chosen), show all students in the class
+        if (!selectedGroup) return true;
+
+        const studentGroupId = student.group?.id ?? student.group;
+        return Number(studentGroupId) === Number(selectedGroup);
+    });
 
     const filteredSubjects = Subjects.filter(
         (subject) => (subject.student_class?.id === Number(SelectedClass) || subject.student_class === Number(SelectedClass))
@@ -34,6 +50,7 @@ const Assign_Marks = () => {
         const fetchStudents = async () => {
             try {
                 const res = await api.get("/students/", { headers: { Authorization: `Bearer ${token}` } });
+                console.log(res.data)
                 setStudents(res.data);
             } catch (err) { console.log(err); }
         };
@@ -70,6 +87,32 @@ const Assign_Marks = () => {
             fetchMarks();
         }
     }, [token]);
+
+    // Fetch groups whenever SelectedClass changes
+    useEffect(() => {
+        const fetchGroups = async () => {
+            setGroupsLoading(true);
+            try {
+                const res = await api.get(`/groups/?class_id=${SelectedClass}`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                setGroups(res.data);
+            } catch (err) {
+                console.log(err);
+                setGroups([]);
+            } finally {
+                setGroupsLoading(false);
+            }
+        };
+
+        setSelectedGroup(""); // Reset selected group on class change
+
+        if (token && SelectedClass) {
+            fetchGroups();
+        } else {
+            setGroups([]);
+        }
+    }, [SelectedClass, token]);
 
     useEffect(() => {
         if (SelectedTest && Marks.length > 0) {
@@ -135,9 +178,9 @@ const Assign_Marks = () => {
                 text: "Marks Submitted Successfully!",
                 icon: "success",
                 confirmButtonText: "OK",
-                confirmButtonColor: "#0056D2", // --primary
-                background: "#F4F7FC",         // --secondary
-                color: "#1A253C",              // --quinary
+                confirmButtonColor: "#0056D2",
+                background: "#F4F7FC",
+                color: "#1A253C",
             });
 
             const updatedMarks = await api.get("/marks/", { headers: { Authorization: `Bearer ${token}` } });
@@ -153,9 +196,10 @@ const Assign_Marks = () => {
     return (
         <div className="p-6 bg-[var(--secondary)] text-[var(--quinary)] min-h-screen font-sans">
             <div className="text-3xl font-bold tracking-tight mb-2 text-[var(--quinary)]">Assign Marks</div>
-            <p className="text-gray-500 text-sm mb-6">Select a class and an assessment to record student grades.</p>
+            <p className="text-gray-500 text-sm mb-6">Select a class, optional group, and an assessment to record student grades.</p>
 
             <div className="flex flex-col sm:flex-row gap-4 mb-8 items-end">
+                {/* Class Select */}
                 <div className="flex flex-col min-w-[200px] w-full sm:w-auto">
                     <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">Class</label>
                     <select
@@ -168,6 +212,31 @@ const Assign_Marks = () => {
                     </select>
                 </div>
 
+                {/* Group Select (Conditional based on class) */}
+                {SelectedClass && groupsLoading && (
+                    <div className="flex flex-col min-w-[180px] w-full sm:w-auto">
+                        <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">Group</label>
+                        <div className="text-sm text-gray-400 p-3">Loading groups...</div>
+                    </div>
+                )}
+
+                {SelectedClass && !groupsLoading && groups.length > 0 && (
+                    <div className="flex flex-col min-w-[180px] w-full sm:w-auto">
+                        <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">Group</label>
+                        <select
+                            value={selectedGroup}
+                            onChange={(e) => setSelectedGroup(e.target.value)}
+                            className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] text-sm cursor-pointer"
+                        >
+                            <option value="">All Groups</option>
+                            {groups.map((grp) => (
+                                <option key={grp.id} value={grp.id}>{grp.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+
+                {/* Assessment Select */}
                 <div className="flex flex-col min-w-[200px] w-full sm:w-auto">
                     <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">Assessment / Test</label>
                     <select
@@ -181,6 +250,7 @@ const Assign_Marks = () => {
                     </select>
                 </div>
 
+                {/* Total Marks */}
                 <div className="flex flex-col w-full sm:w-28">
                     <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">Total Marks</label>
                     <input
@@ -193,6 +263,7 @@ const Assign_Marks = () => {
                 </div>
             </div>
 
+            {/* Students List Container */}
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
                 {SelectedClass && filteredStudents.length > 0 ? (
                     filteredStudents.map((student) => (
@@ -223,7 +294,11 @@ const Assign_Marks = () => {
                     ))
                 ) : (
                     <div className="text-center py-8 text-gray-400 text-sm">
-                        {SelectedClass ? "No students found registered under this class." : "Please choose a class from the options above to manage student data."}
+                        {SelectedClass
+                            ? selectedGroup
+                                ? "No students found registered under this class group."
+                                : "No students found registered under this class."
+                            : "Please choose a class from the options above to manage student data."}
                     </div>
                 )}
             </div>

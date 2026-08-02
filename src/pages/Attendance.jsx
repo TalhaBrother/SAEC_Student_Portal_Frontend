@@ -8,15 +8,28 @@ const Attendance = () => {
 
     const [Students, setStudents] = useState([]);
     const [Classes, setClasses] = useState([]);
-    const [SelectedClass, setSelectedClass] = useState(""); // Fixed from [] to ""
+    const [SelectedClass, setSelectedClass] = useState("");
     const [AttendanceData, setAttendanceData] = useState({});
-    const [AttendanceDate, setAttendanceDate] = useState(new Date().toISOString().split("T")[0]); // Defaults to today
+    const [AttendanceDate, setAttendanceDate] = useState(new Date().toISOString().split("T")[0]);
     const [loading, setLoading] = useState(false);
 
     // Safe filtering checking nested object structures
     const filteredStudents = Students.filter(
         (student) => (student.student_class?.id === Number(SelectedClass) || student.student_class === Number(SelectedClass))
     );
+
+    // Automatically default all filtered students to "PRESENT" whenever SelectedClass or Students list changes
+    useEffect(() => {
+        if (SelectedClass && filteredStudents.length > 0) {
+            const initialAttendance = {};
+            filteredStudents.forEach((student) => {
+                initialAttendance[student.id] = "PRESENT";
+            });
+            setAttendanceData(initialAttendance);
+        } else {
+            setAttendanceData({});
+        }
+    }, [SelectedClass, Students]);
 
     // Controlled key-value storage object mapping studentId -> status string
     const markAttendance = (studentId, status) => {
@@ -67,9 +80,9 @@ const Attendance = () => {
                 text: "Attendance Submitted Successfully!",
                 icon: "success",
                 confirmButtonText: "OK",
-                confirmButtonColor: "#0056D2", // --primary
-                background: "#F4F7FC",         // --secondary
-                color: "#1A253C",              // --quinary
+                confirmButtonColor: "#0056D2",
+                background: "#F4F7FC",
+                color: "#1A253C",
             });
         } catch (err) {
             console.error("Failed to save bulk attendance:", err);
@@ -110,7 +123,6 @@ const Attendance = () => {
 
     const handleClassChange = (e) => {
         setSelectedClass(e.target.value);
-        setAttendanceData({}); // Reset selection cache when switching classrooms
     };
 
     return (
@@ -151,7 +163,9 @@ const Attendance = () => {
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
                 {SelectedClass && filteredStudents.length > 0 ? (
                     filteredStudents.map((student) => {
-                        const currentStatus = AttendanceData[student.id];
+                        // Fallback to "PRESENT" if not explicitly defined
+                        const currentStatus = AttendanceData[student.id] || "PRESENT";
+
                         return (
                             <div
                                 key={student.id}
@@ -162,16 +176,16 @@ const Attendance = () => {
                                     {student.full_name}
                                 </div>
 
-
                                 {/* Status Selection Buttons Container */}
                                 <div className="flex items-center gap-3">
                                     <button
                                         type="button"
                                         onClick={() => markAttendance(student.id, "PRESENT")}
-                                        className={`px-4 py-2 text-xs uppercase font-bold tracking-wider rounded-xl border transition-all duration-200 cursor-pointer ${currentStatus === "PRESENT"
+                                        className={`px-4 py-2 text-xs uppercase font-bold tracking-wider rounded-xl border transition-all duration-200 cursor-pointer ${
+                                            currentStatus === "PRESENT"
                                                 ? "bg-green-500 border-green-500 text-white shadow-sm"
                                                 : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
-                                            }`}
+                                        }`}
                                     >
                                         Present
                                     </button>
@@ -179,10 +193,11 @@ const Attendance = () => {
                                     <button
                                         type="button"
                                         onClick={() => markAttendance(student.id, "ABSENT")}
-                                        className={`px-4 py-2 text-xs uppercase font-bold tracking-wider rounded-xl border transition-all duration-200 cursor-pointer ${currentStatus === "ABSENT"
+                                        className={`px-4 py-2 text-xs uppercase font-bold tracking-wider rounded-xl border transition-all duration-200 cursor-pointer ${
+                                            currentStatus === "ABSENT"
                                                 ? "bg-red-500 border-red-500 text-white shadow-sm"
                                                 : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
-                                            }`}
+                                        }`}
                                     >
                                         Absent
                                     </button>

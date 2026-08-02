@@ -89,7 +89,7 @@ export default function AdminDashboard() {
             <option value="">Select Class</option>
             {Classes.map((cls) => (
               <option key={cls.id} value={cls.id}>
-                {cls.name}
+                {cls.display_name}
               </option>
             ))}
           </select>

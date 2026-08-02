@@ -18,17 +18,20 @@ import Add_Subject from './pages/Add_Subject'
 import Create_Class from "./pages/Create_Class"
 import Fee_Structure from './pages/Fee_Structure'
 import Generate_Vouchers from './pages/Generate_Vouchers'
+import Fee_Reports from './pages/Fee_Reports'
 import { Routes, Route } from 'react-router'
+import { useNavigate } from 'react-router'
 
 function App() {
   
+  const Navigate=useNavigate()
 
   return (
     <>
       <Routes>
 
           <Route path='/' element={<ProtectedRoute><DashboardLayout/></ProtectedRoute>}>
-            <Route index element={<StudentDashboard/>}/>
+            <Route index element={<ProtectedRoute><ProtectedAdmin><AdminDashboard /></ProtectedAdmin></ProtectedRoute>}/>
             <Route path='/admin' element={<ProtectedRoute><ProtectedAdmin><AdminDashboard /></ProtectedAdmin></ProtectedRoute>}/>
             <Route path='/admin/add-student' element={<ProtectedRoute><ProtectedAdmin><Add_Student /></ProtectedAdmin></ProtectedRoute>}/>
             <Route path='/admin/attendance' element={<ProtectedRoute><ProtectedAdmin><Attendance/></ProtectedAdmin></ProtectedRoute>}/>
@@ -39,6 +42,7 @@ function App() {
               <Route path='/admin/create-class' element={<ProtectedRoute><ProtectedAdmin><Create_Class/></ProtectedAdmin></ProtectedRoute>}/>
              <Route path='/admin/fee-structure' element={<ProtectedRoute><ProtectedAdmin><Fee_Structure/></ProtectedAdmin></ProtectedRoute>}/>
               <Route path='/admin/generate-vouchers' element={<ProtectedRoute><ProtectedAdmin><Generate_Vouchers/></ProtectedAdmin></ProtectedRoute>}/>
+               <Route path='/admin/fee-report' element={<ProtectedRoute><ProtectedAdmin><Fee_Reports/></ProtectedAdmin></ProtectedRoute>}/>
 
 
 

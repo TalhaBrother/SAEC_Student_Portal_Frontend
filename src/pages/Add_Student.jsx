@@ -1,3 +1,5 @@
+// SAEC Student Portal
+
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import useAuthStore from '../store/authStore';
@@ -5,10 +7,13 @@ import Swal from "sweetalert2";
 
 const Add_Student = () => {
   const [fullName, setFullName] = useState("");
-  const [fatherName, setfatherName]= useState("");
+  const [fatherName, setfatherName] = useState("");
   const [studentId, setStudentId] = useState("");
   const [studentClass, setStudentClass] = useState("");
   const [phone, setPhone] = useState("");
+  const [gender, setGender] = useState("");
+  const [residence, setResidence] = useState("");
+  const [studentWhatsappNo, setStudentWhatsappNo] = useState("");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -32,14 +37,16 @@ const Add_Student = () => {
         student_id: studentId,
         student_class: studentClass,
         phone: phone,
+        gender: gender,
+        residence: residence,
+        student_whatsapp_no: studentWhatsappNo,
         username: username,
         email: email,
         password: password
       };
 
       // Only include `group` when the selected class actually has groups.
-      // Sending it for a groupless class is rejected by the backend.
-      if (groups.length > 0) {
+      if (groups.length > 0 && groupId) {
         payload.group = groupId;
       }
 
@@ -63,10 +70,13 @@ const Add_Student = () => {
 
       // Reset state form fields
       setFullName("");
-      setfatherName("")
+      setfatherName("");
       setStudentId("");
       setStudentClass("");
       setPhone("");
+      setGender("");
+      setResidence("");
+      setStudentWhatsappNo("");
       setUsername("");
       setEmail("");
       setPassword("");
@@ -76,13 +86,18 @@ const Add_Student = () => {
       console.error("Add Student Error!");
       console.log("Status:", error.response?.status);
       console.log("Data:", error.response?.data);
-      alert("Failed to register student. Please check input field constraints.");
+
+      const errorData = error.response?.data;
+      let errorMsg = "Failed to register student. Please check input field constraints.";
+      if (errorData && typeof errorData === "object") {
+        errorMsg = Object.entries(errorData)
+          .map(([key, val]) => `${key}: ${Array.isArray(val) ? val.join(" ") : val}`)
+          .join("\n");
+      }
+      alert(errorMsg);
     } finally {
       setLoading(false);
     }
-
-
-
   };
 
   useEffect(() => {
@@ -95,7 +110,7 @@ const Add_Student = () => {
         });
 
         setClasses(res.data);
-        console.log(res.data)
+        console.log(res.data);
       } catch (err) {
         console.log(err);
       }
@@ -107,7 +122,6 @@ const Add_Student = () => {
   }, [token]);
 
   // Fetch groups whenever the selected class changes.
-  // If the class has no groups, hide the field and clear any selection.
   useEffect(() => {
     const fetchGroups = async () => {
       setGroupsLoading(true);
@@ -133,7 +147,6 @@ const Add_Student = () => {
       setGroups([]);
     }
   }, [studentClass, token]);
-
 
   return (
     <div className="p-6 bg-[var(--secondary)] text-[var(--quinary)] min-h-screen font-sans">
@@ -169,7 +182,7 @@ const Add_Student = () => {
                 />
               </div>
 
-               <div className="flex flex-col">
+              <div className="flex flex-col">
                 <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
                   Father Name
                 </label>
@@ -178,23 +191,74 @@ const Add_Student = () => {
                   value={fatherName}
                   onChange={(e) => setfatherName(e.target.value)}
                   placeholder="Shafat Khan"
-                  required
                   className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm"
                 />
               </div>
 
               <div className="flex flex-col">
                 <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
-                  Phone Number
+                  Gender
+                </label>
+                <select
+                  value={gender}
+                  onChange={(e) => setGender(e.target.value)}
+                  className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm"
+                >
+                  <option value="">Select Gender</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col">
+                <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
+                  Residence Address
+                </label>
+                <input
+                  type="text"
+                  value={residence}
+                  onChange={(e) => setResidence(e.target.value)}
+                  placeholder="Block 13, Gulshan-e-Iqbal, Karachi"
+                  className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm"
+                />
+              </div>
+
+              <div className="flex flex-col">
+                <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
+                  Parent WhatsApp No
                 </label>
                 <input
                   type="tel"
+                  maxLength={11}
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+92 300 1234567"
-                  required
+                  placeholder="03001234567"
                   className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm"
                 />
+                {phone.length > 0 && phone.length < 11 && (
+                  <span className="text-xs text-red-500 mt-1 font-medium">
+                    Phone number must be exactly 11 digits ({phone.length}/11)
+                  </span>
+                )}
+              </div>
+
+              <div className="flex flex-col">
+                <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
+                  Student WhatsApp No
+                </label>
+                <input
+                  type="tel"
+                  maxLength={11}
+                  value={studentWhatsappNo}
+                  onChange={(e) => setStudentWhatsappNo(e.target.value)}
+                  placeholder="03007654321"
+                  className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm"
+                />
+                 {studentWhatsappNo.length > 0 && studentWhatsappNo.length < 11 && (
+                  <span className="text-xs text-red-500 mt-1 font-medium">
+                    Phone number must be exactly 11 digits ({studentWhatsappNo.length}/11)
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -209,7 +273,7 @@ const Add_Student = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="flex flex-col">
                 <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
-                  Student ID Registration
+                  GR No / Student ID
                 </label>
                 <input
                   type="text"
@@ -228,15 +292,13 @@ const Add_Student = () => {
                 <select
                   value={studentClass}
                   onChange={(e) => setStudentClass(e.target.value)}
-
                   required
                   className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm"
                 >
                   <option value="">Select Class</option>
                   {Classes.map((cls) => (
-                    <option key={cls.id} value={cls.id} >{cls.display_name}</option>
+                    <option key={cls.id} value={cls.id}>{cls.display_name}</option>
                   ))}
-
                 </select>
               </div>
 
@@ -302,7 +364,6 @@ const Add_Student = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="shayan@gmail.com"
-                  required
                   className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm"
                 />
               </div>
@@ -323,7 +384,7 @@ const Add_Student = () => {
             </div>
           </div>
 
-          {/* Form Form Submission Interactivity Action Block */}
+          {/* Form Submission Action Block */}
           <div className="pt-4 flex justify-end">
             <button
               type="submit"

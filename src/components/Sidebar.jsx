@@ -14,6 +14,7 @@ import {
   HiOutlineBookOpen,
   HiOutlineCloudArrowUp,
   HiOutlineNewspaper,
+  HiOutlineReceiptRefund,
   
 } from "react-icons/hi2";
 
@@ -35,11 +36,12 @@ export default function Sidebar({closeMobileMenu}) {
     { label: "Add Student", icon: HiOutlineUsers,roles:['admin'], path:'/admin/add-student' },
     { label: "Fee Structure", icon: HiOutlineBanknotes,roles:['admin'], path:'/admin/fee-structure' },
     { label: "Generate Vouchers", icon: HiOutlineNewspaper,roles:['admin'], path:'/admin/generate-vouchers' },
+    { label: "Fee Report", icon: HiOutlineReceiptRefund,roles:['admin'], path:'/admin/fee-report' },
     { label: "Result", icon: HiOutlineAcademicCap ,roles:['student','admin'], path:'/admin/result'},
   ];
 
   const handleNavClick = (label) => {
-    // setActive(label);
+    setActive(label);
    if (closeMobileMenu) {
       closeMobileMenu();
   }
