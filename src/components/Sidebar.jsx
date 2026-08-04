@@ -28,12 +28,12 @@ export default function Sidebar({closeMobileMenu}) {
   
   const NAV_ITEMS = [
     { label: "Dashboard", icon: HiOutlineSquares2X2 ,roles:['student','admin'], path: role === "admin"? '/admin':"/" },
-    { label: "Assign Marks", icon: HiOutlinePencil ,roles:['student','admin'], path:'/admin/assign-marks' },
-    { label: "Add Subject", icon: HiOutlineBookOpen ,roles:['admin'], path: '/admin/add-subject'},
+    { label: "Classes", icon: HiOutlineCloudArrowUp ,roles:['admin'], path:'/admin/classes' },
+    { label: "Students", icon: HiOutlineUsers,roles:['admin'], path:'/admin/students' },
+    { label: "Subjects", icon: HiOutlineBookOpen ,roles:['admin'], path: '/admin/subjects'},
+    { label: "Tests", icon: HiOutlineDocumentText ,roles:['student','admin'], path:"/admin/tests"},
+    { label: "Marks", icon: HiOutlinePencil ,roles:['student','admin'], path:'/admin/marks' },
     { label: "Attendance", icon: HiOutlineCalendarDays ,roles:['admin'], path:'/admin/attendance'},
-    { label: "Create Test", icon: HiOutlineDocumentText ,roles:['student','admin'], path:"/admin/create-test"},
-    { label: "Create Class", icon: HiOutlineCloudArrowUp ,roles:['admin'], path:'/admin/create-class' },
-    { label: "Add Student", icon: HiOutlineUsers,roles:['admin'], path:'/admin/add-student' },
     { label: "Fee Structure", icon: HiOutlineBanknotes,roles:['admin'], path:'/admin/fee-structure' },
     { label: "Generate Vouchers", icon: HiOutlineNewspaper,roles:['admin'], path:'/admin/generate-vouchers' },
     { label: "Fee Report", icon: HiOutlineReceiptRefund,roles:['admin'], path:'/admin/fee-report' },

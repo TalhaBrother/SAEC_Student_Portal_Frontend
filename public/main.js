@@ -10,6 +10,7 @@ function createWindow() {
     width: 1200,
     height: 800,
     title: "Student Portal",
+    icon: path.join(__dirname, 'icon.ico'),
     autoHideMenuBar: true,
     webPreferences: {
       nodeIntegration: false,

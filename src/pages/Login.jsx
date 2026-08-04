@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import api from '../api/axios';
 import { useNavigate } from 'react-router';
 import useAuthStore from '../store/authStore';
-import logo from "../assets/logo.jpeg";
+import logo from "../assets/logo.png";
 
 const Login = () => {
   const [username, setUsername] = useState('');
@@ -20,7 +20,7 @@ const Login = () => {
       const res = await api.post('/auth/login/', { username, password });
       console.log('Login successful:', res.data);
       login(res.data);
-      
+
       if (res.data.user?.role === "admin") {
         navigate("/admin", { replace: true });
       } else {
@@ -35,85 +35,87 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col md:flex-row bg-[var(--secondary)] text-[var(--quinary)] font-sans antialiased">
-      
-      {/* Left Side: Clean Professional SaaS Form Panel */}
-      <div className="w-full md:w-1/2 flex flex-col justify-between px-6 sm:px-16 lg:px-24 py-8 md:py-12 bg-[var(--secondary)]">
-        
-        {/* Responsive Top Branding Header */}
-        <div className="flex items-center gap-3 max-w-md w-full mx-auto mb-10 md:mb-0">
-          <div className="h-10 w-16 overflow-hidden rounded-lg shadow-sm border border-gray-100 flex items-center justify-center">
-            <img 
-              src={logo} 
-              alt="SAEC Coaching" 
-              className="h-full w-full object-cover scale-110"
-            />
-          </div>
-          <span className="text-lg font-bold tracking-tight text-[var(--quinary)] uppercase">
-            SAEC Coaching Center
-          </span>
-        </div>
+    <div className="min-h-screen w-full flex bg-[var(--secondary)] text-[var(--quinary)] font-sans antialiased">
 
-        {/* Core Interactive Login Box */}
-        <div className="max-w-md w-full mx-auto my-auto w-full">
-          {/* Header Description */}
+      {/* ─── Left Side: SaaS Authentication Panel ─── */}
+      <div className="w-full md:w-1/2 min-h-screen flex flex-col justify-between p-8 sm:p-12 lg:p-16 bg-[var(--secondary)]">
+
+        {/* Spacer for vertical balance (Logo/Brand removed from top) */}
+        <div className="hidden md:block h-6" />
+
+        {/* Center Card: Form Container */}
+        <div className="w-full max-w-md mx-auto my-auto">
+
+          {/* SaaS Header Accent */}
           <div className="mb-8">
-            <h2 className="text-3xl font-bold tracking-tight mb-2 text-[var(--quinary)]">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--primary)]/10 text-[var(--primary)] text-xs font-semibold uppercase tracking-wider mb-3">
+              <span className="w-2 h-2 rounded-full bg-[var(--primary)] animate-pulse" />
+              Student & Portal Access
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[var(--quinary)] mb-2">
               Welcome Back
-            </h2>
-            <p className="text-gray-500 text-sm">
-              Enter your system credentials to access your dashboard overview.
+            </h1>
+            <p className="text-gray-500 text-sm leading-relaxed">
+              Please enter your academic credentials to sign in to your dashboard.
             </p>
           </div>
 
           {/* Core Interactive Login Form */}
           <form className="space-y-5" onSubmit={handleLogin}>
-            
+
             {/* Username Input Container */}
-            <div className="flex flex-col">
-              <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-gray-600 block">
                 Username
               </label>
-              <input 
-                type="text" 
-                placeholder="Enter your account username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
-                className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm"
-              />
+              <div className="relative flex items-center">
+                <input
+                  type="text"
+                  placeholder="e.g. Talha"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                  className="w-full bg-white text-[var(--quinary)] border border-gray-200 rounded-xl px-4 py-3 text-sm placeholder:text-gray-400 outline-none focus:border-[var(--primary)] focus:ring-4 focus:ring-[var(--primary)]/10 transition-all duration-200 shadow-sm"
+                />
+              </div>
             </div>
 
             {/* Password Input Container */}
-            <div className="flex flex-col">
-              <div className="flex justify-between items-center mb-1">
-                <label className="text-xs font-bold uppercase tracking-wider text-gray-500">
+            <div className="space-y-1.5">
+              <div className="flex justify-between items-center">
+                <label className="text-xs font-bold uppercase tracking-wider text-gray-600 block">
                   Password
                 </label>
-                <a href="#forgot" className="text-xs font-semibold text-[var(--primary)] hover:underline transition-all">
+                <a
+                  href="#forgot"
+                  className="text-xs font-semibold text-[var(--primary)] hover:opacity-80 transition-opacity"
+                >
                   Forgot Password?
                 </a>
               </div>
+
               <div className="relative flex items-center">
-                <input 
-                  type={showPassword ? "text" : "password"} 
+                <input
+                  type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="w-full bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 pr-10 outline-none focus:border-[var(--primary)] transition-colors text-sm"
+                  className="w-full bg-white text-[var(--quinary)] border border-gray-200 rounded-xl px-4 py-3 pr-11 text-sm placeholder:text-gray-400 outline-none focus:border-[var(--primary)] focus:ring-4 focus:ring-[var(--primary)]/10 transition-all duration-200 shadow-sm"
                 />
-                <button 
-                  type="button" 
+
+                <button
+                  type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 text-gray-400 hover:text-gray-600 transition-colors focus:outline-none cursor-pointer"
+                  className="absolute right-3.5 text-gray-400 hover:text-gray-600 transition-colors focus:outline-none cursor-pointer"
+                  tabIndex="-1"
                 >
                   {showPassword ? (
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-5 h-5">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />
                     </svg>
                   ) : (
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-5 h-5">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.644m17.928 0a1.012 1.012 0 0 1 0 .644M12 18.75a6.75 6.75 0 1 1 0-13.5 6.75 6.75 0 0 1 0 13.5z" />
                       <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0z" />
                     </svg>
@@ -122,63 +124,117 @@ const Login = () => {
               </div>
             </div>
 
-            {/* Submit Security Request Action */}
-            <button 
-              type="submit" 
+            {/* Single Submit Action Button */}
+            <button
+              type="submit"
               disabled={loading}
-              className="w-full bg-[var(--primary)] hover:bg-[var(--quinary)] disabled:opacity-50 text-white font-semibold py-3 px-4 rounded-xl transition-all duration-300 shadow-md transform active:scale-[0.98] mt-2 cursor-pointer text-sm tracking-wide uppercase"
+              className="w-full bg-[var(--primary)] hover:opacity-95 disabled:opacity-50 text-white font-bold py-3.5 px-4 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg active:scale-[0.99] cursor-pointer text-sm tracking-wider uppercase mt-2 flex items-center justify-center gap-2"
             >
-              {loading ? "Verifying Credentials..." : "Sign In to Portal"}
+              {loading ? (
+                <>
+                  <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span>Verifying Credentials...</span>
+                </>
+              ) : (
+                <span>Sign In to Portal</span>
+              )}
             </button>
           </form>
         </div>
 
-        {/* Footer Navigation Redirection */}
-        <div className="mt-8 pt-4 border-t border-gray-200 text-center flex items-center justify-center gap-2 max-w-md w-full mx-auto">
-          <span className="text-xs text-gray-500">Don't have an institutional account?</span>
-          <button className="bg-white hover:bg-gray-50 text-[var(--quinary)] font-medium text-xs px-4 py-2 rounded-xl border border-gray-300 transition-all cursor-pointer shadow-sm">
-            Sign up
-          </button>
+        {/* Hoverable Dropdown on TSWare */}
+        <div className="w-full max-w-md mx-auto pt-6 border-t border-gray-200/60 text-center relative">
+          <div className="text-xs font-medium text-gray-400 tracking-wide">
+            Designed &amp; Developed by{' '}
+            <span className="relative inline-block group cursor-pointer text-[var(--quinary)] font-bold underline decoration-dotted underline-offset-4">
+              TSWare
+
+              {/* WhatsApp Contact Popup */}
+              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2.5 hidden group-hover:flex flex-col gap-2 bg-white p-3.5 rounded-2xl shadow-xl border border-gray-100 text-left min-w-[190px] z-30 transition-all duration-200">
+
+                {/* Header Badge */}
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Contact Us via WhatsApp
+                </span>
+
+                {/* Contact Person 1 */}
+                <a
+                  href="https://wa.me/923112001157?text=Hello%20Shayan,%20I%20have%20an%20inquiry%20regarding%20SAEC%20Portal."
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-between p-2 rounded-xl hover:bg-emerald-50 text-xs font-semibold text-gray-700 hover:text-emerald-700 transition-colors group/link"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">💬</span>
+                    <span>Shayan Khan</span>
+                  </div>
+                  <span className="text-[10px] opacity-0 group-hover/link:opacity-100 transition-opacity text-emerald-600 font-bold">
+                    Chat →
+                  </span>
+                </a>
+
+                {/* Contact Person 2 */}
+                <a
+                  href="https://wa.me/923273112383?text=Hello%20Talha,%20I%20have%20an%20inquiry%20regarding%20SAEC%20Portal."
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-between p-2 rounded-xl hover:bg-emerald-50 text-xs font-semibold text-gray-700 hover:text-emerald-700 transition-colors group/link"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">💬</span>
+                    <span>Talha Ikram</span>
+                  </div>
+                  <span className="text-[10px] opacity-0 group-hover/link:opacity-100 transition-opacity text-emerald-600 font-bold">
+                    Chat →
+                  </span>
+                </a>
+
+                {/* Tail / Arrow pointing down to TSWare text */}
+                <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-b border-r border-gray-100 rotate-45" />
+              </span>
+            </span>
+          </div>
         </div>
 
       </div>
 
-      {/* Right Side: High-End Marketing Banner Aspect */}
-      <div className="hidden md:flex md:w-1/2 bg-[var(--primary)] p-12 flex-col justify-between items-center relative overflow-hidden select-none">
-        {/* Geometric aesthetic background accents */}
-        <div className="absolute top-[-10%] left-[-10%] w-72 h-72 bg-white/10 rounded-full filter blur-3xl opacity-30 animate-pulse"></div>
-        <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-indigo-900 rounded-full filter blur-3xl opacity-20"></div>
+      {/* ─── Right Side: Featured SAEC Branding Showcase ─── */}
+      <div className="hidden md:flex md:w-1/2 bg-[var(--primary)] p-12 flex-col items-center justify-center relative overflow-hidden select-none">
 
-        {/* Branding Messaging */}
-        <div className="w-full text-left z-10 mt-10 max-w-md mx-auto">
-          <h1 className="text-4xl lg:text-5xl font-extrabold tracking-tight mb-3 text-white leading-tight">
-            SAEC Coaching <br /> Center
-          </h1>
-          <p className="text-indigo-100 text-sm opacity-80 leading-relaxed">
-            Monitor dynamic grading distributions, process real-time bulk attendance metrics, and orchestrate institutional operational pipelines cleanly.
-          </p>
-        </div>
+        {/* Soft Modern Glow & Gradient Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-black/20 pointer-events-none" />
+        <div className="absolute -top-24 -left-24 w-96 h-96 bg-white/10 rounded-full blur-3xl" />
+        <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-black/20 rounded-full blur-3xl" />
 
-        {/* Dynamic Abstract Framed Graphic - Now contains the logo cleanly */}
-        <div className="w-full max-w-md aspect-video flex items-center justify-center z-10 relative mb-10 mx-auto">
-          <div className="w-full h-full border border-white/15 rounded-2xl flex flex-col items-center justify-center p-6 bg-white/10 backdrop-blur-xl shadow-2xl overflow-hidden group">
-            <div className="w-3/4 max-w-[240px] aspect-[1.6] rounded-xl overflow-hidden shadow-lg border border-white/10 transition-transform duration-500 group-hover:scale-105  flex items-center justify-center">
-              <img 
-                src={logo} 
-                alt="Academy Emblem" 
-                className="w-full h-full object-cover scale-110" 
-              />
-            </div>
-            <div className="mt-4 text-center">
-              <span className="text-white font-medium text-xs tracking-wider uppercase block">
-                Official Institutional Portal
-              </span>
-              <span className="text-indigo-200/50 text-[10px] block mt-0.5">
-                Secured Environment • Live Sync
-              </span>
-            </div>
+        {/* Prominent SAEC Logo Stage */}
+        <div className="z-10 flex flex-col items-center justify-center max-w-lg w-full text-center">
+          <div className="relative group p-10 bg-white/10 backdrop-blur-2xl rounded-3xl border border-white/20 shadow-2xl transition-all duration-500 hover:scale-[1.02]">
+
+            {/* Glow backing behind logo image */}
+            <div className="absolute inset-0 bg-white/20 rounded-3xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+            <img
+              src={logo}
+              alt="SAEC Coaching Center Logo"
+              className="relative z-10 max-h-[320px] w-auto object-contain mx-auto drop-shadow-2xl"
+            />
+          </div>
+
+          {/* Subheading below Big Emblem */}
+          <div className="mt-8 space-y-1.5">
+            <h2 className="text-white text-2xl font-bold tracking-tight">
+              SAEC Coaching Center
+            </h2>
+            <p className="text-white/70 text-xs font-medium uppercase tracking-widest">
+              Student Portal &amp; Academic Management System
+            </p>
           </div>
         </div>
+
       </div>
 
     </div>
