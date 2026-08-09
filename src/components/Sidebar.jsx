@@ -33,11 +33,12 @@ export default function Sidebar({closeMobileMenu}) {
     { label: "Subjects", icon: HiOutlineBookOpen ,roles:['admin'], path: '/admin/subjects'},
     { label: "Tests", icon: HiOutlineDocumentText ,roles:['student','admin'], path:"/admin/tests"},
     { label: "Marks", icon: HiOutlinePencil ,roles:['student','admin'], path:'/admin/marks' },
-    { label: "Attendance", icon: HiOutlineCalendarDays ,roles:['admin'], path:'/admin/attendance'},
-    { label: "Fee Structure", icon: HiOutlineBanknotes,roles:['admin'], path:'/admin/fee-structure' },
-    { label: "Generate Vouchers", icon: HiOutlineNewspaper,roles:['admin'], path:'/admin/generate-vouchers' },
-    { label: "Fee Report", icon: HiOutlineReceiptRefund,roles:['admin'], path:'/admin/fee-report' },
     { label: "Result", icon: HiOutlineAcademicCap ,roles:['student','admin'], path:'/admin/result'},
+    { label: "Attendance", icon: HiOutlineCalendarDays ,roles:['admin'], path:'/admin/attendance'},
+    // { label: "Fee Structure", icon: HiOutlineBanknotes,roles:['admin'], path:'/admin/fee-structure' },
+    // { label: "Generate Vouchers", icon: HiOutlineNewspaper,roles:['admin'], path:'/admin/generate-vouchers' },
+    // { label: "Fee Report", icon: HiOutlineReceiptRefund,roles:['admin'], path:'/admin/fee-report' },
+     { label: "Fees", icon: HiOutlineReceiptRefund,roles:['admin'], path:'/admin/fees' },
   ];
 
   const handleNavClick = (label) => {

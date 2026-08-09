@@ -19,6 +19,7 @@ import Classes from "./pages/Classes"
 import Fee_Structure from './pages/Fee_Structure'
 import Generate_Vouchers from './pages/Generate_Vouchers'
 import Fee_Reports from './pages/Fee_Reports'
+import Fees from './pages/Fees'
 import { Routes, Route } from 'react-router'
 import { useNavigate } from 'react-router'
 
@@ -43,6 +44,8 @@ function App() {
              <Route path='/admin/fee-structure' element={<ProtectedRoute><ProtectedAdmin><Fee_Structure/></ProtectedAdmin></ProtectedRoute>}/>
               <Route path='/admin/generate-vouchers' element={<ProtectedRoute><ProtectedAdmin><Generate_Vouchers/></ProtectedAdmin></ProtectedRoute>}/>
                <Route path='/admin/fee-report' element={<ProtectedRoute><ProtectedAdmin><Fee_Reports/></ProtectedAdmin></ProtectedRoute>}/>
+                <Route path='/admin/fees' element={<ProtectedRoute><ProtectedAdmin><Fees/></ProtectedAdmin></ProtectedRoute>}/>
+
 
 
 

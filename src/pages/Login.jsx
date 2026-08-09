@@ -71,7 +71,7 @@ const Login = () => {
               <div className="relative flex items-center">
                 <input
                   type="text"
-                  placeholder="e.g. Talha"
+                  placeholder="admin"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   required

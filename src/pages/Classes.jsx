@@ -1,8 +1,7 @@
-// SAEC
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api/axios';
 import useAuthStore from '../store/authStore';
+import Swal from 'sweetalert2';
 
 // Fixed board choices — backend only accepts these values, displayed with friendly labels
 const BOARD_OPTIONS = [
@@ -34,6 +33,8 @@ const Class = () => {
     const [classes, setClasses] = useState([]);
     const [fetching, setFetching] = useState(true);
 
+    const [searchQuery, setSearchQuery] = useState("");
+
     const [formData, setFormData] = useState(emptyForm());
     const [saving, setSaving] = useState(false);
     const [deletingId, setDeletingId] = useState(null);
@@ -61,6 +62,13 @@ const Class = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    // ---------- LOCAL FILTER BY CLASS NAME ----------
+    const filteredClasses = useMemo(() => {
+        if (!searchQuery.trim()) return classes;
+        const query = searchQuery.toLowerCase().trim();
+        return classes.filter((cls) => cls.name?.toLowerCase().includes(query));
+    }, [classes, searchQuery]);
+
     // ---------- FORM HELPERS (shared by sections & groups) ----------
     const addField = (field) => {
         setFormData((prev) => ({ ...prev, [field]: [...prev[field], ""] }));
@@ -82,6 +90,7 @@ const Class = () => {
 
     const openCreateForm = () => {
         setFormData(emptyForm());
+        setSearchQuery("");
         setMessage({ type: "", text: "" });
         setMode("form");
     };
@@ -94,12 +103,14 @@ const Class = () => {
             sections: cls.sections?.length ? cls.sections.map((s) => s.name) : [""],
             groups: cls.groups?.length ? cls.groups.map((g) => g.name) : [""],
         });
+        setSearchQuery("");
         setMessage({ type: "", text: "" });
         setMode("form");
     };
 
     const cancelForm = () => {
         setFormData(emptyForm());
+        setSearchQuery("");
         setMode("list");
     };
 
@@ -135,6 +146,7 @@ const Class = () => {
 
             await fetchClasses();
             setFormData(emptyForm());
+            setSearchQuery("");
             setMode("list");
         } catch (error) {
             console.error("Error saving class:", error);
@@ -154,33 +166,64 @@ const Class = () => {
         }
     };
 
-    // ---------- DELETE ----------
-    const handleDelete = async (cls) => {
-        const confirmed = window.confirm(
-            `Delete "${cls.display_name}"? This cannot be undone.`
-        );
-        if (!confirmed) return;
+   // ---------- DELETE ----------
+const handleDelete = async (cls) => {
+    // Determine display string fallback (cls.display_name or cls.name)
+    const className = cls.display_name || cls.name || "this class";
 
-        setDeletingId(cls.id);
-        setMessage({ type: "", text: "" });
+    const result = await Swal.fire({
+        title: 'Are you sure?',
+        text: `Delete "${className}"? This cannot be undone.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444', // Tailwind red-500
+        cancelButtonColor: '#6b7280',  // Tailwind gray-500
+        confirmButtonText: 'Yes, delete it!',
+        cancelButtonText: 'Cancel',
+        reverseButtons: true,
+    });
 
-        try {
-            await api.delete(`/classes/${cls.id}/`, { headers });
-            console.log("Class Deleted Successfully:", cls.id);
-            setMessage({ type: "success", text: "Class deleted successfully!" });
-            await fetchClasses();
-        } catch (error) {
-            console.error("Error deleting class:", error);
-            setMessage({
-                type: "error",
-                text:
-                    error.response?.data?.detail ||
-                    "Failed to delete class. It may still have students linked to it.",
-            });
-        } finally {
-            setDeletingId(null);
-        }
-    };
+    if (!result.isConfirmed) return;
+
+    setDeletingId(cls.id);
+    setMessage({ type: "", text: "" });
+
+    try {
+        await api.delete(`/classes/${cls.id}/`, { headers });
+        console.log("Class Deleted Successfully:", cls.id);
+
+        await Swal.fire({
+            title: 'Deleted!',
+            text: 'Class deleted successfully.',
+            icon: 'success',
+            timer: 2000,
+            showConfirmButton: false,
+        });
+
+        setMessage({ type: "success", text: "Class deleted successfully!" });
+        await fetchClasses();
+    } catch (error) {
+        console.error("Error deleting class:", error);
+        
+        const errorMessage =
+            error.response?.data?.detail ||
+            "Failed to delete class. It may still have students linked to it.";
+
+        await Swal.fire({
+            title: 'Error!',
+            text: errorMessage,
+            icon: 'error',
+            confirmButtonColor: 'var(--primary, #3b82f6)',
+        });
+
+        setMessage({
+            type: "error",
+            text: errorMessage,
+        });
+    } finally {
+        setDeletingId(null);
+    }
+};
 
     return (
         <div className="p-6 bg-[var(--secondary)] text-[var(--quinary)] min-h-screen font-sans">
@@ -196,7 +239,15 @@ const Class = () => {
                 </div>
 
                 {mode === "list" && (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                        {/* Search Input Bar */}
+                        <input
+                            type="text"
+                            placeholder="Search class name..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl px-3.5 py-2 outline-none focus:border-[var(--primary)] text-sm transition-colors placeholder-gray-400 w-48 sm:w-64"
+                        />
                         <button
                             type="button"
                             onClick={fetchClasses}
@@ -402,9 +453,13 @@ const Class = () => {
                         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center text-gray-400 text-sm">
                             No classes yet. Click "+ New Class" to create your first one.
                         </div>
+                    ) : filteredClasses.length === 0 ? (
+                        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center text-gray-400 text-sm">
+                            No classes matching "{searchQuery}".
+                        </div>
                     ) : (
                         <div className="space-y-3">
-                            {classes.map((cls) => (
+                            {filteredClasses.map((cls) => (
                                 <div
                                     key={cls.id}
                                     className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5"

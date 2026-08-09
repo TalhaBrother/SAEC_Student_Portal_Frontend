@@ -1,120 +1,182 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import api from "../api/axios";
 import useAuthStore from "../store/authStore";
 
 const Result = () => {
     const token = useAuthStore((state) => state.accessToken);
+    const authHeaders = { Authorization: `Bearer ${token}` };
 
-    // Structural System State
-    const [Students, setStudents] = useState([]);
+    // Directory data
     const [Classes, setClasses] = useState([]);
-    const [Tests, setTests] = useState([]);
+    const [Sections, setSections] = useState([]);
+    const [Groups, setGroups] = useState([]);
+    const [Students, setStudents] = useState([]);
 
-    // Filtering & Selections
+    // Filters
     const [SelectedClass, setSelectedClass] = useState("");
-    const [SelectedTest, setSelectedTest] = useState("");
+    const [SelectedSection, setSelectedSection] = useState("");
+    const [SelectedGroup, setSelectedGroup] = useState("");
+    const [SearchTerm, setSearchTerm] = useState("");
+    const [DebouncedSearch, setDebouncedSearch] = useState("");
 
-    // Report Viewing Data Storage
-    const [activeReportCard, setActiveReportCard] = useState(null);
-    const [activeHistory, setActiveHistory] = useState(null);
-    const [selectedStudentName, setSelectedStudentName] = useState("");
-    const [loadingReport, setLoadingReport] = useState(false);
+    // Loading flags
+    const [loadingStudents, setLoadingStudents] = useState(false);
+    const [downloadingId, setDownloadingId] = useState(null); // studentId or `${id}-${testId}` currently generating a PDF
+    const [expandedStudentId, setExpandedStudentId] = useState(null);
+    const [loadingAvailable, setLoadingAvailable] = useState(false);
+    const [availableReportsByStudent, setAvailableReportsByStudent] = useState({});
 
-    // Client-side filtration
-    const filteredStudents = Students.filter(
-        (student) => (student.student_class?.id === Number(SelectedClass) || student.student_class === Number(SelectedClass))
-    );
-
-    const filteredTests = Tests.filter(
-        (test) => (test.student_class?.id === Number(SelectedClass) || test.student_class === Number(SelectedClass))
-    );
-
-    // API Pipeline Handlers
+    // ---------------------------------------------------------
+    // Debounce the search box so we don't hammer the API on every keystroke
+    // ---------------------------------------------------------
     useEffect(() => {
-        const fetchInitialData = async () => {
-            try {
-                const headers = { Authorization: `Bearer ${token}` };
-                const [studRes, clsRes, testRes] = await Promise.all([
-                    api.get("/students/", { headers }),
-                    api.get("/classes/", { headers }),
-                    api.get("/tests/", { headers })
-                ]);
-                setStudents(studRes.data);
-                setClasses(clsRes.data);
-                setTests(testRes.data);
+        const timer = setTimeout(() => setDebouncedSearch(SearchTerm.trim()), 400);
+        return () => clearTimeout(timer);
+    }, [SearchTerm]);
 
-              
+    // ---------------------------------------------------------
+    // Load classes once on mount
+    // ---------------------------------------------------------
+    useEffect(() => {
+        const loadClasses = async () => {
+            try {
+                const res = await api.get("/classes/", { headers: authHeaders });
+                setClasses(res.data);
             } catch (err) {
-                console.error("Failed to load initial directory datasets:", err);
+                console.error("Failed to load classes:", err);
             }
         };
-        if (token) fetchInitialData();
+        if (token) loadClasses();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [token]);
 
-    // FETCH & VIEW: Individual Test Report Card (Generates and opens PDF)
-    const handleFetchReportCard = async (studentId, studentName) => {
-        if (!SelectedTest) {
-            alert("Please select a target evaluation test framework first!");
-            return;
-        }
-        setLoadingReport(true);
-        setSelectedStudentName(studentName);
+    // ---------------------------------------------------------
+    // When class changes: reset dependent filters, load sections & groups
+    // ---------------------------------------------------------
+    useEffect(() => {
+        setSelectedSection("");
+        setSelectedGroup("");
+        setSearchTerm("");
+        setDebouncedSearch("");
+        setSections([]);
+        setGroups([]);
+        setStudents([]);
+        setExpandedStudentId(null);
 
+        if (!SelectedClass || !token) return;
+
+        const loadSectionsAndGroups = async () => {
+            try {
+                const [secRes, grpRes] = await Promise.all([
+                    api.get(`/sections/?class_id=${SelectedClass}`, { headers: authHeaders }),
+                    api.get(`/groups/?class_id=${SelectedClass}`, { headers: authHeaders }),
+                ]);
+                setSections(secRes.data || []);
+                setGroups(grpRes.data || []);
+            } catch (err) {
+                console.error("Failed to load sections/groups:", err);
+            }
+        };
+        loadSectionsAndGroups();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [SelectedClass, token]);
+
+    // ---------------------------------------------------------
+    // Load students whenever class/section/group/search change
+    // ---------------------------------------------------------
+    const fetchStudents = useCallback(async () => {
+        if (!SelectedClass || !token) return;
+
+        setLoadingStudents(true);
         try {
-            // CRITICAL: responseType: 'blob' tells Axios to handle raw file binaries
-            const res = await api.get(`reports/report-card/${studentId}/`, {
-                headers: { Authorization: `Bearer ${token}` },
-                responseType: 'blob'
+            const params = new URLSearchParams({ class_id: SelectedClass });
+            if (SelectedSection) params.append("section_id", SelectedSection);
+            if (SelectedGroup) params.append("group_id", SelectedGroup);
+            if (DebouncedSearch) params.append("search", DebouncedSearch);
+
+            const res = await api.get(`/students/?${params.toString()}`, {
+                headers: authHeaders,
+            });
+            setStudents(res.data || []);
+        } catch (err) {
+            console.error("Failed to load students:", err);
+            setStudents([]);
+        } finally {
+            setLoadingStudents(false);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [SelectedClass, SelectedSection, SelectedGroup, DebouncedSearch, token]);
+
+    useEffect(() => {
+        fetchStudents();
+    }, [fetchStudents]);
+
+    // ---------------------------------------------------------
+    // Download the PDF report card. testId is optional — omit it to
+    // generate the combined report across every test the student has marks for.
+    // ---------------------------------------------------------
+    const handleDownloadReportCard = async (studentId, studentName, testId = null) => {
+        const busyKey = testId ? `${studentId}-${testId}` : `${studentId}`;
+        setDownloadingId(busyKey);
+        try {
+            const url = testId
+                ? `/reports/report-card/${studentId}/?test_id=${testId}`
+                : `/reports/report-card/${studentId}/`;
+
+            const res = await api.get(url, {
+                headers: authHeaders,
+                responseType: "blob",
             });
 
-            // 1. Create a local temporary URL for the binary PDF data
-            const file = new Blob([res.data], { type: 'application/pdf' });
+            const file = new Blob([res.data], { type: "application/pdf" });
             const fileURL = URL.createObjectURL(file);
-
-            // 2. Open the PDF in a new browser tab for professional viewing/printing
-            window.open(fileURL, '_blank');
-
+            window.open(fileURL, "_blank");
         } catch (err) {
-            console.error("PDF Compilation Error:", err);
-            alert("Could not retrieve Report Card. Make sure marks are assigned for this test.");
+            console.error("Report card download failed:", err);
+            alert(`Could not generate the report card for ${studentName}. Make sure marks are assigned.`);
         } finally {
-            setLoadingReport(false);
+            setDownloadingId(null);
         }
     };
 
-    // FETCH & VIEW: Full History Report (Assuming this might also be a PDF layout)
-    const handleFetchHistory = async (studentId, studentName) => {
-        setLoadingReport(true);
-        setSelectedStudentName(studentName);
-
-        try {
-            const res = await api.get(`reports/student/${studentId}/`, {
-                headers: { Authorization: `Bearer ${token}` },
-                responseType: 'blob' // Keeps backend file consistency
-            });
-
-            const file = new Blob([res.data], { type: 'application/pdf' });
-            const fileURL = URL.createObjectURL(file);
-            window.open(fileURL, '_blank');
-
-        } catch (err) {
-            console.error("History Stream Error:", err);
-            alert("Failed to track down timeline history profiles for this student entry.");
-        } finally {
-            setLoadingReport(false);
-        }
-    };
-
-    const handleSendWhatsAppText = async (studentId) => {
-        if (!SelectedTest) {
-            alert("Please select a target evaluation test framework first!");
+    // ---------------------------------------------------------
+    // Expand a student row to show every test they have marks for,
+    // each with its own download / WhatsApp action.
+    // ---------------------------------------------------------
+    const handleToggleAvailableTests = async (studentId) => {
+        if (expandedStudentId === studentId) {
+            setExpandedStudentId(null);
             return;
         }
 
+        setExpandedStudentId(studentId);
+
+        if (availableReportsByStudent[studentId]) return; // already cached
+
+        setLoadingAvailable(true);
         try {
-            // Fetch the compiled text message from Django backend
-            const res = await api.get(`reports/whatsapp-text/${studentId}/${SelectedTest}/`, {
-                headers: { Authorization: `Bearer ${token}` }
+            const res = await api.get(`/reports/student/${studentId}/`, {
+                headers: authHeaders,
+            });
+            setAvailableReportsByStudent((prev) => ({
+                ...prev,
+                [studentId]: res.data?.available_reports || [],
+            }));
+        } catch (err) {
+            console.error("Failed to load available tests:", err);
+            setAvailableReportsByStudent((prev) => ({ ...prev, [studentId]: [] }));
+        } finally {
+            setLoadingAvailable(false);
+        }
+    };
+
+    // ---------------------------------------------------------
+    // WhatsApp a single test's results to the student's guardian
+    // ---------------------------------------------------------
+    const handleSendWhatsAppText = async (studentId, testId) => {
+        try {
+            const res = await api.get(`/reports/whatsapp-text/${studentId}/${testId}/`, {
+                headers: authHeaders,
             });
 
             const { phone, message } = res.data;
@@ -124,195 +186,191 @@ const Result = () => {
                 return;
             }
 
-            // Clean any non-digit characters from the phone number string
-            let cleanPhone = phone.replace(/\D/g, '');
-
-            // If the number starts with standard local zero (e.g. 0300...), swap it with the country code (e.g. 92)
-            if (cleanPhone.startsWith('0')) {
-                cleanPhone = '92' + cleanPhone.substring(1);
+            let cleanPhone = phone.replace(/\D/g, "");
+            if (cleanPhone.startsWith("0")) {
+                cleanPhone = "92" + cleanPhone.substring(1);
             }
 
-            // Formulate the redirect string link with safety encoding
             const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
-
-            // Open the native app window or web portal seamlessly
-            window.open(whatsappUrl, '_blank');
-
+            window.open(whatsappUrl, "_blank");
         } catch (err) {
-            console.error("WhatsApp Dispatch Failure:", err);
-            alert(err.response?.data?.error || "Failed to generate text template layout.");
+            console.error("WhatsApp dispatch failed:", err);
+            alert(err.response?.data?.error || "Failed to generate the WhatsApp text template.");
         }
     };
 
     return (
         <div className="p-6 bg-[var(--secondary)] text-[var(--quinary)] min-h-screen font-sans">
-            {/* Context Module Header */}
-            <div className="text-3xl font-bold tracking-tight mb-2 text-[var(--quinary)]">Academic Analytics & Reports</div>
+            {/* Header */}
+            <div className="text-3xl font-bold tracking-tight mb-2 text-[var(--quinary)]">Academic Reports</div>
             <p className="text-gray-500 text-sm mb-6">Inspect, compile, and distribute finalized performance metrics and multi-test summaries.</p>
 
-            {/* Controls Filter Deck Container */}
-            <div className="flex flex-col sm:flex-row gap-4 mb-8 items-end bg-white p-5 rounded-2xl border border-gray-200 shadow-sm max-w-4xl">
+            {/* Filter Deck */}
+            <div className="flex flex-col sm:flex-row gap-4 mb-4 items-end bg-white p-5 rounded-2xl border border-gray-200 shadow-sm max-w-5xl flex-wrap">
                 <div className="flex flex-col min-w-[220px] w-full sm:w-auto">
-                    <label className="text-xs uppercase tracking-wider text-gray-500 font-bold mb-1">Target Class Registry</label>
+                    <label className="text-xs uppercase tracking-wider text-gray-500 font-bold mb-1">Class</label>
                     <select
                         value={SelectedClass}
-                        onChange={(e) => { setSelectedClass(e.target.value); setSelectedTest(""); }}
+                        onChange={(e) => setSelectedClass(e.target.value)}
                         className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] text-sm cursor-pointer font-medium"
                     >
                         <option value="">Select Class</option>
-                        {Classes.map((cls) => <option key={cls.id} value={cls.id}>{cls.display_name}</option>)}
+                        {Classes.map((cls) => (
+                            <option key={cls.id} value={cls.id}>
+                                {cls.display_name || cls.name}
+                            </option>
+                        ))}
                     </select>
                 </div>
 
-                <div className="flex flex-col min-w-[220px] w-full sm:w-auto">
-                    <label className="text-xs uppercase tracking-wider text-gray-500 font-bold mb-1">Evaluation Cycle (Test)</label>
-                    <select
-                        value={SelectedTest}
-                        onChange={(e) => setSelectedTest(e.target.value)}
+                {Sections.length > 0 && (
+                    <div className="flex flex-col min-w-[180px] w-full sm:w-auto">
+                        <label className="text-xs uppercase tracking-wider text-gray-500 font-bold mb-1">Section</label>
+                        <select
+                            value={SelectedSection}
+                            onChange={(e) => setSelectedSection(e.target.value)}
+                            className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] text-sm cursor-pointer font-medium"
+                        >
+                            <option value="">All Sections</option>
+                            {Sections.map((s) => (
+                                <option key={s.id} value={s.id}>{s.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+
+                {Groups.length > 0 && (
+                    <div className="flex flex-col min-w-[180px] w-full sm:w-auto">
+                        <label className="text-xs uppercase tracking-wider text-gray-500 font-bold mb-1">Group</label>
+                        <select
+                            value={SelectedGroup}
+                            onChange={(e) => setSelectedGroup(e.target.value)}
+                            className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] text-sm cursor-pointer font-medium"
+                        >
+                            <option value="">All Groups</option>
+                            {Groups.map((g) => (
+                                <option key={g.id} value={g.id}>{g.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+
+                <div className="flex flex-col min-w-[220px] w-full sm:w-auto flex-1">
+                    <label className="text-xs uppercase tracking-wider text-gray-500 font-bold mb-1">Search (name or roll no.)</label>
+                    <input
+                        type="text"
+                        value={SearchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
                         disabled={!SelectedClass}
-                        className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] text-sm cursor-pointer disabled:opacity-50 disabled:bg-gray-50 font-medium"
-                    >
-                        <option value="">Select Target Test</option>
-                        {filteredTests.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                    </select>
+                        placeholder="Search by name or student ID..."
+                        className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] text-sm disabled:opacity-50 disabled:bg-gray-50 font-medium"
+                    />
                 </div>
             </div>
 
-            {/* Split Screen Panel Grid */}
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
-
-                {/* Roster Selection Block */}
-                <div className="xl:col-span-1 bg-white rounded-2xl border border-gray-200 shadow-sm p-5 space-y-4">
-                    <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-2">Class Registry List</h3>
-
-                    {SelectedClass && filteredStudents.length > 0 ? (
-                        filteredStudents.map((student) => (
-                            <div key={student.id} className="border-b border-gray-100 pb-4 last:border-0 last:pb-0 space-y-2">
-                                <div className="font-semibold text-[var(--quinary)] text-sm">{student.full_name}<span>{student.phone}</span></div>
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={() => handleFetchReportCard(student.id, student.full_name)}
-                                        disabled={!SelectedTest}
-                                        className="text-xs bg-[var(--secondary)] hover:bg-[var(--primary)] hover:text-white text-[var(--primary)] font-semibold py-2 px-3 rounded-xl transition-all cursor-pointer disabled:opacity-40 disabled:hover:bg-[var(--secondary)] disabled:hover:text-[var(--primary)]"
-                                    >
-                                        Report Card
-                                    </button>
-                                    <button
-                                        onClick={() => handleFetchHistory(student.id, student.full_name)}
-                                        className="text-xs bg-gray-100 hover:bg-[var(--quinary)] hover:text-white text-gray-600 font-semibold py-2 px-3 rounded-xl transition-all cursor-pointer"
-                                    >
-                                        Full History
-                                    </button>
-                                    <button
-                                        onClick={() => handleSendWhatsAppText(student.id)}
-                                        disabled={!SelectedTest}
-                                        className="text-xs bg-emerald-50 hover:bg-emerald-600 hover:text-white text-emerald-600 font-bold py-2 px-3 rounded-xl transition-all cursor-pointer border border-emerald-200 disabled:opacity-40 disabled:hover:bg-emerald-50 disabled:hover:text-emerald-600"
-                                    >
-                                        💬 WhatsApp Text
-                                    </button>
-
-                                </div>
-                            </div>
-                        ))
-                    ) : (
-                        <div className="text-gray-400 text-xs italic py-4">Select an active class directory filter to map profiles.</div>
-                    )}
+            {/* Bulk / future actions — backend endpoints not implemented yet */}
+            {SelectedClass && (
+                <div className="flex gap-3 mb-8 max-w-5xl flex-wrap">
+                    <button
+                        disabled
+                        title="Coming soon"
+                        className="text-xs bg-gray-100 text-gray-400 font-semibold py-2 px-4 rounded-xl border border-gray-200 cursor-not-allowed"
+                    >
+                        📦 Generate Complete Class Reports (Coming soon)
+                    </button>
+                    <button
+                        disabled
+                        title="Coming soon"
+                        className="text-xs bg-gray-100 text-gray-400 font-semibold py-2 px-4 rounded-xl border border-gray-200 cursor-not-allowed"
+                    >
+                        💬 WhatsApp All Parents (Coming soon)
+                    </button>
                 </div>
+            )}
 
-                {/* Display Analytics Terminal Window */}
-                <div className="xl:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-sm p-6 min-h-[400px] flex flex-col justify-between">
+            {/* Student Roster */}
+            <div className="max-w-5xl bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">Class Registry List</h3>
 
-                    {loadingReport ? (
-                        <div className="flex flex-col items-center justify-center my-auto space-y-2 py-20">
-                            <div className="w-8 h-8 border-4 border-t-[var(--primary)] border-gray-200 rounded-full animate-spin"></div>
-                            <span className="text-gray-400 text-xs font-medium">Assembling Records...</span>
-                        </div>
-                    ) : activeReportCard ? (
-                        /* OPTION A: COMPACT REPORT CARD FORMAT */
-                        <div className="space-y-6">
-                            <div className="border-b border-gray-200 pb-4 flex justify-between items-start">
-                                <div>
-                                    <h4 className="text-xl font-bold text-[var(--quinary)]">{selectedStudentName}</h4>
-                                    <p className="text-xs text-[var(--primary)] font-semibold tracking-wider uppercase mt-1">
-                                        {activeReportCard.test_name || "Official Assessment Record Summary"}
-                                    </p>
-                                </div>
-                                <button onClick={() => window.print()} className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold py-2 px-4 rounded-xl border border-gray-300 transition-all cursor-pointer">
-                                    Print Document
-                                </button>
-                            </div>
-
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left text-sm">
-                                    <thead>
-                                        <tr className="border-b border-gray-200 text-gray-400 font-bold uppercase tracking-wider text-xs">
-                                            <th className="pb-3">Subject Module</th>
-                                            <th className="pb-3 text-center">Marks Obtained</th>
-                                            <th className="pb-3 text-center">Max Base Allocation</th>
-                                            <th className="pb-3 text-right">Performance Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-100 font-medium text-gray-700">
-                                        {(activeReportCard.marks || []).map((m, idx) => (
-                                            <tr key={idx}>
-                                                <td className="py-3.5 font-semibold text-[var(--quinary)]">{m.subject_name || m.subject}</td>
-                                                <td className="py-3.5 text-center font-mono text-base text-gray-900">{m.obtained_marks}</td>
-                                                <td className="py-3.5 text-center font-mono text-gray-400">/ {m.total_marks}</td>
-                                                <td className="py-3.5 text-right">
-                                                    <span className={`text-xs px-2.5 py-1 rounded-full font-bold ${m.obtained_marks >= (m.total_marks * 0.4) ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-500'}`}>
-                                                        {m.obtained_marks >= (m.total_marks * 0.4) ? "Clear" : "Deficit"}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    ) : activeHistory ? (
-                        /* OPTION B: FULL TIMELINE AUDIT HISTORY RECORD */
-                        <div className="space-y-6">
-                            <div className="border-b border-gray-200 pb-4">
-                                <h4 className="text-xl font-bold text-[var(--quinary)]">{selectedStudentName}</h4>
-                                <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider mt-1">Institutional Evaluation Timeline Log</p>
-                            </div>
-
-                            <div className="space-y-4 relative border-l-2 border-gray-100 pl-4 ml-2">
-                                {(activeHistory.reports || activeHistory).map((report, idx) => (
-                                    <div key={idx} className="relative space-y-2">
-                                        <div className="absolute left-[-21px] top-1.5 w-2 h-2 rounded-full bg-[var(--primary)] ring-4 ring-white" />
-                                        <div className="bg-[var(--secondary)] border border-gray-200 rounded-xl p-4">
-                                            <div className="flex justify-between items-center mb-2">
-                                                <span className="font-bold text-sm text-[var(--quinary)]">{report.test_name}</span>
-                                                <span className="text-xs font-mono text-gray-400">{report.date || "Archived Matrix"}</span>
-                                            </div>
-                                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
-                                                {(report.marks || []).map((m, mIdx) => (
-                                                    <div key={mIdx} className="bg-white px-2.5 py-1.5 rounded-lg border border-gray-100 flex justify-between font-medium">
-                                                        <span className="text-gray-500">{m.subject_name || m.subject}:</span>
-                                                        <span className="font-bold text-[var(--quinary)]">{m.obtained_marks}/{m.total_marks}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
+                {!SelectedClass ? (
+                    <div className="text-gray-400 text-xs italic py-4">Select a class to load its students.</div>
+                ) : loadingStudents ? (
+                    <div className="flex items-center gap-2 py-8 justify-center text-gray-400 text-xs font-medium">
+                        <div className="w-5 h-5 border-4 border-t-[var(--primary)] border-gray-200 rounded-full animate-spin"></div>
+                        Loading students...
+                    </div>
+                ) : Students.length === 0 ? (
+                    <div className="text-gray-400 text-xs italic py-4">No students found for the current filters.</div>
+                ) : (
+                    <div className="divide-y divide-gray-100">
+                        {Students.map((student) => (
+                            <div key={student.id} className="py-4 space-y-3">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div>
+                                        <div className="font-semibold text-[var(--quinary)] text-sm">{student.full_name}</div>
+                                        <div className="text-xs text-gray-400">
+                                            {student.student_id}
+                                            {/* {student.section ? ` · ${student.section}` : ""}
+                                            {student.group ? ` · ${student.group}` : ""} */}
                                         </div>
                                     </div>
-                                ))}
+                                    <div className="flex gap-2 flex-wrap">
+                                        <button
+                                            onClick={() => handleDownloadReportCard(student.id, student.full_name)}
+                                            disabled={downloadingId === `${student.id}`}
+                                            className="text-xs bg-[var(--secondary)] hover:bg-[var(--primary)] hover:text-white text-[var(--primary)] font-semibold py-2 px-3 rounded-xl transition-all cursor-pointer disabled:opacity-40"
+                                        >
+                                            {downloadingId === `${student.id}` ? "Generating..." : "Full Report Card"}
+                                        </button>
+                                        <button
+                                            onClick={() => handleToggleAvailableTests(student.id)}
+                                            className="text-xs bg-gray-100 hover:bg-[var(--quinary)] hover:text-white text-gray-600 font-semibold py-2 px-3 rounded-xl transition-all cursor-pointer"
+                                        >
+                                            {expandedStudentId === student.id ? "Hide Tests" : "View Tests"}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {expandedStudentId === student.id && (
+                                    <div className="bg-[var(--secondary)] border border-gray-200 rounded-xl p-3 space-y-2">
+                                        {loadingAvailable && !availableReportsByStudent[student.id] ? (
+                                            <div className="text-xs text-gray-400 py-2">Loading test history...</div>
+                                        ) : (availableReportsByStudent[student.id] || []).length === 0 ? (
+                                            <div className="text-xs text-gray-400 py-2">No marks recorded for this student yet.</div>
+                                        ) : (
+                                            availableReportsByStudent[student.id].map((test) => (
+                                                <div
+                                                    key={test.test_id}
+                                                    className="bg-white rounded-lg border border-gray-100 px-3 py-2 flex flex-wrap items-center justify-between gap-2"
+                                                >
+                                                    <div>
+                                                        <div className="text-sm font-semibold text-[var(--quinary)]">{test.test_name}</div>
+                                                        <div className="text-xs text-gray-400">{test.date} · {test.percentage}%</div>
+                                                    </div>
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            onClick={() => handleDownloadReportCard(student.id, student.full_name, test.test_id)}
+                                                            disabled={downloadingId === `${student.id}-${test.test_id}`}
+                                                            className="text-xs bg-[var(--secondary)] hover:bg-[var(--primary)] hover:text-white text-[var(--primary)] font-semibold py-1.5 px-3 rounded-lg transition-all cursor-pointer disabled:opacity-40"
+                                                        >
+                                                            {downloadingId === `${student.id}-${test.test_id}` ? "..." : "Download"}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleSendWhatsAppText(student.id, test.test_id)}
+                                                            className="text-xs bg-emerald-50 hover:bg-emerald-600 hover:text-white text-emerald-600 font-bold py-1.5 px-3 rounded-lg transition-all cursor-pointer border border-emerald-200"
+                                                        >
+                                                            💬
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                )}
                             </div>
-                        </div>
-                    ) : (
-                        /* EMPTY HOVER STATE BACKGROUND INTERACTION FLAG */
-                        <div className="text-center py-24 my-auto text-gray-400 text-sm">
-                            No student reports fetched. Select a student and action path parameter from the sidebar to compile metric representations.
-                        </div>
-                    )}
-
-                    {/* Bottom Status Branding Disclaimer */}
-                    <div className="border-t border-gray-100 pt-4 mt-6 flex justify-between items-center text-[10px] text-gray-400 font-mono tracking-widest uppercase">
-                        <span>Data State Core: Synchronized</span>
-                        <span>Secure Verification Portal</span>
+                        ))}
                     </div>
-                </div>
-
+                )}
             </div>
         </div>
     );

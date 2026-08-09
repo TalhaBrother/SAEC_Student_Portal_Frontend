@@ -28,6 +28,9 @@ const Marks = () => {
   const [scoresInput, setScoresInput] = useState({});
   const [globalTotalMarks, setGlobalTotalMarks] = useState("100");
 
+  // Subject-level Total Marks State: { [subjectId]: number | string }
+  const [subjectTotals, setSubjectTotals] = useState({});
+
   // UI Loaders
   const [loading, setLoading] = useState(false);
   const [fetchingSheet, setFetchingSheet] = useState(false);
@@ -53,50 +56,49 @@ const Marks = () => {
     if (token) fetchMetadata();
   }, [token]);
 
-// Fetch contextual Groups & Sections when Selected Class changes
-useEffect(() => {
-  const fetchClassSubContext = async () => {
-    if (!selectedClass) {
-      setGroups([]);
-      setSections([]);
-      return;
-    }
+  // Fetch contextual Groups & Sections when Selected Class changes
+  useEffect(() => {
+    const fetchClassSubContext = async () => {
+      if (!selectedClass) {
+        setGroups([]);
+        setSections([]);
+        return;
+      }
 
-    setGroupsLoading(true);
+      setGroupsLoading(true);
 
-    try {
-      // Adjust path if your app routes them under /api/students/ or similar
-      const grpPromise = api
-        .get(`/students/groups/`, {
-          params: { class_id: selectedClass },
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        .catch(() => ({ data: [] })); // Fallback safely if route differs
+      try {
+        const grpPromise = api
+          .get(`/groups/`, {
+            params: { class_id: selectedClass },
+            headers: { Authorization: `Bearer ${token}` },
+          })
+          .catch(() => ({ data: [] }));
 
-      const secPromise = api
-        .get(`/students/sections/`, {
-          params: { class_id: selectedClass },
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        .catch(() => ({ data: [] })); // Fallback safely if route differs
+        const secPromise = api
+          .get(`/sections/`, {
+            params: { class_id: selectedClass },
+            headers: { Authorization: `Bearer ${token}` },
+          })
+          .catch(() => ({ data: [] }));
 
-      const [grpRes, secRes] = await Promise.all([grpPromise, secPromise]);
+        const [grpRes, secRes] = await Promise.all([grpPromise, secPromise]);
 
-      setGroups(grpRes.data || []);
-      setSections(secRes.data || []);
-    } catch (err) {
-      console.error("Failed to fetch contextual class groups/sections:", err);
-      setGroups([]);
-      setSections([]);
-    } finally {
-      setGroupsLoading(false);
-    }
-  };
+        setGroups(grpRes.data || []);
+        setSections(secRes.data || []);
+      } catch (err) {
+        console.error("Failed to fetch contextual class groups/sections:", err);
+        setGroups([]);
+        setSections([]);
+      } finally {
+        setGroupsLoading(false);
+      }
+    };
 
-  setSelectedGroup("");
-  setSelectedSection("");
-  if (token) fetchClassSubContext();
-}, [selectedClass, token]);
+    setSelectedGroup("");
+    setSelectedSection("");
+    if (token) fetchClassSubContext();
+  }, [selectedClass, token]);
 
   // Load backend marksheet data when Class and Test are both active
   const loadMarksheet = async () => {
@@ -111,24 +113,46 @@ useEffect(() => {
 
       setMarksheetData(res.data);
 
-      // Hydrate score input matrix from existing mark records
       const initialScores = {};
+      const initialSubjectTotals = {};
+
       if (res.data?.students) {
         res.data.students.forEach((std) => {
           std.subjects.forEach((subj) => {
             const key = `${std.student_id}_${subj.subject_id}`;
+            
+            // Set individual score inputs (obtained_marks & status only)
             initialScores[key] = {
               obtained_marks:
                 subj.obtained_marks !== null && subj.obtained_marks !== undefined
                   ? subj.obtained_marks
                   : "",
-              total_marks: subj.total_marks || globalTotalMarks,
               status: subj.status || "present",
             };
+
+            // Initialize subject total from API if not set yet
+            if (
+              subj.total_marks !== undefined &&
+              subj.total_marks !== null &&
+              !initialSubjectTotals[subj.subject_id]
+            ) {
+              initialSubjectTotals[subj.subject_id] = subj.total_marks;
+            }
           });
         });
       }
+
+      // Fallback to global total if subject total wasn't returned
+      if (res.data?.students?.[0]?.subjects) {
+        res.data.students[0].subjects.forEach((subj) => {
+          if (!initialSubjectTotals[subj.subject_id]) {
+            initialSubjectTotals[subj.subject_id] = globalTotalMarks;
+          }
+        });
+      }
+
       setScoresInput(initialScores);
+      setSubjectTotals(initialSubjectTotals);
     } catch (err) {
       console.error("Failed to load marksheet:", err);
       setMarksheetData(null);
@@ -143,25 +167,44 @@ useEffect(() => {
     } else {
       setMarksheetData(null);
       setScoresInput({});
+      setSubjectTotals({});
     }
   }, [selectedClass, selectedTest]);
 
-  // Handle Score Inputs inside Matrix
-  const handleScoreChange = (studentId, subjectId, field, value) => {
+  // Sync all subject totals when Global Total Marks changes
+  const handleGlobalTotalChange = (val) => {
+    setGlobalTotalMarks(val);
+    setSubjectTotals((prev) => {
+      const updated = { ...prev };
+      Object.keys(updated).forEach((subjId) => {
+        updated[subjId] = val;
+      });
+      return updated;
+    });
+  };
+
+  // Change total marks for a specific subject column
+  const handleSubjectTotalChange = (subjectId, val) => {
+    setSubjectTotals((prev) => ({
+      ...prev,
+      [subjectId]: val,
+    }));
+  };
+
+  // Handle Score Inputs (obtained marks only)
+  const handleScoreChange = (studentId, subjectId, value) => {
     const key = `${studentId}_${subjectId}`;
     setScoresInput((prev) => ({
       ...prev,
       [key]: {
         ...prev[key],
         status: prev[key]?.status || "present",
-        obtained_marks: prev[key]?.obtained_marks ?? "",
-        total_marks: prev[key]?.total_marks || globalTotalMarks,
-        [field]: value,
+        obtained_marks: value,
       },
     }));
   };
 
-  // Toggle Absent/Present status for specific cell
+  // Toggle Absent/Present status
   const toggleAttendanceStatus = (studentId, subjectId) => {
     const key = `${studentId}_${subjectId}`;
     const currentStatus = scoresInput[key]?.status || "present";
@@ -173,12 +216,11 @@ useEffect(() => {
         ...prev[key],
         status: nextStatus,
         obtained_marks: nextStatus === "absent" ? "" : prev[key]?.obtained_marks || "",
-        total_marks: prev[key]?.total_marks || globalTotalMarks,
       },
     }));
   };
 
-  // Bulk Save Handler (Constructs backend payload)
+  // Bulk Save Handler with Client-Side Validation
   const handleSaveBulkMarks = async () => {
     if (!selectedClass || !selectedTest) {
       Swal.fire("Selection Missing", "Please select a Class and Test first.", "warning");
@@ -190,34 +232,49 @@ useEffect(() => {
       return;
     }
 
-    setLoading(true);
+    // Client-side validation check
+    let validationError = null;
 
-    try {
-      // Build students array formatted for BulkMarkSerializer
-      const studentsPayload = marksheetData.students.map((student) => {
-        const studentMarks = student.subjects.map((subj) => {
-          const key = `${student.student_id}_${subj.subject_id}`;
-          const cellData = scoresInput[key] || {};
-          const isAbsent = cellData.status === "absent";
+    const studentsPayload = marksheetData.students.map((student) => {
+      const studentMarks = student.subjects.map((subj) => {
+        const key = `${student.student_id}_${subj.subject_id}`;
+        const cellData = scoresInput[key] || {};
+        const isAbsent = cellData.status === "absent";
+        
+        const calculatedTotal = Number(subjectTotals[subj.subject_id] || globalTotalMarks || 100);
+        const calculatedObtained = isAbsent
+          ? null
+          : cellData.obtained_marks !== "" && cellData.obtained_marks !== undefined
+          ? Number(cellData.obtained_marks)
+          : 0;
 
-          return {
-            subject_id: Number(subj.subject_id),
-            status: cellData.status || "present",
-            obtained_marks: isAbsent
-              ? null
-              : cellData.obtained_marks !== "" && cellData.obtained_marks !== undefined
-              ? Number(cellData.obtained_marks)
-              : 0,
-            total_marks: Number(cellData.total_marks || globalTotalMarks),
-          };
-        });
+        // Check if obtained marks exceeds total marks
+        if (!isAbsent && calculatedObtained > calculatedTotal) {
+          validationError = `Student "${student.student_name}" has obtained marks (${calculatedObtained}) exceeding total marks (${calculatedTotal}) for ${subj.subject_name}.`;
+        }
 
         return {
-          student_id: Number(student.student_id),
-          marks: studentMarks,
+          subject_id: Number(subj.subject_id),
+          status: cellData.status || "present",
+          obtained_marks: calculatedObtained,
+          total_marks: calculatedTotal,
         };
       });
 
+      return {
+        student_id: Number(student.student_id),
+        marks: studentMarks,
+      };
+    });
+
+    if (validationError) {
+      Swal.fire("Validation Error", validationError, "warning");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
       const payload = {
         test_id: Number(selectedTest),
         class_id: Number(selectedClass),
@@ -237,21 +294,36 @@ useEffect(() => {
         color: "#1A253C",
       });
 
-      // Reload fresh marksheet
       loadMarksheet();
     } catch (err) {
       console.error("Bulk save error:", err?.response?.data || err);
-      const errMsg =
-        err?.response?.data?.error ||
-        err?.response?.data?.non_field_errors?.[0] ||
-        "Failed to submit bulk marks payload.";
+      
+      // Parse nested serializer error array structure
+      let errMsg = "Failed to submit bulk marks payload.";
+      const backendErr = err?.response?.data;
+
+      if (backendErr?.students) {
+        for (const stdErr of backendErr.students) {
+          if (stdErr?.marks) {
+            for (const mErr of stdErr.marks) {
+              if (mErr?.non_field_errors?.length) {
+                errMsg = mErr.non_field_errors[0];
+                break;
+              }
+            }
+          }
+        }
+      } else if (backendErr?.error) {
+        errMsg = backendErr.error;
+      }
+
       Swal.fire("Error", errMsg, "error");
     } finally {
       setLoading(false);
     }
   };
 
-  // Filter test selection by board or class
+  // Filter test options
   const filteredTestOptions = useMemo(() => {
     return tests.filter((t) => {
       if (selectedClass) {
@@ -266,12 +338,11 @@ useEffect(() => {
     });
   }, [tests, selectedClass, selectedBoard]);
 
-  // Compute filtered students list within active marksheet matrix
+  // Compute filtered students list
   const filteredStudentsGrid = useMemo(() => {
     if (!marksheetData?.students) return [];
 
     return marksheetData.students.filter((student) => {
-      // 1. Search Query (Name or Student GR)
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchesName = student.student_name?.toLowerCase().includes(q);
@@ -279,17 +350,9 @@ useEffect(() => {
         if (!matchesName && !matchesGR) return false;
       }
 
-      // 2. Section Filter
-      if (selectedSection) {
-        if (student.section !== selectedSection) return false;
-      }
+      if (selectedSection && student.section !== selectedSection) return false;
+      if (selectedGroup && student.group !== selectedGroup) return false;
 
-      // 3. Group Filter
-      if (selectedGroup) {
-        if (student.group !== selectedGroup) return false;
-      }
-
-      // 4. Status Filter
       if (selectedStatus) {
         const matchStatus = student.subjects.some((subj) => {
           const key = `${student.student_id}_${subj.subject_id}`;
@@ -309,7 +372,7 @@ useEffect(() => {
     scoresInput,
   ]);
 
-  // Filter visible columns dynamically if Subject Filter is applied
+  // Filter visible subject columns
   const visibleSubjects = useMemo(() => {
     if (!marksheetData?.students?.[0]?.subjects) return [];
     if (!selectedSubject) return marksheetData.students[0].subjects;
@@ -345,7 +408,6 @@ useEffect(() => {
 
       {/* Filter & Selector Bar */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 mb-6 space-y-4">
-        {/* Step 1 Selector Row */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Class Select */}
           <div className="flex flex-col">
@@ -389,17 +451,18 @@ useEffect(() => {
             </select>
           </div>
 
-          {/* Global Total Marks Override */}
+          {/* Global Default Total Marks */}
           <div className="flex flex-col">
             <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">
-              Default Total Marks
+              Set All Total Marks
             </label>
             <input
               type="number"
               min="1"
               value={globalTotalMarks}
-              onChange={(e) => setGlobalTotalMarks(e.target.value)}
+              onChange={(e) => handleGlobalTotalChange(e.target.value)}
               className="bg-[var(--secondary)] text-[var(--quinary)] border border-gray-300 rounded-xl p-2.5 outline-none focus:border-[var(--primary)] text-sm font-semibold text-center"
+              placeholder="e.g. 100"
             />
           </div>
 
@@ -420,7 +483,6 @@ useEffect(() => {
 
         {/* Extended Criteria Filters */}
         <div className="pt-3 border-t border-gray-100 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          {/* Group Filter */}
           <div>
             <select
               value={selectedGroup}
@@ -437,7 +499,6 @@ useEffect(() => {
             </select>
           </div>
 
-          {/* Section Filter */}
           <div>
             <select
               value={selectedSection}
@@ -454,7 +515,6 @@ useEffect(() => {
             </select>
           </div>
 
-          {/* Subject Filter */}
           <div>
             <select
               value={selectedSubject}
@@ -477,7 +537,6 @@ useEffect(() => {
             </select>
           </div>
 
-          {/* Status Filter */}
           <div>
             <select
               value={selectedStatus}
@@ -490,7 +549,6 @@ useEffect(() => {
             </select>
           </div>
 
-          {/* Reset Filters */}
           <div>
             <button
               onClick={() => {
@@ -522,14 +580,27 @@ useEffect(() => {
                   <th className="p-4 sticky left-0 bg-[var(--secondary)] z-10 w-16">GR #</th>
                   <th className="p-4 sticky left-16 bg-[var(--secondary)] z-10 min-w-[200px]">Student Name</th>
                   <th className="p-4">Sec / Group</th>
+                  
+                  {/* Column Header per Subject with dynamic Total Marks control */}
                   {visibleSubjects.map((subj) => (
-                    <th key={subj.subject_id} className="p-4 text-center min-w-[160px]">
-                      <div className="font-bold text-[var(--quinary)]">{subj.subject_name}</div>
-                      <div className="text-[10px] text-gray-400 font-normal">Score / Total</div>
+                    <th key={subj.subject_id} className="p-4 text-center min-w-[170px] bg-blue-50/50 border-l border-gray-200">
+                      <div className="font-bold text-[var(--quinary)] mb-1.5">{subj.subject_name}</div>
+                      
+                      <div className="flex items-center justify-center gap-1.5 font-normal normal-case">
+                        <span className="text-[11px] text-gray-500">Total:</span>
+                        <input
+                          type="number"
+                          min="1"
+                          value={subjectTotals[subj.subject_id] ?? globalTotalMarks}
+                          onChange={(e) => handleSubjectTotalChange(subj.subject_id, e.target.value)}
+                          className="w-16 bg-white border border-gray-300 rounded-md py-0.5 px-1.5 text-center text-xs font-bold text-[var(--primary)] shadow-sm outline-none focus:border-[var(--primary)]"
+                        />
+                      </div>
                     </th>
                   ))}
                 </tr>
               </thead>
+              
               <tbody className="divide-y divide-gray-100 text-sm">
                 {filteredStudentsGrid.length > 0 ? (
                   filteredStudentsGrid.map((student) => (
@@ -559,13 +630,13 @@ useEffect(() => {
                         const cellKey = `${student.student_id}_${subj.subject_id}`;
                         const currentCell = scoresInput[cellKey] || {
                           obtained_marks: "",
-                          total_marks: globalTotalMarks,
                           status: "present",
                         };
                         const isAbsent = currentCell.status === "absent";
+                        const maxTotal = subjectTotals[subj.subject_id] || globalTotalMarks;
 
                         return (
-                          <td key={subj.subject_id} className="p-3 text-center border-l border-gray-50">
+                          <td key={subj.subject_id} className="p-3 text-center border-l border-gray-100">
                             <div className="flex items-center justify-center gap-2">
                               {/* Attendance Status Toggle Button */}
                               <button
@@ -587,40 +658,28 @@ useEffect(() => {
                                 disabled={isAbsent}
                                 placeholder={isAbsent ? "ABS" : "0"}
                                 min="0"
-                                max={currentCell.total_marks || globalTotalMarks}
+                                max={maxTotal}
                                 value={isAbsent ? "" : currentCell.obtained_marks}
                                 onChange={(e) =>
                                   handleScoreChange(
                                     student.student_id,
                                     subj.subject_id,
-                                    "obtained_marks",
                                     e.target.value
                                   )
                                 }
-                                className={`w-16 border rounded-lg p-1.5 text-center font-semibold text-sm outline-none transition-all ${
+                                className={`w-20 border rounded-lg p-1.5 text-center font-semibold text-sm outline-none transition-all ${
                                   isAbsent
                                     ? "bg-gray-100 text-gray-400 border-gray-200"
                                     : "bg-white text-[var(--quinary)] border-gray-300 focus:border-[var(--primary)]"
                                 }`}
                               />
 
-                              <span className="text-gray-400 text-xs">/</span>
+                              <span className="text-gray-400 text-xs font-medium">/</span>
 
-                              {/* Total Marks Input */}
-                              <input
-                                type="number"
-                                min="1"
-                                value={currentCell.total_marks || globalTotalMarks}
-                                onChange={(e) =>
-                                  handleScoreChange(
-                                    student.student_id,
-                                    subj.subject_id,
-                                    "total_marks",
-                                    e.target.value
-                                  )
-                                }
-                                className="w-14 bg-gray-50 border border-gray-200 text-gray-600 rounded-lg p-1 text-center text-xs outline-none focus:border-[var(--primary)]"
-                              />
+                              {/* Static Display of Subject's Uniform Total Marks */}
+                              <span className="text-xs font-bold text-gray-500 w-8 text-left">
+                                {maxTotal}
+                              </span>
                             </div>
                           </td>
                         );
