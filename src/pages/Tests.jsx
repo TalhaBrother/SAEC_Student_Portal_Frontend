@@ -29,6 +29,9 @@ const Tests = () => {
         description: ''
     });
 
+    // Special frontend-only value used when assigning a test to every class.
+    const ALL_CLASSES_VALUE = '__ALL_CLASSES__';
+
     // Sub-loading states for forms (class-dependent sections/groups)
     const [formSections, setFormSections] = useState([]);
     const [formGroups, setFormGroups] = useState([]);
@@ -131,7 +134,9 @@ const Tests = () => {
             groups: []
         }));
 
-        if (!classId) {
+        // Sections/groups are class-specific, so they are not applicable
+        // when the test is assigned to every class.
+        if (!classId || classId === ALL_CLASSES_VALUE) {
             setFormSections([]);
             setFormGroups([]);
             return;
@@ -162,36 +167,52 @@ const Tests = () => {
         if (testItem) {
             setEditingTest(testItem);
 
-            // Handle extract class ID from classes_detail array returned by TestSerializer
-            const extractedClassId = testItem.classes_detail && testItem.classes_detail.length > 0
-                ? testItem.classes_detail[0].id
-                : (testItem.classes ? testItem.classes[0] : '');
+            const assignedClassDetails = testItem.classes_detail || [];
+            const assignedClassIds = assignedClassDetails.length > 0
+                ? assignedClassDetails.map((cls) => Number(cls.id))
+                : (testItem.classes || []).map((id) => Number(id));
+
+            // If every currently available class is assigned, show the
+            // frontend-only "All Classes" option.
+            const hasAllClasses = classes.length > 0 &&
+                assignedClassIds.length === classes.length &&
+                classes.every((cls) => assignedClassIds.includes(Number(cls.id)));
+
+            const extractedClassId = hasAllClasses
+                ? ALL_CLASSES_VALUE
+                : (assignedClassIds.length > 0 ? assignedClassIds[0] : '');
 
             const extractedSections = testItem.sections
-                || (testItem.section_details ? testItem.section_details.map((s) => s.id) : []);
+                || (testItem.sections_detail ? testItem.sections_detail.map((s) => s.id) : []);
             const extractedGroups = testItem.groups
-                || (testItem.group_details ? testItem.group_details.map((g) => g.id) : []);
+                || (testItem.groups_detail ? testItem.groups_detail.map((g) => g.id) : []);
 
             setFormData({
                 name: testItem.name || '',
                 student_class: extractedClassId,
-                sections: extractedSections,
-                groups: extractedGroups,
+                sections: hasAllClasses ? [] : extractedSections,
+                groups: hasAllClasses ? [] : extractedGroups,
                 date: testItem.date || '',
                 description: testItem.description || ''
             });
 
-            // Load the sections/groups options for the assigned class, then
-            // re-apply the saved selections (handleFormClassChange resets them)
-            await handleFormClassChange(extractedClassId);
-            setFormData({
-                name: testItem.name || '',
-                student_class: extractedClassId,
-                sections: extractedSections,
-                groups: extractedGroups,
-                date: testItem.date || '',
-                description: testItem.description || ''
-            });
+            if (extractedClassId !== ALL_CLASSES_VALUE) {
+                await handleFormClassChange(extractedClassId);
+
+                // handleFormClassChange resets sections/groups, so restore
+                // the saved selections after the dependent options load.
+                setFormData({
+                    name: testItem.name || '',
+                    student_class: extractedClassId,
+                    sections: extractedSections,
+                    groups: extractedGroups,
+                    date: testItem.date || '',
+                    description: testItem.description || ''
+                });
+            } else {
+                setFormSections([]);
+                setFormGroups([]);
+            }
         } else {
             setEditingTest(null);
             setFormData({
@@ -219,12 +240,17 @@ const Tests = () => {
         e.preventDefault();
         setActionLoading(true);
 
-        // Django expects ManyToMany array for classes: [class_id]
+        // Django expects a ManyToMany array for classes.
+        // For "All Classes", send every class ID.
+        const selectedClassIds = formData.student_class === ALL_CLASSES_VALUE
+            ? classes.map((cls) => Number(cls.id))
+            : [Number(formData.student_class)];
+
         const payload = {
             name: formData.name,
-            classes: [Number(formData.student_class)],
-            sections: formData.sections,
-            groups: formData.groups,
+            classes: selectedClassIds,
+            sections: formData.student_class === ALL_CLASSES_VALUE ? [] : formData.sections,
+            groups: formData.student_class === ALL_CLASSES_VALUE ? [] : formData.groups,
             date: formData.date,
             description: formData.description
         };
@@ -542,6 +568,7 @@ const Tests = () => {
                                     className="bg-white border border-gray-300 rounded-xl p-3 text-sm outline-none focus:border-[var(--primary)] cursor-pointer"
                                 >
                                     <option value="">Select Class</option>
+                                    <option value={ALL_CLASSES_VALUE}>All Classes</option>
                                     {classes.map((cls) => (
                                         <option key={cls.id} value={cls.id}>
                                             {cls.display_name || cls.name}
@@ -551,7 +578,7 @@ const Tests = () => {
                             </div>
 
                             {/* Multiple Sections Selection */}
-                            {formData.student_class && (
+                            {formData.student_class && formData.student_class !== ALL_CLASSES_VALUE && (
                                 <div className="flex flex-col">
                                     <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">
                                         Sections (Optional - Select multiple or leave empty for ALL)
@@ -593,7 +620,7 @@ const Tests = () => {
                             )}
 
                             {/* Multiple Groups Selection */}
-                            {formData.student_class && (
+                            {formData.student_class && formData.student_class !== ALL_CLASSES_VALUE && (
                                 <div className="flex flex-col">
                                     <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">
                                         Groups (Optional - Select multiple or leave empty for ALL)

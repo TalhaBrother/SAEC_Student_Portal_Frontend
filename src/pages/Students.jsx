@@ -58,6 +58,10 @@ const Students = () => {
   // Form state
   const [formData, setFormData] = useState(emptyForm());
   const [formLoading, setFormLoading] = useState(false); // loading the detail record for edit
+
+  // Profile image state
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState({ type: "", text: "" });
 
@@ -137,9 +141,52 @@ const Students = () => {
   const formSections = formClassObj?.sections || [];
   const formGroups = formClassObj?.groups || [];
 
+  // ---------- PROFILE IMAGE ----------
+  const clearImagePreview = () => {
+    setImageFile(null);
+    setImagePreview(null);
+  };
+
+  const handleImageChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5 MB
+
+    if (file.size > MAX_IMAGE_SIZE) {
+      e.target.value = "";
+      setImageFile(null);
+      setMessage({
+        type: "error",
+        text: "Profile picture must be 5 MB or smaller.",
+      });
+      return;
+    }
+
+    // Only the size is restricted on the frontend. The Django ImageField/Pillow
+    // remains responsible for validating whether the selected file is actually
+    // an image format that the backend can process.
+    setImageFile(file);
+    setMessage({ type: "", text: "" });
+
+    const objectUrl = URL.createObjectURL(file);
+    setImagePreview(objectUrl);
+  };
+
+  // Revoke temporary object URLs when the selected file/preview changes or the
+  // component unmounts, preventing browser memory leaks.
+  useEffect(() => {
+    return () => {
+      if (imagePreview?.startsWith("blob:")) {
+        URL.revokeObjectURL(imagePreview);
+      }
+    };
+  }, [imagePreview]);
+
   // ---------- FORM open/close ----------
   const openCreateForm = () => {
     setFormData(emptyForm());
+    clearImagePreview();
     setMessage({ type: "", text: "" });
     setMode("form");
   };
@@ -170,6 +217,9 @@ const Students = () => {
         email: detail.email || "",
         password: "",
       });
+
+      setImageFile(null);
+      setImagePreview(detail.image || null);
     } catch (err) {
       console.error("Error loading student for edit:", err);
       setMessage({ type: "error", text: "Failed to load student record." });
@@ -181,6 +231,7 @@ const Students = () => {
 
   const cancelForm = () => {
     setFormData(emptyForm());
+    clearImagePreview();
     setMode("list");
   };
 
@@ -195,40 +246,64 @@ const Students = () => {
     try {
       let res;
 
+      // The student image is an ImageField on the Django backend, so use
+      // multipart/form-data for create/update submissions.
+      const payload = new FormData();
+
       if (isEdit) {
-        const payload = {
-          full_name: formData.fullName,
-          father_name: formData.fatherName,
-          student_class: formData.studentClass,
-          phone: formData.phone,
-          gender: formData.gender,
-          residence: formData.residence,
-          student_whatsapp_no: formData.studentWhatsappNo,
-        };
-        if (formSections.length > 0 && formData.section) payload.section = formData.section;
-        if (formGroups.length > 0 && formData.group) payload.group = formData.group;
-        if (formData.email) payload.email = formData.email;
+        payload.append("full_name", formData.fullName);
+        payload.append("father_name", formData.fatherName);
+        payload.append("student_class", formData.studentClass);
+        payload.append("phone", formData.phone);
+        payload.append("gender", formData.gender);
+        payload.append("residence", formData.residence);
+        payload.append("student_whatsapp_no", formData.studentWhatsappNo);
 
-        res = await api.patch(`/students/${formData.id}/`, payload, { headers });
+        if (formSections.length > 0 && formData.section) {
+          payload.append("section", formData.section);
+        }
+        if (formGroups.length > 0 && formData.group) {
+          payload.append("group", formData.group);
+        }
+        if (formData.email) {
+          payload.append("email", formData.email);
+        }
       } else {
-        const payload = {
-          full_name: formData.fullName,
-          father_name: formData.fatherName,
-          student_id: formData.studentId,
-          student_class: formData.studentClass,
-          phone: formData.phone,
-          gender: formData.gender,
-          residence: formData.residence,
-          student_whatsapp_no: formData.studentWhatsappNo,
-          username: formData.username,
-          email: formData.email,
-          password: formData.password,
-        };
-        if (formSections.length > 0 && formData.section) payload.section = formData.section;
-        if (formGroups.length > 0 && formData.group) payload.group = formData.group;
+        payload.append("full_name", formData.fullName);
+        payload.append("father_name", formData.fatherName);
+        payload.append("student_id", formData.studentId);
+        payload.append("student_class", formData.studentClass);
+        payload.append("phone", formData.phone);
+        payload.append("gender", formData.gender);
+        payload.append("residence", formData.residence);
+        payload.append("student_whatsapp_no", formData.studentWhatsappNo);
+        payload.append("username", formData.username);
+        payload.append("email", formData.email);
+        payload.append("password", formData.password);
 
-        res = await api.post("/students/", payload, { headers });
+        if (formSections.length > 0 && formData.section) {
+          payload.append("section", formData.section);
+        }
+        if (formGroups.length > 0 && formData.group) {
+          payload.append("group", formData.group);
+        }
       }
+
+      // Only send image when a new file has been selected. During editing,
+      // leaving the image untouched keeps the existing profile picture.
+      if (imageFile) {
+        payload.append("image", imageFile);
+      }
+
+      const multipartHeaders = {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": undefined,
+      };
+
+
+      res = isEdit
+        ? await api.patch(`/students/${formData.id}/`, payload, { headers:multipartHeaders })
+        : await api.post("/students/", payload, { headers:multipartHeaders });
 
       console.log(isEdit ? "Student Updated Successfully:" : "Student Added Successfully:", res.data);
 
@@ -244,6 +319,7 @@ const Students = () => {
 
       await fetchStudents();
       setFormData(emptyForm());
+      clearImagePreview();
       setMode("list");
     } catch (error) {
       console.error(isEdit ? "Update Student Error!" : "Add Student Error!", error.response?.data);
@@ -347,6 +423,27 @@ const Students = () => {
     }
   };
 
+  // Generates a sanitized username from full name + random 3-digit suffix
+  const generateUsername = (fullName) => {
+    if (!fullName) return "";
+    const sanitized = fullName
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]/g, ""); // remove spaces and special characters
+    const randomSuffix = Math.floor(100 + Math.random() * 900); // e.g., 482
+    return `${sanitized}${randomSuffix}`;
+  };
+
+  // Generates a random secure password
+  const generatePassword = (length = 10) => {
+    const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
+    let password = "";
+    for (let i = 0; i < length; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return password;
+  };
+
   return (
     <div className="p-6 bg-[var(--secondary)] text-[var(--quinary)] min-h-screen font-sans">
       {/* Header */}
@@ -382,11 +479,10 @@ const Students = () => {
       {/* Status Message Display */}
       {message.text && (
         <div
-          className={`p-3 rounded-xl text-sm mb-6 whitespace-pre-line text-center border max-w-3xl ${
-            message.type === "success"
-              ? "bg-green-50 text-green-700 border-green-200"
-              : "bg-red-50 text-red-700 border-red-200"
-          }`}
+          className={`p-3 rounded-xl text-sm mb-6 whitespace-pre-line text-center border max-w-3xl ${message.type === "success"
+            ? "bg-green-50 text-green-700 border-green-200"
+            : "bg-red-50 text-red-700 border-red-200"
+            }`}
         >
           {message.text}
         </div>
@@ -403,6 +499,72 @@ const Students = () => {
             <div className="text-sm text-gray-400 p-6 text-center">Loading student record...</div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Section: Profile Picture */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
+                  Profile Picture
+                </h3>
+
+                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
+                  <div className="w-28 h-28 rounded-full border-4 border-gray-100 bg-gray-50 overflow-hidden flex items-center justify-center shadow-sm shrink-0">
+                    {imagePreview ? (
+                      <img
+                        src={imagePreview}
+                        alt="Student profile preview"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          // Keep the selected file intact even if the browser cannot
+                          // render a particular image format in the preview.
+                          e.currentTarget.style.display = "none";
+                        }}
+                      />
+                    ) : (
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        className="w-12 h-12 text-gray-300"
+                        aria-hidden="true"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.5 20.25a8.25 8.25 0 0 1 15 0"
+                        />
+                      </svg>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col items-center sm:items-start gap-2">
+                    <label
+                      htmlFor="student-profile-image"
+                      className="bg-[var(--primary)] hover:bg-[var(--quinary)] text-white font-medium py-2.5 px-5 rounded-xl transition-colors cursor-pointer text-sm shadow-sm"
+                    >
+                      {imageFile ? "Change Image" : imagePreview ? "Change Image" : "Upload Image"}
+                    </label>
+                    <input
+                      id="student-profile-image"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageChange}
+                      className="hidden"
+                    />
+                    <p className="text-xs text-gray-400 text-center sm:text-left">
+                      Maximum size: 5 MB. JPG, JPEG, PNG, GIF, WebP and other supported image formats.
+                    </p>
+                    {imageFile && (
+                      <p className="text-xs text-gray-500 max-w-xs truncate" title={imageFile.name}>
+                        Selected: {imageFile.name}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <hr className="border-gray-100" />
+
               {/* Section: Personal Information */}
               <div>
                 <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
@@ -416,7 +578,24 @@ const Students = () => {
                     <input
                       type="text"
                       value={formData.fullName}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, fullName: e.target.value }))}
+                      onChange={(e) => {
+                        const name = e.target.value;
+                        setFormData((prev) => {
+                          // Only auto-generate credentials if creating a new record
+                          if (!prev.id) {
+                            const autoUsername = generateUsername(name);
+                            const autoPassword = prev.password || generatePassword(10); // Keep existing or generate new
+                            return {
+                              ...prev,
+                              fullName: name,
+                              username: autoUsername,
+                              password: autoPassword,
+                              confirmPassword: autoPassword, // Matches automatically
+                            };
+                          }
+                          return { ...prev, fullName: name };
+                        });
+                      }}
                       placeholder="Shayan Khan"
                       required
                       className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm"
@@ -525,11 +704,10 @@ const Students = () => {
                       placeholder="STU-2026-001"
                       required
                       disabled={Boolean(formData.id)}
-                      className={`border border-gray-300 rounded-xl p-3 outline-none transition-colors text-sm ${
-                        formData.id
-                          ? "bg-gray-100 text-gray-500 cursor-not-allowed"
-                          : "bg-white text-[var(--quinary)] focus:border-[var(--primary)]"
-                      }`}
+                      className={`border border-gray-300 rounded-xl p-3 outline-none transition-colors text-sm ${formData.id
+                        ? "bg-gray-100 text-gray-500 cursor-not-allowed"
+                        : "bg-white text-[var(--quinary)] focus:border-[var(--primary)]"
+                        }`}
                     />
                     {formData.id && (
                       <p className="text-gray-400 text-xs mt-1">GR No cannot be changed after registration.</p>
@@ -605,64 +783,95 @@ const Students = () => {
 
               <hr className="border-gray-100" />
 
+
               {/* Section: Portal Account Credentials */}
               <div>
-                <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
-                  Portal Account Credentials
-                </h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
+                    Portal Account Credentials
+                  </h3>
+                  {!formData.id && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newPass = generatePassword(10);
+                        setFormData((prev) => ({
+                          ...prev,
+                          username: generateUsername(prev.fullName),
+                          password: newPass,
+                          confirmPassword: newPass,
+                        }));
+                      }}
+                      className="text-xs font-semibold text-[var(--primary)] hover:underline cursor-pointer"
+                    >
+                      ↻ Regenerate Credentials
+                    </button>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* Username: shown always, but only editable at creation — the backend has no way to change it after */}
+                  {/* Username */}
                   <div className="flex flex-col">
                     <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
                       Username
                     </label>
-                    {formData.id ? (
-                      <input
-                        type="text"
-                        value={formData.username}
-                        disabled
-                        className="bg-gray-100 text-gray-500 border border-gray-300 rounded-xl p-3 outline-none text-sm cursor-not-allowed"
-                      />
-                    ) : (
-                      <input
-                        type="text"
-                        value={formData.username}
-                        onChange={(e) => setFormData((prev) => ({ ...prev, username: e.target.value }))}
-                        placeholder="shayankhan123"
-                        required
-                        className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm"
-                      />
-                    )}
+                    <input
+                      type="text"
+                      value={formData.username || ""}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, username: e.target.value }))}
+                      disabled={Boolean(formData.id)}
+                      placeholder="Auto-generated"
+                      required
+                      className={`border border-gray-300 rounded-xl p-3 outline-none text-sm transition-colors ${formData.id
+                        ? "bg-gray-100 text-gray-500 cursor-not-allowed"
+                        : "bg-white text-[var(--quinary)] focus:border-[var(--primary)]"
+                        }`}
+                    />
                   </div>
 
+                  {/* Email */}
                   <div className="flex flex-col">
                     <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
                       Email Address
                     </label>
                     <input
                       type="email"
-                      value={formData.email}
+                      value={formData.email || ""}
                       onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
                       placeholder="shayan@gmail.com"
                       className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm"
                     />
                   </div>
 
-                  {/* Password: creation only — backend has no password-reset field on update */}
+                  {/* Password */}
                   {!formData.id && (
-                    <div className="flex flex-col">
-                      <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
-                        System Password
-                      </label>
+                    <>
+                      <div className="flex flex-col">
+                        <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
+                          System Password
+                        </label>
+                        <input
+                          type="text" // Shown as text so admin can view/copy auto-generated password easily
+                          value={formData.password || ""}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              password: e.target.value,
+                              confirmPassword: e.target.value,
+                            }))
+                          }
+                          placeholder="Auto-generated"
+                          required
+                          className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm font-mono"
+                        />
+                      </div>
+
+                      {/* Optional Hidden/Readonly Confirm Password */}
                       <input
-                        type="password"
-                        value={formData.password}
-                        onChange={(e) => setFormData((prev) => ({ ...prev, password: e.target.value }))}
-                        placeholder="••••••••"
-                        required
-                        className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm"
+                        type="hidden"
+                        value={formData.confirmPassword || formData.password || ""}
                       />
-                    </div>
+                    </>
                   )}
                 </div>
               </div>
@@ -687,8 +896,8 @@ const Students = () => {
                       ? "Updating..."
                       : "Registering..."
                     : formData.id
-                    ? "Update Student"
-                    : "Create Student Account"}
+                      ? "Update Student"
+                      : "Create Student Account"}
                 </button>
               </div>
             </form>
@@ -853,11 +1062,10 @@ const Students = () => {
                         </td>
                         <td className="p-3 whitespace-nowrap">
                           <span
-                            className={`text-xs font-medium px-2.5 py-1 rounded-full border ${
-                              student.is_frozen
-                                ? "bg-red-50 text-red-600 border-red-200"
-                                : "bg-green-50 text-green-700 border-green-200"
-                            }`}
+                            className={`text-xs font-medium px-2.5 py-1 rounded-full border ${student.is_frozen
+                              ? "bg-red-50 text-red-600 border-red-200"
+                              : "bg-green-50 text-green-700 border-green-200"
+                              }`}
                           >
                             {student.is_frozen ? "Frozen" : "Active"}
                           </span>
@@ -875,15 +1083,14 @@ const Students = () => {
                               type="button"
                               onClick={() => handleToggleStatus(student)}
                               disabled={statusChangingId === student.id}
-                              className={`text-sm font-medium hover:underline cursor-pointer disabled:opacity-50 ${
-                                student.is_frozen ? "text-green-600" : "text-amber-600"
-                              }`}
+                              className={`text-sm font-medium hover:underline cursor-pointer disabled:opacity-50 ${student.is_frozen ? "text-green-600" : "text-amber-600"
+                                }`}
                             >
                               {statusChangingId === student.id
                                 ? "..."
                                 : student.is_frozen
-                                ? "Activate"
-                                : "Freeze"}
+                                  ? "Activate"
+                                  : "Freeze"}
                             </button>
                             <button
                               type="button"
