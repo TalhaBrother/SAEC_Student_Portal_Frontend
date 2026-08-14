@@ -26,8 +26,8 @@ function startDjango() {
 
     djangoProcess = spawn(djangoExe, [], {
         cwd: resourcesPath,
-        windowsHide: false,
-        stdio: 'inherit'
+        windowsHide: true,
+        stdio: 'ignore'
     });
 
     djangoProcess.on('error', (error) => {
@@ -53,7 +53,7 @@ function createWindow() {
         }
     });
 
-    mainWindow.webContents.openDevTools();
+    // mainWindow.webContents.openDevTools();
 
     if (app.isPackaged) {
         const indexPath = path.join(

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import api from "../api/axios";
 import useAuthStore from "../store/authStore";
 
@@ -26,14 +26,18 @@ const Result = () => {
     const [loadingAvailable, setLoadingAvailable] = useState(false);
     const [availableReportsByStudent, setAvailableReportsByStudent] = useState({});
 
-    // Report card format — this is a site-wide setting (affects every
-    // admin's report card generation), not a per-download choice.
-    const [ReportFormat, setReportFormat] = useState(null); // "current" | "individual"
-    const [loadingFormat, setLoadingFormat] = useState(true);
-    const [savingFormat, setSavingFormat] = useState(false);
+    // Report card format is a single global setting on the backend — there's
+    // no per-request param. To give per-download choice anyway, we flip that
+    // global setting immediately before each download/zip request. This ref
+    // tracks what we last set it to, so we skip redundant PATCH calls.
+    const lastSetFormatRef = useRef(null);
 
     // Whole-class ZIP generation
     const [downloadingZip, setDownloadingZip] = useState(false);
+    const [classZipFormat, setClassZipFormat] = useState("current"); // "current" | "individual"
+    const [classTests, setClassTests] = useState([]);
+    const [loadingClassTests, setLoadingClassTests] = useState(false);
+    const [selectedZipTestId, setSelectedZipTestId] = useState("");
 
     // ---------------------------------------------------------
     // Debounce the search box so we don't hammer the API on every keystroke
@@ -60,51 +64,47 @@ const Result = () => {
     }, [token]);
 
     // ---------------------------------------------------------
-    // Load the current report card format setting once on mount.
-    // This is a global setting shared by every admin.
+    // Load the tests available for the selected class, so the whole-class
+    // ZIP action can offer a test picker when Format 2 is chosen.
     // ---------------------------------------------------------
     useEffect(() => {
-        const loadFormat = async () => {
-            setLoadingFormat(true);
+        setClassTests([]);
+        setSelectedZipTestId("");
+        setClassZipFormat("current");
+
+        if (!SelectedClass || !token) return;
+
+        const loadClassTests = async () => {
+            setLoadingClassTests(true);
             try {
-                const res = await api.get("/reports/report-card-settings/", {
+                const res = await api.get(`/report-tests/?class_id=${SelectedClass}`, {
                     headers: authHeaders,
                 });
-                setReportFormat(res.data?.format || "current");
+                setClassTests(res.data || []);
             } catch (err) {
-                console.error("Failed to load report card format setting:", err);
-                setReportFormat("current");
+                console.error("Failed to load class tests:", err);
+                setClassTests([]);
             } finally {
-                setLoadingFormat(false);
+                setLoadingClassTests(false);
             }
         };
-        if (token) loadFormat();
+        loadClassTests();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [token]);
+    }, [SelectedClass, token]);
 
     // ---------------------------------------------------------
-    // Switch the report card format. Optimistically updates the UI,
-    // then persists via PATCH; rolls back on failure.
+    // Make sure the backend's global report-card-format setting matches
+    // what this specific download needs, right before requesting it.
+    // Skips the PATCH if we already know it's set correctly.
     // ---------------------------------------------------------
-    const handleChangeFormat = async (newFormat) => {
-        if (newFormat === ReportFormat || savingFormat) return;
-
-        const previousFormat = ReportFormat;
-        setReportFormat(newFormat);
-        setSavingFormat(true);
-        try {
-            await api.patch(
-                "/reports/report-card-settings/",
-                { format: newFormat },
-                { headers: authHeaders }
-            );
-        } catch (err) {
-            console.error("Failed to update report card format:", err);
-            setReportFormat(previousFormat);
-            alert("Could not update the report card format. Please try again.");
-        } finally {
-            setSavingFormat(false);
-        }
+    const ensureServerFormat = async (format) => {
+        if (lastSetFormatRef.current === format) return;
+        await api.patch(
+            "/reports/report-card-settings/",
+            { format },
+            { headers: authHeaders }
+        );
+        lastSetFormatRef.current = format;
     };
 
     // ---------------------------------------------------------
@@ -169,18 +169,16 @@ const Result = () => {
     }, [fetchStudents]);
 
     // ---------------------------------------------------------
-    // Download the PDF report card. testId is optional — omit it to
-    // generate the combined report across every test the student has marks for.
+    // Download the combined report card (every test, Format 1 only —
+    // Format 2 always needs one specific test, see handleDownloadTestReport).
     // ---------------------------------------------------------
-    const handleDownloadReportCard = async (studentId, studentName, testId = null) => {
-        const busyKey = testId ? `${studentId}-${testId}` : `${studentId}`;
+    const handleDownloadReportCard = async (studentId, studentName) => {
+        const busyKey = `${studentId}`;
         setDownloadingId(busyKey);
         try {
-            const url = testId
-                ? `/reports/report-card/${studentId}/?test_id=${testId}`
-                : `/reports/report-card/${studentId}/`;
+            await ensureServerFormat("current");
 
-            const res = await api.get(url, {
+            const res = await api.get(`/reports/report-card/${studentId}/`, {
                 headers: authHeaders,
                 responseType: "blob",
             });
@@ -197,18 +195,57 @@ const Result = () => {
     };
 
     // ---------------------------------------------------------
-    // Generate a ZIP of full report cards for every student matching
-    // the currently selected class/section/group/search filters.
+    // Download a single test's report card in either format.
+    // format: "current" (Format 1) | "individual" (Format 2)
+    // ---------------------------------------------------------
+    const handleDownloadTestReport = async (studentId, studentName, testId, format) => {
+        const busyKey = `${studentId}-${testId}-${format}`;
+        setDownloadingId(busyKey);
+        try {
+            await ensureServerFormat(format);
+
+            const res = await api.get(
+                `/reports/report-card/${studentId}/?test_id=${testId}`,
+                {
+                    headers: authHeaders,
+                    responseType: "blob",
+                }
+            );
+
+            const file = new Blob([res.data], { type: "application/pdf" });
+            const fileURL = URL.createObjectURL(file);
+            window.open(fileURL, "_blank");
+        } catch (err) {
+            console.error("Test report download failed:", err);
+            alert(`Could not generate this report for ${studentName}. Make sure marks are assigned for this test.`);
+        } finally {
+            setDownloadingId(null);
+        }
+    };
+
+    // ---------------------------------------------------------
+    // Generate a ZIP of report cards, in the chosen format, for every
+    // student matching the currently selected class/section/group/search
+    // filters. Format 2 additionally requires one test selected up front
+    // (that format is inherently per-test).
     // ---------------------------------------------------------
     const handleGenerateClassZip = async () => {
         if (!SelectedClass) return;
 
+        if (classZipFormat === "individual" && !selectedZipTestId) {
+            alert("Please select a test first — Format 2 needs one test to generate the whole class's reports.");
+            return;
+        }
+
         setDownloadingZip(true);
         try {
+            await ensureServerFormat(classZipFormat);
+
             const params = new URLSearchParams({ class_id: SelectedClass });
             if (SelectedSection) params.append("section_id", SelectedSection);
             if (SelectedGroup) params.append("group_id", SelectedGroup);
             if (DebouncedSearch) params.append("search", DebouncedSearch);
+            if (classZipFormat === "individual") params.append("test_id", selectedZipTestId);
 
             const res = await api.get(
                 `/reports/class-report-cards-zip/?${params.toString()}`,
@@ -311,53 +348,6 @@ const Result = () => {
             <div className="text-3xl font-bold tracking-tight mb-2 text-[var(--quinary)]">Academic Reports</div>
             <p className="text-gray-500 text-sm mb-6">Inspect, compile, and distribute finalized performance metrics and multi-test summaries.</p>
 
-            {/* Report Card Format — site-wide setting */}
-            <div className="max-w-5xl bg-white p-5 rounded-2xl border border-gray-200 shadow-sm mb-4">
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                    <div>
-                        <h3 className="text-xs uppercase tracking-wider text-gray-500 font-bold mb-1">Report Card Format</h3>
-                        <p className="text-xs text-gray-400">
-                            Site-wide setting — changes how report cards are generated for every admin until switched again.
-                        </p>
-                    </div>
-
-                    {loadingFormat ? (
-                        <div className="text-xs text-gray-400 font-medium py-2">Loading...</div>
-                    ) : (
-                        <div className="flex gap-2 flex-wrap">
-                            <button
-                                onClick={() => handleChangeFormat("current")}
-                                disabled={savingFormat}
-                                className={`text-xs font-semibold py-2 px-4 rounded-xl border transition-all cursor-pointer disabled:opacity-50 ${
-                                    ReportFormat === "current"
-                                        ? "bg-[var(--primary)] text-white border-[var(--primary)]"
-                                        : "bg-white text-[var(--quinary)] border-gray-300 hover:border-[var(--primary)]"
-                                }`}
-                            >
-                                Format 1 — Current Report Card
-                            </button>
-                            <button
-                                onClick={() => handleChangeFormat("individual")}
-                                disabled={savingFormat}
-                                className={`text-xs font-semibold py-2 px-4 rounded-xl border transition-all cursor-pointer disabled:opacity-50 ${
-                                    ReportFormat === "individual"
-                                        ? "bg-[var(--primary)] text-white border-[var(--primary)]"
-                                        : "bg-white text-[var(--quinary)] border-gray-300 hover:border-[var(--primary)]"
-                                }`}
-                            >
-                                Format 2 — Individual Test Report Card
-                            </button>
-                        </div>
-                    )}
-                </div>
-
-                {ReportFormat === "individual" && (
-                    <div className="mt-3 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
-                        In this format, report cards are generated per test. Use "View Tests" on a student and download a specific test's report — the combined "Full Report Card" button is disabled while this format is active.
-                    </div>
-                )}
-            </div>
-
             {/* Filter Deck */}
             <div className="flex flex-col sm:flex-row gap-4 mb-4 items-end bg-white p-5 rounded-2xl border border-gray-200 shadow-sm max-w-5xl flex-wrap">
                 <div className="flex flex-col min-w-[220px] w-full sm:w-auto">
@@ -423,21 +413,76 @@ const Result = () => {
 
             {/* Bulk actions */}
             {SelectedClass && (
-                <div className="flex gap-3 mb-8 max-w-5xl flex-wrap">
-                    <button
-                        onClick={handleGenerateClassZip}
-                        disabled={downloadingZip || loadingStudents || Students.length === 0}
-                        className="text-xs bg-[var(--secondary)] hover:bg-[var(--primary)] hover:text-white text-[var(--primary)] font-semibold py-2 px-4 rounded-xl border border-gray-200 transition-all cursor-pointer disabled:opacity-40"
-                    >
-                        {downloadingZip ? "Generating ZIP..." : "📦 Generate Complete Class Reports"}
-                    </button>
-                    <button
-                        disabled
-                        title="Coming soon"
-                        className="text-xs bg-gray-100 text-gray-400 font-semibold py-2 px-4 rounded-xl border border-gray-200 cursor-not-allowed"
-                    >
-                        💬 WhatsApp All Parents (Coming soon)
-                    </button>
+                <div className="flex flex-col gap-3 mb-8 max-w-5xl bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">
+                    <div className="flex flex-wrap items-center gap-3">
+                        <span className="text-xs uppercase tracking-wider text-gray-500 font-bold">Whole Class Format:</span>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => { setClassZipFormat("current"); setSelectedZipTestId(""); }}
+                                className={`text-xs font-semibold py-1.5 px-3 rounded-lg border transition-all cursor-pointer ${
+                                    classZipFormat === "current"
+                                        ? "bg-[var(--primary)] text-white border-[var(--primary)]"
+                                        : "bg-white text-[var(--quinary)] border-gray-300 hover:border-[var(--primary)]"
+                                }`}
+                            >
+                                Format 1
+                            </button>
+                            <button
+                                onClick={() => setClassZipFormat("individual")}
+                                className={`text-xs font-semibold py-1.5 px-3 rounded-lg border transition-all cursor-pointer ${
+                                    classZipFormat === "individual"
+                                        ? "bg-[var(--primary)] text-white border-[var(--primary)]"
+                                        : "bg-white text-[var(--quinary)] border-gray-300 hover:border-[var(--primary)]"
+                                }`}
+                            >
+                                Format 2
+                            </button>
+                        </div>
+
+                        {classZipFormat === "individual" && (
+                            <select
+                                value={selectedZipTestId}
+                                onChange={(e) => setSelectedZipTestId(e.target.value)}
+                                disabled={loadingClassTests}
+                                className="bg-white text-[var(--quinary)] border border-gray-300 rounded-lg py-1.5 px-3 outline-none focus:border-[var(--primary)] text-xs cursor-pointer font-medium disabled:opacity-50 min-w-[160px]"
+                            >
+                                <option value="">
+                                    {loadingClassTests ? "Loading tests..." : "Select a test"}
+                                </option>
+                                {classTests.map((t) => (
+                                    <option key={t.id} value={t.id}>{t.name}</option>
+                                ))}
+                            </select>
+                        )}
+                    </div>
+
+                    {classZipFormat === "individual" && (
+                        <div className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                            Format 2 generates one report per student for a single test — pick the test above before generating.
+                        </div>
+                    )}
+
+                    <div className="flex gap-3 flex-wrap">
+                        <button
+                            onClick={handleGenerateClassZip}
+                            disabled={
+                                downloadingZip ||
+                                loadingStudents ||
+                                Students.length === 0 ||
+                                (classZipFormat === "individual" && !selectedZipTestId)
+                            }
+                            className="text-xs bg-[var(--secondary)] hover:bg-[var(--primary)] hover:text-white text-[var(--primary)] font-semibold py-2 px-4 rounded-xl border border-gray-200 transition-all cursor-pointer disabled:opacity-40"
+                        >
+                            {downloadingZip ? "Generating ZIP..." : "📦 Generate Complete Class Reports"}
+                        </button>
+                        <button
+                            disabled
+                            title="Coming soon"
+                            className="text-xs bg-gray-100 text-gray-400 font-semibold py-2 px-4 rounded-xl border border-gray-200 cursor-not-allowed"
+                        >
+                            💬 WhatsApp All Parents (Coming soon)
+                        </button>
+                    </div>
                 </div>
             )}
 
@@ -470,11 +515,10 @@ const Result = () => {
                                     <div className="flex gap-2 flex-wrap">
                                         <button
                                             onClick={() => handleDownloadReportCard(student.id, student.full_name)}
-                                            disabled={downloadingId === `${student.id}` || ReportFormat === "individual"}
-                                            title={ReportFormat === "individual" ? "Switch to 'Current Report Card' format, or download a specific test below." : undefined}
+                                            disabled={downloadingId === `${student.id}`}
                                             className="text-xs bg-[var(--secondary)] hover:bg-[var(--primary)] hover:text-white text-[var(--primary)] font-semibold py-2 px-3 rounded-xl transition-all cursor-pointer disabled:opacity-40"
                                         >
-                                            {downloadingId === `${student.id}` ? "Generating..." : "Full Report Card"}
+                                            {downloadingId === `${student.id}` ? "Generating..." : "Full Report Card (Format 1)"}
                                         </button>
                                         <button
                                             onClick={() => handleToggleAvailableTests(student.id)}
@@ -501,13 +545,20 @@ const Result = () => {
                                                         <div className="text-sm font-semibold text-[var(--quinary)]">{test.test_name}</div>
                                                         <div className="text-xs text-gray-400">{test.date} · {test.percentage}%</div>
                                                     </div>
-                                                    <div className="flex gap-2">
+                                                    <div className="flex gap-2 flex-wrap">
                                                         <button
-                                                            onClick={() => handleDownloadReportCard(student.id, student.full_name, test.test_id)}
-                                                            disabled={downloadingId === `${student.id}-${test.test_id}`}
+                                                            onClick={() => handleDownloadTestReport(student.id, student.full_name, test.test_id, "current")}
+                                                            disabled={downloadingId === `${student.id}-${test.test_id}-current`}
                                                             className="text-xs bg-[var(--secondary)] hover:bg-[var(--primary)] hover:text-white text-[var(--primary)] font-semibold py-1.5 px-3 rounded-lg transition-all cursor-pointer disabled:opacity-40"
                                                         >
-                                                            {downloadingId === `${student.id}-${test.test_id}` ? "..." : "Download"}
+                                                            {downloadingId === `${student.id}-${test.test_id}-current` ? "..." : "Format 1"}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDownloadTestReport(student.id, student.full_name, test.test_id, "individual")}
+                                                            disabled={downloadingId === `${student.id}-${test.test_id}-individual`}
+                                                            className="text-xs bg-indigo-50 hover:bg-indigo-600 hover:text-white text-indigo-600 font-semibold py-1.5 px-3 rounded-lg transition-all cursor-pointer disabled:opacity-40 border border-indigo-200"
+                                                        >
+                                                            {downloadingId === `${student.id}-${test.test_id}-individual` ? "..." : "Format 2"}
                                                         </button>
                                                         <button
                                                             onClick={() => handleSendWhatsAppText(student.id, test.test_id)}

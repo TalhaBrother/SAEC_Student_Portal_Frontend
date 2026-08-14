@@ -20,17 +20,20 @@ const Tests = () => {
     // Modal & Form States
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingTest, setEditingTest] = useState(null);
+
+    // How the test is being assigned: a single class, a hand-picked list of
+    // classes, or every class. This drives which class picker UI is shown.
+    const [assignMode, setAssignMode] = useState('single'); // 'single' | 'multiple' | 'all'
+
     const [formData, setFormData] = useState({
         name: '',
-        student_class: '',
+        student_class: '', // used when assignMode === 'single'
+        classes: [],        // used when assignMode === 'multiple'
         sections: [],
         groups: [],
         date: '',
         description: ''
     });
-
-    // Special frontend-only value used when assigning a test to every class.
-    const ALL_CLASSES_VALUE = '__ALL_CLASSES__';
 
     // Sub-loading states for forms (class-dependent sections/groups)
     const [formSections, setFormSections] = useState([]);
@@ -125,7 +128,7 @@ const Tests = () => {
         }
     }, [fetchTests, token]);
 
-    // 4. Handle Class changes inside Modal (Fetches applicable sections and groups for selected class)
+    // 4. Handle single-class selection inside Modal (Fetches applicable sections and groups for selected class)
     const handleFormClassChange = async (classId) => {
         setFormData((prev) => ({
             ...prev,
@@ -135,8 +138,8 @@ const Tests = () => {
         }));
 
         // Sections/groups are class-specific, so they are not applicable
-        // when the test is assigned to every class.
-        if (!classId || classId === ALL_CLASSES_VALUE) {
+        // until a single class is actually chosen.
+        if (!classId) {
             setFormSections([]);
             setFormGroups([]);
             return;
@@ -162,6 +165,35 @@ const Tests = () => {
         }
     };
 
+    // Toggle a class in/out of the "Multiple Classes" selection.
+    const handleToggleMultiClass = (classId) => {
+        setFormData((prev) => {
+            const id = Number(classId);
+            const alreadySelected = prev.classes.includes(id);
+            return {
+                ...prev,
+                classes: alreadySelected
+                    ? prev.classes.filter((c) => c !== id)
+                    : [...prev.classes, id]
+            };
+        });
+    };
+
+    // Switch between Single / Multiple / All assignment modes, resetting
+    // whichever fields don't apply to the newly selected mode.
+    const handleAssignModeChange = (mode) => {
+        setAssignMode(mode);
+        setFormData((prev) => ({
+            ...prev,
+            student_class: '',
+            classes: [],
+            sections: [],
+            groups: []
+        }));
+        setFormSections([]);
+        setFormGroups([]);
+    };
+
     // Modal Handlers
     const handleOpenModal = async (testItem = null) => {
         if (testItem) {
@@ -172,40 +204,54 @@ const Tests = () => {
                 ? assignedClassDetails.map((cls) => Number(cls.id))
                 : (testItem.classes || []).map((id) => Number(id));
 
-            // If every currently available class is assigned, show the
-            // frontend-only "All Classes" option.
+            // If every currently available class is assigned, treat it as
+            // "All Classes". Otherwise more than one class means "Multiple
+            // Classes", and exactly one means "Single Class".
             const hasAllClasses = classes.length > 0 &&
                 assignedClassIds.length === classes.length &&
                 classes.every((cls) => assignedClassIds.includes(Number(cls.id)));
 
-            const extractedClassId = hasAllClasses
-                ? ALL_CLASSES_VALUE
-                : (assignedClassIds.length > 0 ? assignedClassIds[0] : '');
+            const mode = hasAllClasses
+                ? 'all'
+                : (assignedClassIds.length > 1 ? 'multiple' : 'single');
+
+            setAssignMode(mode);
 
             const extractedSections = testItem.sections
                 || (testItem.sections_detail ? testItem.sections_detail.map((s) => s.id) : []);
             const extractedGroups = testItem.groups
                 || (testItem.groups_detail ? testItem.groups_detail.map((g) => g.id) : []);
 
+            // Sections/groups are only meaningful when the test is tied to
+            // exactly one class.
+            const applicableSections = mode === 'single' ? extractedSections : [];
+            const applicableGroups = mode === 'single' ? extractedGroups : [];
+
+            const singleClassId = mode === 'single' && assignedClassIds.length > 0
+                ? assignedClassIds[0]
+                : '';
+
             setFormData({
                 name: testItem.name || '',
-                student_class: extractedClassId,
-                sections: hasAllClasses ? [] : extractedSections,
-                groups: hasAllClasses ? [] : extractedGroups,
+                student_class: singleClassId,
+                classes: mode === 'multiple' ? assignedClassIds : [],
+                sections: applicableSections,
+                groups: applicableGroups,
                 date: testItem.date || '',
                 description: testItem.description || ''
             });
 
-            if (extractedClassId !== ALL_CLASSES_VALUE) {
-                await handleFormClassChange(extractedClassId);
+            if (mode === 'single' && singleClassId) {
+                await handleFormClassChange(singleClassId);
 
                 // handleFormClassChange resets sections/groups, so restore
                 // the saved selections after the dependent options load.
                 setFormData({
                     name: testItem.name || '',
-                    student_class: extractedClassId,
-                    sections: extractedSections,
-                    groups: extractedGroups,
+                    student_class: singleClassId,
+                    classes: [],
+                    sections: applicableSections,
+                    groups: applicableGroups,
                     date: testItem.date || '',
                     description: testItem.description || ''
                 });
@@ -215,9 +261,11 @@ const Tests = () => {
             }
         } else {
             setEditingTest(null);
+            setAssignMode('single');
             setFormData({
                 name: '',
                 student_class: '',
+                classes: [],
                 sections: [],
                 groups: [],
                 date: '',
@@ -232,25 +280,48 @@ const Tests = () => {
     const handleCloseModal = () => {
         setIsModalOpen(false);
         setEditingTest(null);
-        setFormData({ name: '', student_class: '', sections: [], groups: [], date: '', description: '' });
+        setAssignMode('single');
+        setFormData({ name: '', student_class: '', classes: [], sections: [], groups: [], date: '', description: '' });
+        setFormSections([]);
+        setFormGroups([]);
     };
 
     // Create & Update (POST / PUT)
     const handleSave = async (e) => {
         e.preventDefault();
+
+        if (assignMode === 'single' && !formData.student_class) {
+            showMessage('error', 'Please select a class.');
+            return;
+        }
+
+        if (assignMode === 'multiple' && formData.classes.length === 0) {
+            showMessage('error', 'Please select at least one class.');
+            return;
+        }
+
         setActionLoading(true);
 
         // Django expects a ManyToMany array for classes.
-        // For "All Classes", send every class ID.
-        const selectedClassIds = formData.student_class === ALL_CLASSES_VALUE
-            ? classes.map((cls) => Number(cls.id))
-            : [Number(formData.student_class)];
+        // - Single: exactly one class.
+        // - Multiple: whichever classes were checked.
+        // - All: every class ID currently available.
+        let selectedClassIds;
+        if (assignMode === 'all') {
+            selectedClassIds = classes.map((cls) => Number(cls.id));
+        } else if (assignMode === 'multiple') {
+            selectedClassIds = formData.classes.map((id) => Number(id));
+        } else {
+            selectedClassIds = [Number(formData.student_class)];
+        }
 
+        // Sections/groups are class-specific, so they only apply when the
+        // test is tied to exactly one class.
         const payload = {
             name: formData.name,
             classes: selectedClassIds,
-            sections: formData.student_class === ALL_CLASSES_VALUE ? [] : formData.sections,
-            groups: formData.student_class === ALL_CLASSES_VALUE ? [] : formData.groups,
+            sections: assignMode === 'single' ? formData.sections : [],
+            groups: assignMode === 'single' ? formData.groups : [],
             date: formData.date,
             description: formData.description
         };
@@ -453,10 +524,12 @@ const Tests = () => {
                                 </tr>
                             ) : (
                                 tests.map((t, idx) => {
-                                    // Parse class name from backend `classes_detail` array
-                                    const assignedClasses = t.classes_detail && t.classes_detail.length > 0
-                                        ? t.classes_detail.map(c => c.display_name || c.name).join(', ')
-                                        : 'N/A';
+                                    // Backend already computes the right label here:
+                                    // "All Classes" when every class is assigned,
+                                    // "No Classes" when none are, the class names
+                                    // when there are a few, or "X, Y, Z + N more"
+                                    // when there are many.
+                                    const assignedClasses = t.classes_display || 'N/A';
 
                                     return (
                                         <tr key={t.id} className="hover:bg-gray-50 transition-colors">
@@ -556,29 +629,95 @@ const Tests = () => {
                                 />
                             </div>
 
-                            {/* Class Selector */}
+                            {/* Class Assignment Mode: Single / Multiple / All */}
                             <div className="flex flex-col">
                                 <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">
                                     Assign to Class *
                                 </label>
-                                <select
-                                    required
-                                    value={formData.student_class}
-                                    onChange={(e) => handleFormClassChange(e.target.value)}
-                                    className="bg-white border border-gray-300 rounded-xl p-3 text-sm outline-none focus:border-[var(--primary)] cursor-pointer"
-                                >
-                                    <option value="">Select Class</option>
-                                    <option value={ALL_CLASSES_VALUE}>All Classes</option>
-                                    {classes.map((cls) => (
-                                        <option key={cls.id} value={cls.id}>
-                                            {cls.display_name || cls.name}
-                                        </option>
+                                <div className="grid grid-cols-3 gap-2 mb-2">
+                                    {[
+                                        { key: 'single', label: 'Single Class' },
+                                        { key: 'multiple', label: 'Multiple Classes' },
+                                        { key: 'all', label: 'All Classes' },
+                                    ].map((opt) => (
+                                        <button
+                                            key={opt.key}
+                                            type="button"
+                                            onClick={() => handleAssignModeChange(opt.key)}
+                                            className={`text-xs font-medium py-2 px-2 rounded-xl border transition-colors cursor-pointer ${assignMode === opt.key
+                                                    ? 'bg-[var(--primary)] border-[var(--primary)] text-white'
+                                                    : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                                                }`}
+                                        >
+                                            {opt.label}
+                                        </button>
                                     ))}
-                                </select>
+                                </div>
+
+                                {/* Single Class: plain dropdown */}
+                                {assignMode === 'single' && (
+                                    <select
+                                        required
+                                        value={formData.student_class}
+                                        onChange={(e) => handleFormClassChange(e.target.value)}
+                                        className="bg-white border border-gray-300 rounded-xl p-3 text-sm outline-none focus:border-[var(--primary)] cursor-pointer"
+                                    >
+                                        <option value="">Select Class</option>
+                                        {classes.map((cls) => (
+                                            <option key={cls.id} value={cls.id}>
+                                                {cls.display_name || cls.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                )}
+
+                                {/* Multiple Classes: checkbox grid */}
+                                {assignMode === 'multiple' && (
+                                    classes.length > 0 ? (
+                                        <div className="flex flex-wrap gap-2 border border-gray-300 rounded-xl p-3 max-h-32 overflow-y-auto">
+                                            {classes.map((cls) => {
+                                                const checked = formData.classes.includes(Number(cls.id));
+                                                return (
+                                                    <label
+                                                        key={cls.id}
+                                                        className={`flex items-center space-x-1.5 text-xs px-2.5 py-1.5 rounded-lg border cursor-pointer transition-colors ${checked
+                                                                ? 'bg-blue-50 border-blue-200 text-blue-700 font-medium'
+                                                                : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
+                                                            }`}
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={checked}
+                                                            onChange={() => handleToggleMultiClass(cls.id)}
+                                                            className="rounded accent-[var(--primary)] cursor-pointer"
+                                                        />
+                                                        <span>{cls.display_name || cls.name}</span>
+                                                    </label>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <span className="text-xs text-gray-400 italic">No classes registered yet.</span>
+                                    )
+                                )}
+
+                                {/* All Classes: informational note, nothing to pick */}
+                                {assignMode === 'all' && (
+                                    <p className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-xl p-3">
+                                        This test will be assigned to every class ({classes.length} total). Sections and
+                                        groups aren't available in this mode since they're specific to each class.
+                                    </p>
+                                )}
+
+                                {assignMode === 'multiple' && (
+                                    <p className="text-xs text-gray-400 mt-1 italic">
+                                        Sections and groups aren't available when assigning to multiple classes.
+                                    </p>
+                                )}
                             </div>
 
                             {/* Multiple Sections Selection */}
-                            {formData.student_class && formData.student_class !== ALL_CLASSES_VALUE && (
+                            {assignMode === 'single' && formData.student_class && (
                                 <div className="flex flex-col">
                                     <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">
                                         Sections (Optional - Select multiple or leave empty for ALL)
@@ -620,7 +759,7 @@ const Tests = () => {
                             )}
 
                             {/* Multiple Groups Selection */}
-                            {formData.student_class && formData.student_class !== ALL_CLASSES_VALUE && (
+                            {assignMode === 'single' && formData.student_class && (
                                 <div className="flex flex-col">
                                     <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">
                                         Groups (Optional - Select multiple or leave empty for ALL)
