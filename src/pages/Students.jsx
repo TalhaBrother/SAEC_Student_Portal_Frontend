@@ -302,8 +302,8 @@ const Students = () => {
 
 
       res = isEdit
-        ? await api.patch(`/students/${formData.id}/`, payload, { headers:multipartHeaders })
-        : await api.post("/students/", payload, { headers:multipartHeaders });
+        ? await api.patch(`/students/${formData.id}/`, payload, { headers: multipartHeaders })
+        : await api.post("/students/", payload, { headers: multipartHeaders });
 
       console.log(isEdit ? "Student Updated Successfully:" : "Student Added Successfully:", res.data);
 
@@ -434,6 +434,13 @@ const Students = () => {
     return `${sanitized}${randomSuffix}`;
   };
 
+  const generateEmail = (fullName) => {
+    if (!fullName) return "";
+    // Uses existing username or creates a clean prefix from fullName
+    const handle = fullName.toLowerCase().trim().replace(/[^a-z0-9]/g, "");
+    return `${handle}@gmail.com`; // Change domain as needed
+  };
+
   // Generates a random secure password
   const generatePassword = (length = 10) => {
     const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
@@ -443,6 +450,7 @@ const Students = () => {
     }
     return password;
   };
+
 
   return (
     <div className="p-6 bg-[var(--secondary)] text-[var(--quinary)] min-h-screen font-sans">
@@ -581,16 +589,18 @@ const Students = () => {
                       onChange={(e) => {
                         const name = e.target.value;
                         setFormData((prev) => {
-                          // Only auto-generate credentials if creating a new record
+                          // Auto-generate credentials only when registering a new student
                           if (!prev.id) {
                             const autoUsername = generateUsername(name);
-                            const autoPassword = prev.password || generatePassword(10); // Keep existing or generate new
+                            const autoEmail = generateEmail(name);
+                            const autoPassword = prev.password || generatePassword(10);
                             return {
                               ...prev,
                               fullName: name,
                               username: autoUsername,
+                              email: autoEmail,
                               password: autoPassword,
-                              confirmPassword: autoPassword, // Matches automatically
+                              confirmPassword: autoPassword,
                             };
                           }
                           return { ...prev, fullName: name };
@@ -795,9 +805,13 @@ const Students = () => {
                       type="button"
                       onClick={() => {
                         const newPass = generatePassword(10);
+                        const newUsername = generateUsername(formData.fullName);
+                        const newEmail = generateEmail(formData.fullName, newUsername);
+
                         setFormData((prev) => ({
                           ...prev,
-                          username: generateUsername(prev.fullName),
+                          username: newUsername,
+                          email: newEmail,
                           password: newPass,
                           confirmPassword: newPass,
                         }));
