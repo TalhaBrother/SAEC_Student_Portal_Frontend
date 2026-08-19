@@ -3,6 +3,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
 
+app.disableHardwareAcceleration();
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -49,7 +51,8 @@ function createWindow() {
 
         webPreferences: {
             nodeIntegration: false,
-            contextIsolation: true
+            contextIsolation: true,
+            backgroundThrottling: false
         }
     });
 
@@ -68,6 +71,8 @@ function createWindow() {
         mainWindow.loadURL('http://localhost:5173');
     }
 }
+
+
 
 app.whenReady().then(() => {
     startDjango();

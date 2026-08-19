@@ -27,6 +27,10 @@ export default function AdminDashboard() {
           headers: { Authorization: `Bearer ${token}` },
         });
         setClasses(res.data);
+        
+        if (res.data && res.data.length > 0) {
+          setSelectedClass(res.data[0].id);
+        }
       } catch (err) {
         console.error("Failed to load classes:", err);
       }
