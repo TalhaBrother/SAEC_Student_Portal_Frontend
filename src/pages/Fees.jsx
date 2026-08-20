@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import Swal from 'sweetalert2';
 import api from '../api/axios';
 import useAuthStore from '../store/authStore';
 
@@ -158,6 +159,228 @@ const PeriodToggle = ({ value, onChange }) => (
   </div>
 );
 
+const MODES = [
+  { key: 'class', label: 'Class' },
+  { key: 'student', label: 'Individual Student' },
+];
+
+const ModeToggle = ({ value, onChange }) => (
+  <div className="inline-flex rounded-xl border border-gray-200 bg-white p-1 shadow-sm mb-6">
+    {MODES.map((m) => (
+      <button
+        key={m.key}
+        type="button"
+        onClick={() => onChange(m.key)}
+        className={`px-4 py-2 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer ${
+          value === m.key
+            ? 'bg-[var(--primary)] text-white'
+            : 'text-gray-500 hover:text-[var(--quinary)]'
+        }`}
+      >
+        {m.label}
+      </button>
+    ))}
+  </div>
+);
+
+// Shared GR No search box, reused wherever a single student needs to be
+// looked up (individual fee structure + individual voucher generation).
+// Mirrors the exact lookup used by the Student Search report tab
+// (GET /fee-submission/search/<gr_no>/), so behavior stays consistent
+// across the app.
+const StudentSearchBox = ({ token, onFound, message, setMessage, hint }) => {
+  const [grNo, setGrNo] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSearch = async (e) => {
+    e.preventDefault();
+    if (!grNo.trim()) return;
+
+    setLoading(true);
+    setMessage({ type: '', text: '' });
+
+    try {
+      const res = await api.get(`/fee-submission/search/${encodeURIComponent(grNo.trim())}/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      onFound(res.data);
+    } catch (error) {
+      console.error('Error searching student:', error);
+      const status = error.response?.status;
+      onFound(null);
+      setMessage({
+        type: 'error',
+        text: status === 404 ? 'No student found with that GR No.' : 'Failed to search. Please try again.',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSearch} className="flex items-end gap-4">
+      <Field label="GR No" hint={hint || 'Search a student by their GR No.'}>
+        <input
+          type="text"
+          value={grNo}
+          onChange={(e) => setGrNo(e.target.value)}
+          placeholder="e.g. 2021-045"
+          required
+          className={inputClass}
+        />
+      </Field>
+      <button type="submit" disabled={loading} className={primaryBtnClass}>
+        {loading ? 'Searching...' : 'Search'}
+      </button>
+    </form>
+  );
+};
+
+const StudentSummaryCard = ({ student }) => (
+  <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 max-w-3xl grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div>
+      <p className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">GR No</p>
+      <p className="font-medium">{student.gr_no}</p>
+    </div>
+    <div>
+      <p className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">Name</p>
+      <p className="font-medium">{student.full_name}</p>
+    </div>
+    <div>
+      <p className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">Father Name</p>
+      <p className="font-medium">{student.father_name}</p>
+    </div>
+    <div>
+      <p className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">Class</p>
+      <p className="font-medium">
+        {student.student_class?.display_name || student.student_class?.name || '—'}
+      </p>
+    </div>
+  </div>
+);
+
+// Shared tuition/exam/arrears + due-date fields grid, used by both the
+// class-level FeeStructure form and the per-student override form —
+// the two share an identical field shape on the backend.
+const FeeAmountFields = ({ form, updateField }) => (
+  <>
+    <div>
+      <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
+        Fee Amounts
+      </h3>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="flex flex-col">
+          <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
+            Tuition Fee
+          </label>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={form.tuition_fee}
+            onChange={(e) => updateField('tuition_fee', e.target.value)}
+            placeholder="5000"
+            required
+            className={inputClass}
+          />
+        </div>
+
+        <div className="flex flex-col">
+          <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
+            Exam Fee
+          </label>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={form.exam_fee}
+            onChange={(e) => updateField('exam_fee', e.target.value)}
+            placeholder="1000"
+            required
+            className={inputClass}
+          />
+        </div>
+
+        <div className="flex flex-col">
+          <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
+            Arrears Amount
+          </label>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={form.arrears_amount}
+            onChange={(e) => updateField('arrears_amount', e.target.value)}
+            placeholder="0"
+            required
+            className={inputClass}
+          />
+        </div>
+      </div>
+    </div>
+
+    <hr className="border-gray-100" />
+
+    <div>
+      <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
+        Due Date Handling
+      </h3>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="flex flex-col">
+          <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
+            Amount Within Due Date
+          </label>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={form.amount_within_due_date}
+            onChange={(e) => updateField('amount_within_due_date', e.target.value)}
+            placeholder="6000"
+            required
+            className={inputClass}
+          />
+        </div>
+
+        <div className="flex flex-col">
+          <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
+            Amount After Due Date
+          </label>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={form.amount_after_due_date}
+            onChange={(e) => updateField('amount_after_due_date', e.target.value)}
+            placeholder="6500"
+            required
+            className={inputClass}
+          />
+        </div>
+
+        <div className="flex flex-col">
+          <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
+            Due Day (1–28)
+          </label>
+          <input
+            type="number"
+            min="1"
+            max="28"
+            value={form.due_day}
+            onChange={(e) => updateField('due_day', e.target.value)}
+            placeholder="10"
+            required
+            className={inputClass}
+          />
+          <p className="text-gray-400 text-xs mt-1">
+            Day of the month vouchers become due. Kept ≤28 so it's valid every month.
+          </p>
+        </div>
+      </div>
+    </div>
+  </>
+);
+
 /* ============================================================
    SECTION 1 — Fee Structure
    ============================================================ */
@@ -171,7 +394,7 @@ const EMPTY_STRUCTURE_FORM = {
   due_day: "10",
 };
 
-const FeeStructureSection = ({ token, Classes }) => {
+const ClassFeeStructureForm = ({ token, Classes }) => {
   const [studentClass, setStudentClass] = useState("");
 
   // Holds the id of the existing FeeStructure for the selected class,
@@ -324,122 +547,7 @@ const FeeStructureSection = ({ token, Classes }) => {
 
           <hr className="border-gray-100" />
 
-          {/* Fee Amounts */}
-          <div>
-            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
-              Fee Amounts
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="flex flex-col">
-                <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
-                  Tuition Fee
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={form.tuition_fee}
-                  onChange={(e) => updateField('tuition_fee', e.target.value)}
-                  placeholder="5000"
-                  required
-                  className={inputClass}
-                />
-              </div>
-
-              <div className="flex flex-col">
-                <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
-                  Exam Fee
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={form.exam_fee}
-                  onChange={(e) => updateField('exam_fee', e.target.value)}
-                  placeholder="1000"
-                  required
-                  className={inputClass}
-                />
-              </div>
-
-              <div className="flex flex-col">
-                <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
-                  Arrears Amount
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={form.arrears_amount}
-                  onChange={(e) => updateField('arrears_amount', e.target.value)}
-                  placeholder="0"
-                  required
-                  className={inputClass}
-                />
-              </div>
-            </div>
-          </div>
-
-          <hr className="border-gray-100" />
-
-          {/* Due Date Handling */}
-          <div>
-            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
-              Due Date Handling
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="flex flex-col">
-                <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
-                  Amount Within Due Date
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={form.amount_within_due_date}
-                  onChange={(e) => updateField('amount_within_due_date', e.target.value)}
-                  placeholder="6000"
-                  required
-                  className={inputClass}
-                />
-              </div>
-
-              <div className="flex flex-col">
-                <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
-                  Amount After Due Date
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={form.amount_after_due_date}
-                  onChange={(e) => updateField('amount_after_due_date', e.target.value)}
-                  placeholder="6500"
-                  required
-                  className={inputClass}
-                />
-              </div>
-
-              <div className="flex flex-col">
-                <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
-                  Due Day (1–28)
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="28"
-                  value={form.due_day}
-                  onChange={(e) => updateField('due_day', e.target.value)}
-                  placeholder="10"
-                  required
-                  className={inputClass}
-                />
-                <p className="text-gray-400 text-xs mt-1">
-                  Day of the month vouchers become due. Kept ≤28 so it's valid every month.
-                </p>
-              </div>
-            </div>
-          </div>
+          <FeeAmountFields form={form} updateField={updateField} />
 
           {/* Submit Button */}
           <div className="pt-4 flex justify-end">
@@ -462,11 +570,214 @@ const FeeStructureSection = ({ token, Classes }) => {
   );
 };
 
+// Search a student by GR No, then create/update/remove that one
+// student's individual fee structure (StudentFeeOverride). This never
+// touches the class's FeeStructure — deleting the override just
+// reverts the student back to their class's structure.
+const StudentFeeStructureForm = ({ token }) => {
+  const [student, setStudent] = useState(null);
+  const [searchMessage, setSearchMessage] = useState({ type: "", text: "" });
+
+  const [overrideId, setOverrideId] = useState(null);
+  const [checkingExisting, setCheckingExisting] = useState(false);
+  const [form, setForm] = useState(EMPTY_STRUCTURE_FORM);
+
+  const [loading, setLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [message, setMessage] = useState({ type: "", text: "" });
+
+  const updateField = (field, value) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  // Whenever a student is found, check if they already have an
+  // individual override. If so, load it for editing (PUT). If not,
+  // reset the form to blank defaults (PUT still creates it, per the
+  // backend's upsert behavior).
+  useEffect(() => {
+    const fetchExisting = async () => {
+      setCheckingExisting(true);
+      try {
+        const res = await api.get(`/fees/students/${student.id}/fee-override/`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setOverrideId(res.data.id);
+        setForm({
+          tuition_fee: String(res.data.tuition_fee),
+          exam_fee: String(res.data.exam_fee),
+          arrears_amount: String(res.data.arrears_amount),
+          amount_within_due_date: String(res.data.amount_within_due_date),
+          amount_after_due_date: String(res.data.amount_after_due_date),
+          due_day: String(res.data.due_day),
+        });
+      } catch (err) {
+        setOverrideId(null);
+        setForm(EMPTY_STRUCTURE_FORM);
+      } finally {
+        setCheckingExisting(false);
+      }
+    };
+
+    setMessage({ type: "", text: "" });
+
+    if (token && student) {
+      fetchExisting();
+    } else {
+      setOverrideId(null);
+      setForm(EMPTY_STRUCTURE_FORM);
+    }
+  }, [student, token]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!student) return;
+    setLoading(true);
+    setMessage({ type: "", text: "" });
+
+    const headers = { Authorization: `Bearer ${token}` };
+    const payload = {
+      tuition_fee: form.tuition_fee,
+      exam_fee: form.exam_fee,
+      arrears_amount: form.arrears_amount,
+      amount_within_due_date: form.amount_within_due_date,
+      amount_after_due_date: form.amount_after_due_date,
+      due_day: form.due_day,
+    };
+
+    try {
+      const res = await api.put(`/fees/students/${student.id}/fee-override/`, payload, { headers });
+      setOverrideId(res.data.id);
+      setMessage({
+        type: "success",
+        text: overrideId
+          ? "Individual fee structure updated successfully!"
+          : "Individual fee structure created successfully!",
+      });
+    } catch (error) {
+      console.error("Error saving student fee override:", error);
+      const data = error.response?.data;
+      const fieldError =
+        data?.due_day?.[0] ||
+        data?.non_field_errors?.[0] ||
+        (typeof data === "string" ? data : null);
+
+      setMessage({
+        type: "error",
+        text: fieldError || "Failed to save individual fee structure. Please check the values entered.",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRemoveOverride = async () => {
+    if (!student || !overrideId) return;
+    setDeleting(true);
+    setMessage({ type: "", text: "" });
+
+    try {
+      await api.delete(`/fees/students/${student.id}/fee-override/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setOverrideId(null);
+      setForm(EMPTY_STRUCTURE_FORM);
+      setMessage({
+        type: "success",
+        text: "Individual fee structure removed. This student now follows their class's fee structure again.",
+      });
+    } catch (error) {
+      console.error("Error removing student fee override:", error);
+      setMessage({ type: "error", text: "Failed to remove individual fee structure. Please try again." });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <div>
+      <p className="text-gray-500 text-sm mb-6">
+        Search a student by GR No to set fee amounts just for them. When present, this takes priority over their class's fee structure whenever a voucher is generated for them.
+      </p>
+
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 max-w-xl mb-6">
+        <StudentSearchBox
+          token={token}
+          onFound={(s) => {
+            setStudent(s);
+            setMessage({ type: "", text: "" });
+          }}
+          message={searchMessage}
+          setMessage={setSearchMessage}
+          hint="Search a student to set or edit their individual fee structure."
+        />
+      </div>
+
+      <Message message={searchMessage} />
+
+      {student && (
+        <div className="space-y-4">
+          <StudentSummaryCard student={student} />
+
+          <Message message={message} />
+
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 max-w-3xl">
+            {checkingExisting ? (
+              <p className="text-xs text-gray-400">Checking for an existing individual fee structure...</p>
+            ) : (
+              <>
+                <p className={`text-xs mb-4 ${overrideId ? 'text-[var(--primary)]' : 'text-gray-400'}`}>
+                  {overrideId
+                    ? "This student has an individual fee structure. Editing below updates it."
+                    : "No individual fee structure yet — this student currently follows their class's structure. Saving below will create one just for them."}
+                </p>
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  <FeeAmountFields form={form} updateField={updateField} />
+
+                  <div className="pt-4 flex justify-end gap-3">
+                    {overrideId && (
+                      <button
+                        type="button"
+                        onClick={handleRemoveOverride}
+                        disabled={deleting}
+                        className={secondaryBtnClass}
+                      >
+                        {deleting ? "Removing..." : "Remove Override (revert to class)"}
+                      </button>
+                    )}
+                    <button type="submit" disabled={loading} className={primaryBtnClass}>
+                      {loading ? "Saving..." : overrideId ? "Update Individual Structure" : "Create Individual Structure"}
+                    </button>
+                  </div>
+                </form>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const FeeStructureSection = ({ token, Classes }) => {
+  const [mode, setMode] = useState('class');
+
+  return (
+    <div>
+      <ModeToggle value={mode} onChange={setMode} />
+      {mode === 'class' ? (
+        <ClassFeeStructureForm token={token} Classes={Classes} />
+      ) : (
+        <StudentFeeStructureForm token={token} />
+      )}
+    </div>
+  );
+};
+
 /* ============================================================
    SECTION 2 — Generate Voucher
    ============================================================ */
 
-const GenerateVoucherSection = ({ token, Classes }) => {
+const ClassGenerateVoucherForm = ({ token, Classes }) => {
   const [studentClass, setStudentClass] = useState("");
 
   const today = new Date();
@@ -560,7 +871,7 @@ const GenerateVoucherSection = ({ token, Classes }) => {
           </div>
 
           <p className="text-gray-400 text-xs">
-            Regenerating for the same class and month is safe — existing vouchers and challan numbers are reused, not duplicated.
+            Regenerating for the same class and month is safe — existing vouchers and challan numbers are reused, not duplicated. Pending vouchers are refreshed to each student's latest fee structure (individual override or class); already-paid vouchers are never changed.
           </p>
 
           {/* Submit Button */}
@@ -575,6 +886,139 @@ const GenerateVoucherSection = ({ token, Classes }) => {
           </div>
         </form>
       </div>
+    </div>
+  );
+};
+
+// Search a student by GR No, pick a month/year, and generate that one
+// student's voucher. The backend resolves their individual fee
+// override first, falling back to their class's fee structure, and
+// fails with a clear error if neither exists — no voucher gets created.
+const StudentGenerateVoucherForm = ({ token }) => {
+  const [student, setStudent] = useState(null);
+  const [searchMessage, setSearchMessage] = useState({ type: "", text: "" });
+
+  const today = new Date();
+  const [month, setMonth] = useState(String(today.getMonth() + 1));
+  const [year, setYear] = useState(String(today.getFullYear()));
+
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState({ type: "", text: "" });
+
+  const handleGenerate = async (e) => {
+    e.preventDefault();
+    if (!student) return;
+    setLoading(true);
+    setMessage({ type: "", text: "" });
+
+    try {
+      const params = new URLSearchParams();
+      if (month) params.append('month', month);
+      if (year) params.append('year', year);
+
+      const res = await api.post(
+        `/fees/generate/student/${student.id}/?${params.toString()}`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          responseType: 'blob',
+        }
+      );
+
+      const file = new Blob([res.data], { type: 'application/pdf' });
+      window.open(URL.createObjectURL(file), '_blank');
+
+      setMessage({ type: "success", text: "Voucher generated. Opening PDF in a new tab..." });
+    } catch (error) {
+      console.error("Error generating student voucher:", error);
+      const text = await extractBlobErrorMessage(error, 'Failed to generate voucher. Please try again.');
+      setMessage({ type: "error", text });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div>
+      <p className="text-gray-500 text-sm mb-6">
+        Search a student by GR No, pick a month, and generate their voucher. Their individual fee structure is used if they have one; otherwise their class's structure applies. If neither exists, generation is blocked.
+      </p>
+
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 max-w-xl mb-6">
+        <StudentSearchBox
+          token={token}
+          onFound={(s) => {
+            setStudent(s);
+            setMessage({ type: "", text: "" });
+          }}
+          message={searchMessage}
+          setMessage={setSearchMessage}
+          hint="Search a student to generate a voucher just for them."
+        />
+      </div>
+
+      <Message message={searchMessage} />
+
+      {student && (
+        <div className="space-y-4">
+          <StudentSummaryCard student={student} />
+
+          <Message message={message} />
+
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 max-w-xl">
+            <form onSubmit={handleGenerate} className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Month">
+                  <select
+                    value={month}
+                    onChange={(e) => setMonth(e.target.value)}
+                    className={selectClass}
+                  >
+                    {MONTH_NAMES.map((name, idx) => (
+                      <option key={idx + 1} value={idx + 1}>{name}</option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Year">
+                  <input
+                    type="number"
+                    value={year}
+                    onChange={(e) => setYear(e.target.value)}
+                    placeholder={String(today.getFullYear())}
+                    className={inputClass}
+                  />
+                </Field>
+              </div>
+
+              <p className="text-gray-400 text-xs">
+                Regenerating for the same student and month is safe — the existing voucher and challan number is reused, not duplicated. If it's still pending, its amounts are refreshed to the latest fee structure; a paid voucher is never changed.
+              </p>
+
+              <div className="flex justify-end">
+                <button type="submit" disabled={loading} className={primaryBtnClass}>
+                  {loading ? "Generating..." : "Generate Voucher"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const GenerateVoucherSection = ({ token, Classes }) => {
+  const [mode, setMode] = useState('class');
+
+  return (
+    <div>
+      <ModeToggle value={mode} onChange={setMode} />
+      {mode === 'class' ? (
+        <ClassGenerateVoucherForm token={token} Classes={Classes} />
+      ) : (
+        <StudentGenerateVoucherForm token={token} />
+      )}
     </div>
   );
 };
@@ -1049,14 +1493,46 @@ const StudentSearchTab = ({ token }) => {
   };
 
   const toggleStatus = async (voucher) => {
-    const newStatus = voucher.status === 'PAID' ? 'PENDING' : 'PAID';
+    // One-way: Pending -> Paid only. Once Paid, there's nothing to
+    // toggle to, so this should never actually be called with a
+    // Paid voucher (the button is hidden below) — this check just
+    // makes that explicit rather than relying only on the UI.
+    if (voucher.status === 'PAID') return;
+
+    // Marking a voucher Paid is permanent (it can no longer be
+    // reverted to Pending), so confirm with the exact student and
+    // voucher details before committing — this is the admin's last
+    // chance to catch a wrong voucher before it's locked in.
+    const confirmResult = await Swal.fire({
+      icon: 'warning',
+      title: 'Mark this voucher as Paid?',
+      html: `
+        <div style="text-align:left; font-size:14px; line-height:1.7;">
+          <p><strong>Student:</strong> ${student.full_name}</p>
+          <p><strong>GR No:</strong> ${student.gr_no}</p>
+          <p><strong>Month/Year:</strong> ${MONTH_NAMES[voucher.month - 1]} ${voucher.year}</p>
+          <p><strong>Challan No:</strong> ${voucher.challan_no}</p>
+        </div>
+        <p style="margin-top:12px;">Please verify these details are correct. Once marked Paid, this <strong>cannot be undone</strong>.</p>
+      `,
+      showCancelButton: true,
+      confirmButtonText: 'Yes, Mark as Paid',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#1a3c5e',
+      cancelButtonColor: '#7f8c8d',
+      reverseButtons: true,
+      focusCancel: true,
+    });
+
+    if (!confirmResult.isConfirmed) return;
+
     setUpdatingId(voucher.id);
     setMessage({ type: '', text: '' });
 
     try {
       const res = await api.patch(
         `/fee-submission/vouchers/${voucher.id}/status/`,
-        { status: newStatus },
+        { status: 'PAID' },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
@@ -1066,10 +1542,21 @@ const StudentSearchTab = ({ token }) => {
           v.id === voucher.id ? { ...v, ...res.data } : v
         ),
       }));
-      setMessage({ type: 'success', text: `Voucher #${voucher.challan_no} marked as ${newStatus}.` });
+      setMessage({ type: 'success', text: `Voucher #${voucher.challan_no} marked as PAID.` });
+
+      Swal.fire({
+        icon: 'success',
+        title: 'Marked as Paid',
+        text: `Voucher #${voucher.challan_no} for ${student.full_name} is now marked Paid.`,
+        timer: 2000,
+        showConfirmButton: false,
+      });
     } catch (error) {
       console.error('Error updating voucher status:', error);
-      setMessage({ type: 'error', text: 'Failed to update voucher status. Please try again.' });
+      const data = error.response?.data;
+      const text = data?.error || 'Failed to update voucher status. Please try again.';
+      setMessage({ type: 'error', text });
+      Swal.fire({ icon: 'error', title: 'Failed', text });
     } finally {
       setUpdatingId(null);
     }
@@ -1157,18 +1644,23 @@ const StudentSearchTab = ({ token }) => {
                   <td className="px-4 py-3 text-gray-500">{formatDateTime(v.paid_at)}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={() => toggleStatus(v)}
-                        disabled={updatingId === v.id}
-                        className="text-xs font-semibold uppercase tracking-wide text-[var(--primary)] hover:text-[var(--quinary)] disabled:opacity-50 cursor-pointer"
-                      >
-                        {updatingId === v.id
-                          ? 'Updating...'
-                          : v.status === 'PAID'
-                          ? 'Mark Pending'
-                          : 'Mark Paid'}
-                      </button>
+                      {v.status === 'PAID' ? (
+                        <span
+                          className="text-xs font-semibold uppercase tracking-wide text-gray-400 cursor-not-allowed"
+                          title="Paid vouchers are locked and can't be reverted to Pending."
+                        >
+                          Paid &amp; Locked
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => toggleStatus(v)}
+                          disabled={updatingId === v.id}
+                          className="text-xs font-semibold uppercase tracking-wide text-[var(--primary)] hover:text-[var(--quinary)] disabled:opacity-50 cursor-pointer"
+                        >
+                          {updatingId === v.id ? 'Updating...' : 'Mark Paid'}
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => handleReprint(v)}
