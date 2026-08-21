@@ -1,6 +1,71 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../api/axios';
 import useAuthStore from '../store/authStore';
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+const isEmptyValue = (val) => {
+    if (val === null || val === undefined || val === '') return true;
+    if (Array.isArray(val)) return val.length === 0;
+    if (typeof val === 'object') return Object.keys(val).length === 0;
+    return false;
+};
+
+// Pulls a human-readable message out of whatever shape DRF sends back
+// (string, list, or nested object of lists).
+const extractApiError = (errorData) => {
+    if (isEmptyValue(errorData)) return '';
+    if (typeof errorData === 'string') return errorData;
+
+    if (Array.isArray(errorData)) {
+        return errorData
+            .map((item) => extractApiError(item))
+            .filter((msg) => msg)
+            .join(' ');
+    }
+
+    if (typeof errorData === 'object') {
+        const parts = Object.keys(errorData)
+            .map((key) => {
+                const msg = extractApiError(errorData[key]);
+                if (!msg) return '';
+                const label = key === 'non_field_errors' || key === 'detail' ? '' : `${key}: `;
+                return `${label}${msg}`;
+            })
+            .filter((msg) => msg);
+        return parts.join(' | ');
+    }
+
+    return String(errorData);
+};
+
+const formatApiError = (errorData) =>
+    extractApiError(errorData) || 'Something went wrong. Please try again.';
+
+const MODE_SINGLE = 'single';
+const MODE_MULTIPLE = 'multiple';
+const MODE_ALL = 'all';
+
+const emptyFormData = {
+    name: '',
+    mode: MODE_SINGLE,
+    selectedClassIds: [],
+    selectedSections: [], // flat list of Section ids, merged across every class panel
+    selectedGroups: [],   // flat list of Group ids, merged across every class panel
+    date: '',
+    description: '',
+};
+
+const MONTH_OPTIONS = [
+    { value: '1', label: 'January' }, { value: '2', label: 'February' },
+    { value: '3', label: 'March' }, { value: '4', label: 'April' },
+    { value: '5', label: 'May' }, { value: '6', label: 'June' },
+    { value: '7', label: 'July' }, { value: '8', label: 'August' },
+    { value: '9', label: 'September' }, { value: '10', label: 'October' },
+    { value: '11', label: 'November' }, { value: '12', label: 'December' },
+];
 
 const Tests = () => {
     const token = useAuthStore((state) => state.accessToken);
@@ -13,32 +78,26 @@ const Tests = () => {
 
     // Search & Filter States
     const [searchTerm, setSearchTerm] = useState('');
+    const [selectedBoard, setSelectedBoard] = useState('');
     const [selectedClassFilter, setSelectedClassFilter] = useState('');
     const [selectedSectionFilter, setSelectedSectionFilter] = useState('');
     const [selectedGroupFilter, setSelectedGroupFilter] = useState('');
+    const [selectedDateFilter, setSelectedDateFilter] = useState('');
+    const [selectedMonthFilter, setSelectedMonthFilter] = useState('');
+
+    // Table expand state (per-class breakdown of a test's sections/groups)
+    const [expandedTests, setExpandedTests] = useState(new Set());
 
     // Modal & Form States
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingTest, setEditingTest] = useState(null);
+    const [formData, setFormData] = useState(emptyFormData);
 
-    // How the test is being assigned: a single class, a hand-picked list of
-    // classes, or every class. This drives which class picker UI is shown.
-    const [assignMode, setAssignMode] = useState('single'); // 'single' | 'multiple' | 'all'
-
-    const [formData, setFormData] = useState({
-        name: '',
-        student_class: '', // used when assignMode === 'single'
-        classes: [],        // used when assignMode === 'multiple'
-        sections: [],
-        groups: [],
-        date: '',
-        description: ''
-    });
-
-    // Sub-loading states for forms (class-dependent sections/groups)
-    const [formSections, setFormSections] = useState([]);
-    const [formGroups, setFormGroups] = useState([]);
-    const [formLoading, setFormLoading] = useState(false);
+    // Per-class sections/groups option cache, shared by the modal's
+    // expandable panels AND the table's expandable per-class breakdown.
+    // { [classId]: { sections: [], groups: [], loading, loaded } }
+    const [classOptions, setClassOptions] = useState({});
+    const [expandedFormClasses, setExpandedFormClasses] = useState(new Set());
 
     // UI & Loading States
     const [loading, setLoading] = useState(false);
@@ -48,7 +107,7 @@ const Tests = () => {
     // Toast Notification helper
     const showMessage = (type, text) => {
         setMessage({ type, text });
-        setTimeout(() => setMessage({ type: '', text: '' }), 4000);
+        setTimeout(() => setMessage({ type: '', text: '' }), 4500);
     };
 
     // 1. Fetch Classes for filter dropdown & form selector
@@ -103,9 +162,12 @@ const Tests = () => {
         try {
             const params = new URLSearchParams();
             if (searchTerm.trim()) params.append('search', searchTerm.trim());
+            if (selectedBoard) params.append('board', selectedBoard);
             if (selectedClassFilter) params.append('class_id', selectedClassFilter);
             if (selectedSectionFilter) params.append('section_id', selectedSectionFilter);
             if (selectedGroupFilter) params.append('group_id', selectedGroupFilter);
+            if (selectedDateFilter) params.append('date', selectedDateFilter);
+            if (selectedMonthFilter) params.append('month', selectedMonthFilter);
 
             const res = await api.get(`/tests/?${params.toString()}`, {
                 headers: { Authorization: `Bearer ${token}` },
@@ -117,7 +179,7 @@ const Tests = () => {
         } finally {
             setLoading(false);
         }
-    }, [token, searchTerm, selectedClassFilter, selectedSectionFilter, selectedGroupFilter]);
+    }, [token, searchTerm, selectedBoard, selectedClassFilter, selectedSectionFilter, selectedGroupFilter, selectedDateFilter, selectedMonthFilter]);
 
     useEffect(() => {
         if (token) {
@@ -128,24 +190,23 @@ const Tests = () => {
         }
     }, [fetchTests, token]);
 
-    // 4. Handle single-class selection inside Modal (Fetches applicable sections and groups for selected class)
-    const handleFormClassChange = async (classId) => {
-        setFormData((prev) => ({
+    // -----------------------------------------------------------------
+    // Shared per-class sections/groups cache
+    // (used by both the modal's per-class panels and the table's
+    // expandable per-class breakdown of an existing test)
+    // -----------------------------------------------------------------
+
+    const classFetchTracker = useRef(new Set());
+
+    const ensureClassOptions = useCallback(async (classId) => {
+        if (!classId || classFetchTracker.current.has(String(classId))) return;
+        classFetchTracker.current.add(String(classId));
+
+        setClassOptions((prev) => ({
             ...prev,
-            student_class: classId,
-            sections: [],
-            groups: []
+            [classId]: { sections: [], groups: [], loading: true, loaded: false },
         }));
 
-        // Sections/groups are class-specific, so they are not applicable
-        // until a single class is actually chosen.
-        if (!classId) {
-            setFormSections([]);
-            setFormGroups([]);
-            return;
-        }
-
-        setFormLoading(true);
         try {
             const [secRes, grpRes] = await Promise.all([
                 api.get(`/sections/?class_id=${classId}`, {
@@ -156,176 +217,230 @@ const Tests = () => {
                 }).catch(() => ({ data: [] }))
             ]);
 
-            setFormSections(secRes.data || []);
-            setFormGroups(grpRes.data || []);
+            setClassOptions((prev) => ({
+                ...prev,
+                [classId]: {
+                    sections: secRes.data || [],
+                    groups: grpRes.data || [],
+                    loading: false,
+                    loaded: true,
+                },
+            }));
         } catch (err) {
-            console.error('Error loading form dropdowns:', err);
-        } finally {
-            setFormLoading(false);
+            console.error('Error loading class options:', err);
+            setClassOptions((prev) => ({
+                ...prev,
+                [classId]: { sections: [], groups: [], loading: false, loaded: true },
+            }));
+        }
+    }, [token]);
+
+    // -----------------------------------------------------------------
+    // Table: expand a test row to see its sections/groups broken down
+    // per assigned class (client-side, since Test stores them flat).
+    // -----------------------------------------------------------------
+
+    const toggleTestExpand = (test) => {
+        setExpandedTests((prev) => {
+            const next = new Set(prev);
+            if (next.has(test.id)) {
+                next.delete(test.id);
+            } else {
+                next.add(test.id);
+                (test.classes_detail || []).forEach((cls) => ensureClassOptions(cls.id));
+            }
+            return next;
+        });
+    };
+
+    // -----------------------------------------------------------------
+    // Modal: assignment mode + per-class expandable panels
+    // -----------------------------------------------------------------
+
+    const getFormClassIds = () => formData.selectedClassIds;
+
+    const toggleFormClassExpand = (classId) => {
+        setExpandedFormClasses((prev) => {
+            const next = new Set(prev);
+            if (next.has(classId)) {
+                next.delete(classId);
+            } else {
+                next.add(classId);
+                ensureClassOptions(classId);
+            }
+            return next;
+        });
+    };
+
+    const handleModeChange = (mode) => {
+        if (mode === MODE_ALL) {
+            const allIds = classes.map((c) => c.id);
+            setFormData((prev) => ({
+                ...prev,
+                mode,
+                selectedClassIds: allIds,
+                selectedSections: [],
+                selectedGroups: [],
+            }));
+        } else {
+            setFormData((prev) => ({
+                ...prev,
+                mode,
+                selectedClassIds: [],
+                selectedSections: [],
+                selectedGroups: [],
+            }));
+        }
+        setExpandedFormClasses(new Set());
+    };
+
+    // Single-mode class dropdown
+    const handleSingleClassSelect = (classId) => {
+        setFormData((prev) => ({
+            ...prev,
+            selectedClassIds: classId ? [Number(classId)] : [],
+            selectedSections: [],
+            selectedGroups: [],
+        }));
+        if (classId) {
+            ensureClassOptions(classId);
+            setExpandedFormClasses(new Set([Number(classId)]));
+        } else {
+            setExpandedFormClasses(new Set());
         }
     };
 
-    // Toggle a class in/out of the "Multiple Classes" selection.
-    const handleToggleMultiClass = (classId) => {
+    // Multiple-mode class checkbox toggle
+    const toggleMultipleClass = (classId) => {
+        const id = Number(classId);
         setFormData((prev) => {
-            const id = Number(classId);
-            const alreadySelected = prev.classes.includes(id);
+            const isSelected = prev.selectedClassIds.includes(id);
+            const selectedClassIds = isSelected
+                ? prev.selectedClassIds.filter((c) => c !== id)
+                : [...prev.selectedClassIds, id];
+
+            // If a class is deselected, drop any sections/groups that
+            // belonged only to that class from the flat selections.
+            let selectedSections = prev.selectedSections;
+            let selectedGroups = prev.selectedGroups;
+            if (isSelected) {
+                const classSectionIds = new Set((classOptions[id]?.sections || []).map((s) => s.id));
+                const classGroupIds = new Set((classOptions[id]?.groups || []).map((g) => g.id));
+                selectedSections = prev.selectedSections.filter((sid) => !classSectionIds.has(sid));
+                selectedGroups = prev.selectedGroups.filter((gid) => !classGroupIds.has(gid));
+            }
+
+            return { ...prev, selectedClassIds, selectedSections, selectedGroups };
+        });
+    };
+
+    const toggleSection = (sectionId) => {
+        setFormData((prev) => {
+            const has = prev.selectedSections.includes(sectionId);
             return {
                 ...prev,
-                classes: alreadySelected
-                    ? prev.classes.filter((c) => c !== id)
-                    : [...prev.classes, id]
+                selectedSections: has
+                    ? prev.selectedSections.filter((id) => id !== sectionId)
+                    : [...prev.selectedSections, sectionId],
             };
         });
     };
 
-    // Switch between Single / Multiple / All assignment modes, resetting
-    // whichever fields don't apply to the newly selected mode.
-    const handleAssignModeChange = (mode) => {
-        setAssignMode(mode);
-        setFormData((prev) => ({
-            ...prev,
-            student_class: '',
-            classes: [],
-            sections: [],
-            groups: []
-        }));
-        setFormSections([]);
-        setFormGroups([]);
+    const toggleGroup = (groupId) => {
+        setFormData((prev) => {
+            const has = prev.selectedGroups.includes(groupId);
+            return {
+                ...prev,
+                selectedGroups: has
+                    ? prev.selectedGroups.filter((id) => id !== groupId)
+                    : [...prev.selectedGroups, groupId],
+            };
+        });
     };
 
-    // Modal Handlers
-    const handleOpenModal = async (testItem = null) => {
-        if (testItem) {
-            setEditingTest(testItem);
+    // -----------------------------------------------------------------
+    // Open / close modal
+    // -----------------------------------------------------------------
 
-            const assignedClassDetails = testItem.classes_detail || [];
-            const assignedClassIds = assignedClassDetails.length > 0
-                ? assignedClassDetails.map((cls) => Number(cls.id))
-                : (testItem.classes || []).map((id) => Number(id));
+    const handleOpenCreateModal = () => {
+        setEditingTest(null);
+        setFormData(emptyFormData);
+        setExpandedFormClasses(new Set());
+        setIsModalOpen(true);
+    };
 
-            // If every currently available class is assigned, treat it as
-            // "All Classes". Otherwise more than one class means "Multiple
-            // Classes", and exactly one means "Single Class".
-            const hasAllClasses = classes.length > 0 &&
-                assignedClassIds.length === classes.length &&
-                classes.every((cls) => assignedClassIds.includes(Number(cls.id)));
+    const handleOpenEditModal = async (testItem) => {
+        setEditingTest(testItem);
 
-            const mode = hasAllClasses
-                ? 'all'
-                : (assignedClassIds.length > 1 ? 'multiple' : 'single');
+        const assignedClassIds = (testItem.classes_detail || []).map((c) => Number(c.id));
+        const hasAllClasses = classes.length > 0 &&
+            assignedClassIds.length === classes.length &&
+            classes.every((cls) => assignedClassIds.includes(Number(cls.id)));
 
-            setAssignMode(mode);
+        const mode = hasAllClasses
+            ? MODE_ALL
+            : (assignedClassIds.length > 1 ? MODE_MULTIPLE : MODE_SINGLE);
 
-            const extractedSections = testItem.sections
-                || (testItem.sections_detail ? testItem.sections_detail.map((s) => s.id) : []);
-            const extractedGroups = testItem.groups
-                || (testItem.groups_detail ? testItem.groups_detail.map((g) => g.id) : []);
+        const selectedSections = (testItem.sections_detail || []).map((s) => s.id);
+        const selectedGroups = (testItem.groups_detail || []).map((g) => g.id);
 
-            // Sections/groups are only meaningful when the test is tied to
-            // exactly one class.
-            const applicableSections = mode === 'single' ? extractedSections : [];
-            const applicableGroups = mode === 'single' ? extractedGroups : [];
+        setFormData({
+            name: testItem.name || '',
+            mode,
+            selectedClassIds: assignedClassIds,
+            selectedSections,
+            selectedGroups,
+            date: testItem.date || '',
+            description: testItem.description || '',
+        });
 
-            const singleClassId = mode === 'single' && assignedClassIds.length > 0
-                ? assignedClassIds[0]
-                : '';
+        // Pre-load section/group options for every class already assigned
+        // (ensureClassOptions is a no-op for classes already cached)
+        await Promise.all(assignedClassIds.map((id) => ensureClassOptions(id)));
+        setExpandedFormClasses(new Set(assignedClassIds));
 
-            setFormData({
-                name: testItem.name || '',
-                student_class: singleClassId,
-                classes: mode === 'multiple' ? assignedClassIds : [],
-                sections: applicableSections,
-                groups: applicableGroups,
-                date: testItem.date || '',
-                description: testItem.description || ''
-            });
-
-            if (mode === 'single' && singleClassId) {
-                await handleFormClassChange(singleClassId);
-
-                // handleFormClassChange resets sections/groups, so restore
-                // the saved selections after the dependent options load.
-                setFormData({
-                    name: testItem.name || '',
-                    student_class: singleClassId,
-                    classes: [],
-                    sections: applicableSections,
-                    groups: applicableGroups,
-                    date: testItem.date || '',
-                    description: testItem.description || ''
-                });
-            } else {
-                setFormSections([]);
-                setFormGroups([]);
-            }
-        } else {
-            setEditingTest(null);
-            setAssignMode('single');
-            setFormData({
-                name: '',
-                student_class: '',
-                classes: [],
-                sections: [],
-                groups: [],
-                date: '',
-                description: ''
-            });
-            setFormSections([]);
-            setFormGroups([]);
-        }
         setIsModalOpen(true);
     };
 
     const handleCloseModal = () => {
         setIsModalOpen(false);
         setEditingTest(null);
-        setAssignMode('single');
-        setFormData({ name: '', student_class: '', classes: [], sections: [], groups: [], date: '', description: '' });
-        setFormSections([]);
-        setFormGroups([]);
+        setFormData(emptyFormData);
+        setExpandedFormClasses(new Set());
     };
 
-    // Create & Update (POST / PUT)
+    // -----------------------------------------------------------------
+    // Save (create or update)
+    // -----------------------------------------------------------------
+
     const handleSave = async (e) => {
         e.preventDefault();
 
-        if (assignMode === 'single' && !formData.student_class) {
-            showMessage('error', 'Please select a class.');
+        if (!formData.name.trim()) {
+            showMessage('error', 'Test name is required.');
             return;
         }
 
-        if (assignMode === 'multiple' && formData.classes.length === 0) {
-            showMessage('error', 'Please select at least one class.');
+        if (formData.selectedClassIds.length === 0) {
+            showMessage('error', 'Select at least one class to assign this test to.');
             return;
         }
 
-        setActionLoading(true);
-
-        // Django expects a ManyToMany array for classes.
-        // - Single: exactly one class.
-        // - Multiple: whichever classes were checked.
-        // - All: every class ID currently available.
-        let selectedClassIds;
-        if (assignMode === 'all') {
-            selectedClassIds = classes.map((cls) => Number(cls.id));
-        } else if (assignMode === 'multiple') {
-            selectedClassIds = formData.classes.map((id) => Number(id));
-        } else {
-            selectedClassIds = [Number(formData.student_class)];
+        if (!formData.date) {
+            showMessage('error', 'Test date is required.');
+            return;
         }
 
-        // Sections/groups are class-specific, so they only apply when the
-        // test is tied to exactly one class.
         const payload = {
-            name: formData.name,
-            classes: selectedClassIds,
-            sections: assignMode === 'single' ? formData.sections : [],
-            groups: assignMode === 'single' ? formData.groups : [],
+            name: formData.name.trim(),
+            classes: formData.selectedClassIds.map((id) => Number(id)),
+            sections: formData.selectedSections,
+            groups: formData.selectedGroups,
             date: formData.date,
-            description: formData.description
+            description: formData.description,
         };
 
+        setActionLoading(true);
         try {
             if (editingTest) {
                 await api.put(`/tests/${editingTest.id}/`, payload, {
@@ -342,14 +457,7 @@ const Tests = () => {
             fetchTests();
         } catch (err) {
             console.error('Error saving test:', err);
-            const errorData = err.response?.data;
-            if (errorData && typeof errorData === 'object') {
-                const firstKey = Object.keys(errorData)[0];
-                const msg = Array.isArray(errorData[firstKey]) ? errorData[firstKey][0] : errorData[firstKey];
-                showMessage('error', `${firstKey.toUpperCase()}: ${msg}`);
-            } else {
-                showMessage('error', 'Failed to save test. Please check your inputs.');
-            }
+            showMessage('error', formatApiError(err.response?.data));
         } finally {
             setActionLoading(false);
         }
@@ -377,10 +485,181 @@ const Tests = () => {
     // Reset Filters
     const handleResetFilters = () => {
         setSearchTerm('');
+        setSelectedBoard('');
         setSelectedClassFilter('');
         setSelectedSectionFilter('');
         setSelectedGroupFilter('');
+        setSelectedDateFilter('');
+        setSelectedMonthFilter('');
     };
+
+    // -----------------------------------------------------------------
+    // Small render helpers
+    // -----------------------------------------------------------------
+
+    // Sections/groups panel for one class inside the modal. Checking a box
+    // adds that id into the Test's single flat sections/groups list.
+    const renderClassOptionsPanel = (classId) => {
+        const opts = classOptions[classId];
+
+        if (!opts || opts.loading) {
+            return <span className="text-xs text-gray-400 p-2 block">Loading sections & groups...</span>;
+        }
+
+        return (
+            <div className="space-y-3 pt-2">
+                <div>
+                    <label className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold mb-1 block">
+                        Sections (optional — leave empty for ALL)
+                    </label>
+                    {opts.sections.length > 0 ? (
+                        <div className="flex flex-wrap gap-2 border border-gray-200 rounded-lg p-2 max-h-28 overflow-y-auto bg-white">
+                            {opts.sections.map((sec) => {
+                                const checked = formData.selectedSections.includes(sec.id);
+                                return (
+                                    <label
+                                        key={sec.id}
+                                        className={`flex items-center space-x-1.5 text-xs px-2.5 py-1.5 rounded-lg border cursor-pointer transition-colors ${
+                                            checked
+                                                ? 'bg-blue-50 border-blue-200 text-blue-700 font-medium'
+                                                : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
+                                        }`}
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={checked}
+                                            onChange={() => toggleSection(sec.id)}
+                                            className="rounded accent-[var(--primary)] cursor-pointer"
+                                        />
+                                        <span>{sec.name}</span>
+                                    </label>
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <span className="text-xs text-gray-400 italic">No sections registered for this class.</span>
+                    )}
+                </div>
+
+                <div>
+                    <label className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold mb-1 block">
+                        Groups (optional — leave empty for ALL)
+                    </label>
+                    {opts.groups.length > 0 ? (
+                        <div className="flex flex-wrap gap-2 border border-gray-200 rounded-lg p-2 max-h-28 overflow-y-auto bg-white">
+                            {opts.groups.map((grp) => {
+                                const checked = formData.selectedGroups.includes(grp.id);
+                                return (
+                                    <label
+                                        key={grp.id}
+                                        className={`flex items-center space-x-1.5 text-xs px-2.5 py-1.5 rounded-lg border cursor-pointer transition-colors ${
+                                            checked
+                                                ? 'bg-purple-50 border-purple-200 text-purple-700 font-medium'
+                                                : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
+                                        }`}
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={checked}
+                                            onChange={() => toggleGroup(grp.id)}
+                                            className="rounded accent-[var(--primary)] cursor-pointer"
+                                        />
+                                        <span>{grp.name}</span>
+                                    </label>
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <span className="text-xs text-gray-400 italic">No groups registered for this class.</span>
+                    )}
+                </div>
+            </div>
+        );
+    };
+
+    const renderClassChecklistRow = (cls, { checkable }) => {
+        const classId = cls.id;
+        const isSelected = getFormClassIds().includes(Number(classId));
+        const isExpanded = expandedFormClasses.has(Number(classId));
+
+        return (
+            <div
+                key={classId}
+                className={`border rounded-xl overflow-hidden transition-colors ${
+                    isSelected ? 'border-blue-200 bg-blue-50/40' : 'border-gray-200 bg-white'
+                }`}
+            >
+                <div className="flex items-center justify-between p-2.5">
+                    <label className="flex items-center gap-2 text-sm cursor-pointer flex-1">
+                        {checkable ? (
+                            <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleMultipleClass(classId)}
+                                className="rounded accent-[var(--primary)] cursor-pointer"
+                            />
+                        ) : (
+                            <span className="w-3.5 h-3.5 rounded-full bg-[var(--primary)] inline-block" />
+                        )}
+                        <span className={isSelected ? 'font-medium text-[var(--quinary)]' : 'text-gray-600'}>
+                            {cls.display_name || cls.name}
+                        </span>
+                    </label>
+
+                    {isSelected && (
+                        <button
+                            type="button"
+                            onClick={() => toggleFormClassExpand(Number(classId))}
+                            className="text-xs text-[var(--primary)] font-medium px-2 py-1 rounded-lg hover:bg-blue-100 cursor-pointer"
+                        >
+                            {isExpanded ? 'Hide sections/groups ▲' : 'Sections / Groups ▾'}
+                        </button>
+                    )}
+                </div>
+
+                {isSelected && isExpanded && (
+                    <div className="px-3 pb-3 border-t border-gray-100 bg-white/60">
+                        {renderClassOptionsPanel(classId)}
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    // Does the current combined sections/groups selection risk leaving any
+    // selected class with zero eligible students? (see services.py —
+    // sections/groups filter globally, not per class.)
+    const riskyClassNames = (() => {
+        if (formData.selectedSections.length === 0 && formData.selectedGroups.length === 0) return [];
+        if (formData.selectedClassIds.length <= 1) return [];
+
+        const risky = [];
+        formData.selectedClassIds.forEach((classId) => {
+            const opts = classOptions[classId];
+            if (!opts || !opts.loaded) return;
+
+            const classSectionIds = new Set(opts.sections.map((s) => s.id));
+            const classGroupIds = new Set(opts.groups.map((g) => g.id));
+
+            const sectionsRestricted = formData.selectedSections.length > 0;
+            const groupsRestricted = formData.selectedGroups.length > 0;
+
+            const hasMatchingSection = !sectionsRestricted ||
+                formData.selectedSections.some((id) => classSectionIds.has(id));
+            const hasMatchingGroup = !groupsRestricted ||
+                formData.selectedGroups.some((id) => classGroupIds.has(id));
+
+            if (!hasMatchingSection || !hasMatchingGroup) {
+                const cls = classes.find((c) => Number(c.id) === Number(classId));
+                if (cls) risky.push(cls.display_name || cls.name);
+            }
+        });
+        return risky;
+    })();
+
+    // -----------------------------------------------------------------
+    // Render
+    // -----------------------------------------------------------------
 
     return (
         <div className="p-6 bg-[var(--secondary)] text-[var(--quinary)] min-h-screen font-sans">
@@ -391,7 +670,7 @@ const Tests = () => {
                     <p className="text-gray-500 text-sm mt-1">Schedule, search, filter, and manage student tests.</p>
                 </div>
                 <button
-                    onClick={() => handleOpenModal()}
+                    onClick={handleOpenCreateModal}
                     className="bg-[var(--primary)] hover:bg-[var(--quinary)] text-white font-medium py-3 px-5 rounded-xl transition-all duration-300 shadow-md transform active:scale-[0.98] cursor-pointer self-start md:self-auto"
                 >
                     + Schedule New Test
@@ -401,10 +680,11 @@ const Tests = () => {
             {/* Status Message Notification */}
             {message.text && (
                 <div
-                    className={`p-3 rounded-xl text-sm mb-6 border transition-all ${message.type === 'success'
+                    className={`p-3 rounded-xl text-sm mb-6 border transition-all ${
+                        message.type === 'success'
                             ? 'bg-green-50 text-green-700 border-green-200'
                             : 'bg-red-50 text-red-700 border-red-200'
-                        }`}
+                    }`}
                 >
                     {message.text}
                 </div>
@@ -412,7 +692,7 @@ const Tests = () => {
 
             {/* Filter & Search Bar */}
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 mb-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3">
                     {/* Search Input */}
                     <div>
                         <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1 block">
@@ -427,10 +707,26 @@ const Tests = () => {
                         />
                     </div>
 
+                    {/* Board Filter */}
+                    <div>
+                        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1 block">
+                            Board
+                        </label>
+                        <select
+                            value={selectedBoard}
+                            onChange={(e) => setSelectedBoard(e.target.value)}
+                            className="w-full bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-2.5 text-sm outline-none focus:border-[var(--primary)] cursor-pointer"
+                        >
+                            <option value="">All Boards</option>
+                            <option value="Matric">Matric</option>
+                            <option value="Cambridge">Cambridge</option>
+                        </select>
+                    </div>
+
                     {/* Class Filter (Backend-powered via class_id) */}
                     <div>
                         <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1 block">
-                            Filter by Class
+                            Class
                         </label>
                         <select
                             value={selectedClassFilter}
@@ -481,6 +777,36 @@ const Tests = () => {
                             ))}
                         </select>
                     </div>
+
+                    {/* Exact Date Filter */}
+                    <div>
+                        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1 block">
+                            Date
+                        </label>
+                        <input
+                            type="date"
+                            value={selectedDateFilter}
+                            onChange={(e) => setSelectedDateFilter(e.target.value)}
+                            className="w-full bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-2.5 text-sm outline-none focus:border-[var(--primary)] cursor-pointer"
+                        />
+                    </div>
+
+                    {/* Month Filter */}
+                    <div>
+                        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1 block">
+                            Month
+                        </label>
+                        <select
+                            value={selectedMonthFilter}
+                            onChange={(e) => setSelectedMonthFilter(e.target.value)}
+                            className="w-full bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-2.5 text-sm outline-none focus:border-[var(--primary)] cursor-pointer"
+                        >
+                            <option value="">All Months</option>
+                            {MONTH_OPTIONS.map((m) => (
+                                <option key={m.value} value={m.value}>{m.label}</option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
 
                 <div className="flex justify-end mt-3">
@@ -499,6 +825,7 @@ const Tests = () => {
                     <table className="w-full text-left border-collapse text-sm">
                         <thead>
                             <tr className="border-b border-gray-200 bg-gray-50 text-xs uppercase tracking-wider text-gray-500 font-semibold">
+                                <th className="p-4 w-10"></th>
                                 <th className="p-4">#</th>
                                 <th className="p-4">Test Name</th>
                                 <th className="p-4">Class</th>
@@ -512,13 +839,13 @@ const Tests = () => {
                         <tbody className="divide-y divide-gray-100">
                             {loading ? (
                                 <tr>
-                                    <td colSpan="8" className="p-6 text-center text-gray-400">
+                                    <td colSpan="9" className="p-6 text-center text-gray-400">
                                         Loading tests...
                                     </td>
                                 </tr>
                             ) : tests.length === 0 ? (
                                 <tr>
-                                    <td colSpan="8" className="p-6 text-center text-gray-400">
+                                    <td colSpan="9" className="p-6 text-center text-gray-400">
                                         No tests found matching the criteria.
                                     </td>
                                 </tr>
@@ -530,65 +857,162 @@ const Tests = () => {
                                     // when there are a few, or "X, Y, Z + N more"
                                     // when there are many.
                                     const assignedClasses = t.classes_display || 'N/A';
+                                    const isExpanded = expandedTests.has(t.id);
+                                    const testSectionIds = (t.sections_detail || []).map((s) => s.id);
+                                    const testGroupIds = (t.groups_detail || []).map((g) => g.id);
+                                    const isGloballyAllSections = testSectionIds.length === 0;
+                                    const isGloballyAllGroups = testGroupIds.length === 0;
+                                    const classCount = (t.classes_detail || []).length;
 
                                     return (
-                                        <tr key={t.id} className="hover:bg-gray-50 transition-colors">
-                                            <td className="p-4 text-gray-400 font-medium">{idx + 1}</td>
-                                            <td className="p-4 font-semibold text-[var(--quinary)]">{t.name}</td>
-                                            <td className="p-4 font-medium text-gray-700">{assignedClasses}</td>
-                                            {/* Sections Column */}
-                                            <td className="p-3 whitespace-nowrap">
-                                                {t.sections_detail && t.sections_detail.length > 0 ? (
-                                                    <div className="flex flex-wrap gap-1">
-                                                        {t.sections_detail.map((sec) => (
-                                                            <span key={sec.id} className="px-2 py-0.5 text-xs bg-blue-50 text-blue-600 rounded-md border border-blue-100 font-medium">
-                                                                {sec.name}
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-gray-400 text-xs italic">All Sections</span>
-                                                )}
-                                            </td>
+                                        <React.Fragment key={t.id}>
+                                            <tr className="hover:bg-gray-50 transition-colors">
+                                                <td className="p-4">
+                                                    {classCount > 1 && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => toggleTestExpand(t)}
+                                                            className="w-6 h-6 flex items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-[var(--primary)] cursor-pointer"
+                                                            title="Show per-class breakdown"
+                                                        >
+                                                            {isExpanded ? '▾' : '▸'}
+                                                        </button>
+                                                    )}
+                                                </td>
+                                                <td className="p-4 text-gray-400 font-medium">{idx + 1}</td>
+                                                <td className="p-4 font-semibold text-[var(--quinary)]">{t.name}</td>
+                                                <td className="p-4 font-medium text-gray-700">{assignedClasses}</td>
+                                                {/* Sections Column */}
+                                                <td className="p-3 whitespace-nowrap">
+                                                    {t.sections_detail && t.sections_detail.length > 0 ? (
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {t.sections_detail.map((sec) => (
+                                                                <span key={sec.id} className="px-2 py-0.5 text-xs bg-blue-50 text-blue-600 rounded-md border border-blue-100 font-medium">
+                                                                    {sec.name}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-gray-400 text-xs italic">All Sections</span>
+                                                    )}
+                                                </td>
 
-                                            {/* Groups Column */}
-                                            <td className="p-3 whitespace-nowrap">
-                                                {t.groups_detail && t.groups_detail.length > 0 ? (
-                                                    <div className="flex flex-wrap gap-1">
-                                                        {t.groups_detail.map((grp) => (
-                                                            <span key={grp.id} className="px-2 py-0.5 text-xs bg-purple-50 text-purple-600 rounded-md border border-purple-100 font-medium">
-                                                                {grp.name}
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-gray-400 text-xs italic">All Groups</span>
-                                                )}
-                                            </td>
-                                            <td className="p-4 text-gray-600 font-medium">{t.date}</td>
-                                            <td className="p-4 text-gray-500 max-w-xs truncate">
-                                                {t.description ? (
-                                                    t.description
-                                                ) : (
-                                                    <span className="text-gray-300 italic">No description</span>
-                                                )}
-                                            </td>
-                                            <td className="p-4 text-right space-x-2">
-                                                <button
-                                                    onClick={() => handleOpenModal(t)}
-                                                    className="px-3 py-1.5 text-xs font-medium text-[var(--primary)] bg-gray-100 hover:bg-[var(--primary)] hover:text-white rounded-lg transition-colors cursor-pointer"
-                                                >
-                                                    Edit
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDelete(t.id)}
-                                                    disabled={actionLoading}
-                                                    className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-600 hover:text-white rounded-lg transition-colors cursor-pointer disabled:opacity-50"
-                                                >
-                                                    Delete
-                                                </button>
-                                            </td>
-                                        </tr>
+                                                {/* Groups Column */}
+                                                <td className="p-3 whitespace-nowrap">
+                                                    {t.groups_detail && t.groups_detail.length > 0 ? (
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {t.groups_detail.map((grp) => (
+                                                                <span key={grp.id} className="px-2 py-0.5 text-xs bg-purple-50 text-purple-600 rounded-md border border-purple-100 font-medium">
+                                                                    {grp.name}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-gray-400 text-xs italic">All Groups</span>
+                                                    )}
+                                                </td>
+                                                <td className="p-4 text-gray-600 font-medium">{t.date}</td>
+                                                <td className="p-4 text-gray-500 max-w-xs truncate">
+                                                    {t.description ? (
+                                                        t.description
+                                                    ) : (
+                                                        <span className="text-gray-300 italic">No description</span>
+                                                    )}
+                                                </td>
+                                                <td className="p-4 text-right space-x-2">
+                                                    <button
+                                                        onClick={() => handleOpenEditModal(t)}
+                                                        className="px-3 py-1.5 text-xs font-medium text-[var(--primary)] bg-gray-100 hover:bg-[var(--primary)] hover:text-white rounded-lg transition-colors cursor-pointer"
+                                                    >
+                                                        Edit
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDelete(t.id)}
+                                                        disabled={actionLoading}
+                                                        className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-600 hover:text-white rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                                                    >
+                                                        Delete
+                                                    </button>
+                                                </td>
+                                            </tr>
+
+                                            {isExpanded && (
+                                                <tr>
+                                                    <td colSpan="9" className="p-0 bg-gray-50/70">
+                                                        <div className="p-4 pl-14 space-y-2">
+                                                            {(t.classes_detail || []).map((cls) => {
+                                                                const opts = classOptions[cls.id];
+                                                                const loaded = opts && opts.loaded;
+
+                                                                const sectionsForClass = loaded
+                                                                    ? opts.sections.filter((s) => testSectionIds.includes(s.id))
+                                                                    : [];
+                                                                const groupsForClass = loaded
+                                                                    ? opts.groups.filter((g) => testGroupIds.includes(g.id))
+                                                                    : [];
+
+                                                                const noSectionMatch = loaded && !isGloballyAllSections && sectionsForClass.length === 0;
+                                                                const noGroupMatch = loaded && !isGloballyAllGroups && groupsForClass.length === 0;
+
+                                                                return (
+                                                                    <div
+                                                                        key={cls.id}
+                                                                        className="flex flex-col gap-2 bg-white border border-gray-200 rounded-xl p-3"
+                                                                    >
+                                                                        <div className="text-sm font-medium text-[var(--quinary)]">
+                                                                            {cls.display_name || cls.name}
+                                                                        </div>
+
+                                                                        {!loaded ? (
+                                                                            <span className="text-xs text-gray-400 italic">Loading...</span>
+                                                                        ) : (
+                                                                            <div className="flex flex-wrap gap-4">
+                                                                                <div className="flex flex-wrap gap-1 items-center">
+                                                                                    <span className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mr-1">
+                                                                                        Sections:
+                                                                                    </span>
+                                                                                    {isGloballyAllSections ? (
+                                                                                        <span className="text-gray-400 text-xs italic">All Sections</span>
+                                                                                    ) : noSectionMatch ? (
+                                                                                        <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-0.5 font-medium">
+                                                                                            No matching sections — 0 eligible
+                                                                                        </span>
+                                                                                    ) : (
+                                                                                        sectionsForClass.map((s) => (
+                                                                                            <span key={s.id} className="px-2 py-0.5 text-xs bg-blue-50 text-blue-600 rounded-md border border-blue-100 font-medium">
+                                                                                                {s.name}
+                                                                                            </span>
+                                                                                        ))
+                                                                                    )}
+                                                                                </div>
+                                                                                <div className="flex flex-wrap gap-1 items-center">
+                                                                                    <span className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mr-1">
+                                                                                        Groups:
+                                                                                    </span>
+                                                                                    {isGloballyAllGroups ? (
+                                                                                        <span className="text-gray-400 text-xs italic">All Groups</span>
+                                                                                    ) : noGroupMatch ? (
+                                                                                        <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-0.5 font-medium">
+                                                                                            No matching groups — 0 eligible
+                                                                                        </span>
+                                                                                    ) : (
+                                                                                        groupsForClass.map((g) => (
+                                                                                            <span key={g.id} className="px-2 py-0.5 text-xs bg-purple-50 text-purple-600 rounded-md border border-purple-100 font-medium">
+                                                                                                {g.name}
+                                                                                            </span>
+                                                                                        ))
+                                                                                    )}
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </React.Fragment>
                                     );
                                 })
                             )}
@@ -599,8 +1023,8 @@ const Tests = () => {
 
             {/* Modal: Schedule / Edit Test */}
             {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl border border-gray-200 shadow-xl max-w-lg w-full p-6">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm overflow-y-auto">
+                    <div className="bg-white rounded-2xl border border-gray-200 shadow-xl max-w-xl w-full p-6 my-8 max-h-[90vh] overflow-y-auto">
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="text-xl font-bold text-[var(--quinary)]">
                                 {editingTest ? 'Edit Test' : 'Schedule New Test'}
@@ -629,174 +1053,115 @@ const Tests = () => {
                                 />
                             </div>
 
-                            {/* Class Assignment Mode: Single / Multiple / All */}
+                            {/* Assignment Mode */}
                             <div className="flex flex-col">
                                 <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">
-                                    Assign to Class *
+                                    Assign To
                                 </label>
-                                <div className="grid grid-cols-3 gap-2 mb-2">
+                                <div className="grid grid-cols-3 gap-2">
                                     {[
-                                        { key: 'single', label: 'Single Class' },
-                                        { key: 'multiple', label: 'Multiple Classes' },
-                                        { key: 'all', label: 'All Classes' },
+                                        { value: MODE_SINGLE, label: 'Single Class' },
+                                        { value: MODE_MULTIPLE, label: 'Multiple Classes' },
+                                        { value: MODE_ALL, label: 'All Classes' },
                                     ].map((opt) => (
                                         <button
-                                            key={opt.key}
+                                            key={opt.value}
                                             type="button"
-                                            onClick={() => handleAssignModeChange(opt.key)}
-                                            className={`text-xs font-medium py-2 px-2 rounded-xl border transition-colors cursor-pointer ${assignMode === opt.key
-                                                    ? 'bg-[var(--primary)] border-[var(--primary)] text-white'
-                                                    : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
-                                                }`}
+                                            onClick={() => handleModeChange(opt.value)}
+                                            className={`text-xs font-medium py-2.5 rounded-xl border transition-colors cursor-pointer ${
+                                                formData.mode === opt.value
+                                                    ? 'bg-[var(--primary)] text-white border-[var(--primary)] shadow-sm'
+                                                    : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                                            }`}
                                         >
                                             {opt.label}
                                         </button>
                                     ))}
                                 </div>
-
-                                {/* Single Class: plain dropdown */}
-                                {assignMode === 'single' && (
-                                    <select
-                                        required
-                                        value={formData.student_class}
-                                        onChange={(e) => handleFormClassChange(e.target.value)}
-                                        className="bg-white border border-gray-300 rounded-xl p-3 text-sm outline-none focus:border-[var(--primary)] cursor-pointer"
-                                    >
-                                        <option value="">Select Class</option>
-                                        {classes.map((cls) => (
-                                            <option key={cls.id} value={cls.id}>
-                                                {cls.display_name || cls.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                )}
-
-                                {/* Multiple Classes: checkbox grid */}
-                                {assignMode === 'multiple' && (
-                                    classes.length > 0 ? (
-                                        <div className="flex flex-wrap gap-2 border border-gray-300 rounded-xl p-3 max-h-32 overflow-y-auto">
-                                            {classes.map((cls) => {
-                                                const checked = formData.classes.includes(Number(cls.id));
-                                                return (
-                                                    <label
-                                                        key={cls.id}
-                                                        className={`flex items-center space-x-1.5 text-xs px-2.5 py-1.5 rounded-lg border cursor-pointer transition-colors ${checked
-                                                                ? 'bg-blue-50 border-blue-200 text-blue-700 font-medium'
-                                                                : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
-                                                            }`}
-                                                    >
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={checked}
-                                                            onChange={() => handleToggleMultiClass(cls.id)}
-                                                            className="rounded accent-[var(--primary)] cursor-pointer"
-                                                        />
-                                                        <span>{cls.display_name || cls.name}</span>
-                                                    </label>
-                                                );
-                                            })}
-                                        </div>
-                                    ) : (
-                                        <span className="text-xs text-gray-400 italic">No classes registered yet.</span>
-                                    )
-                                )}
-
-                                {/* All Classes: informational note, nothing to pick */}
-                                {assignMode === 'all' && (
-                                    <p className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-xl p-3">
-                                        This test will be assigned to every class ({classes.length} total). Sections and
-                                        groups aren't available in this mode since they're specific to each class.
-                                    </p>
-                                )}
-
-                                {assignMode === 'multiple' && (
-                                    <p className="text-xs text-gray-400 mt-1 italic">
-                                        Sections and groups aren't available when assigning to multiple classes.
-                                    </p>
-                                )}
                             </div>
 
-                            {/* Multiple Sections Selection */}
-                            {assignMode === 'single' && formData.student_class && (
-                                <div className="flex flex-col">
-                                    <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">
-                                        Sections (Optional - Select multiple or leave empty for ALL)
-                                    </label>
-                                    {formLoading ? (
-                                        <span className="text-xs text-gray-400 p-2">Loading sections...</span>
-                                    ) : formSections.length > 0 ? (
-                                        <div className="flex flex-wrap gap-2 border border-gray-300 rounded-xl p-3 max-h-32 overflow-y-auto">
-                                            {formSections.map((sec) => {
-                                                const checked = formData.sections.includes(sec.id);
-                                                return (
-                                                    <label
-                                                        key={sec.id}
-                                                        className={`flex items-center space-x-1.5 text-xs px-2.5 py-1.5 rounded-lg border cursor-pointer transition-colors ${checked
-                                                                ? 'bg-blue-50 border-blue-200 text-blue-700 font-medium'
-                                                                : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
-                                                            }`}
-                                                    >
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={checked}
-                                                            onChange={(e) => {
-                                                                const newSecs = e.target.checked
-                                                                    ? [...formData.sections, sec.id]
-                                                                    : formData.sections.filter((id) => id !== sec.id);
-                                                                setFormData({ ...formData, sections: newSecs });
-                                                            }}
-                                                            className="rounded accent-[var(--primary)] cursor-pointer"
-                                                        />
-                                                        <span>{sec.name}</span>
-                                                    </label>
-                                                );
-                                            })}
+                            {/* Single Class Mode */}
+                            {formData.mode === MODE_SINGLE && (
+                                <div className="space-y-3">
+                                    <div className="flex flex-col">
+                                        <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">
+                                            Select Class
+                                        </label>
+                                        <select
+                                            required
+                                            value={formData.selectedClassIds[0] || ''}
+                                            onChange={(e) => handleSingleClassSelect(e.target.value)}
+                                            className="bg-white border border-gray-300 rounded-xl p-3 text-sm outline-none focus:border-[var(--primary)] cursor-pointer"
+                                        >
+                                            <option value="">Select Class</option>
+                                            {classes.map((cls) => (
+                                                <option key={cls.id} value={cls.id}>
+                                                    {cls.display_name || cls.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    {formData.selectedClassIds[0] && (
+                                        <div className="border border-gray-200 rounded-xl p-3 bg-gray-50/60">
+                                            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                                Sections & Groups for this class
+                                            </span>
+                                            {renderClassOptionsPanel(formData.selectedClassIds[0])}
                                         </div>
-                                    ) : (
-                                        <span className="text-xs text-gray-400 italic">No sections registered for this class.</span>
                                     )}
                                 </div>
                             )}
 
-                            {/* Multiple Groups Selection */}
-                            {assignMode === 'single' && formData.student_class && (
+                            {/* Multiple Classes Mode */}
+                            {formData.mode === MODE_MULTIPLE && (
                                 <div className="flex flex-col">
                                     <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">
-                                        Groups (Optional - Select multiple or leave empty for ALL)
+                                        Select Classes (check the ones to assign)
                                     </label>
-                                    {formLoading ? (
-                                        <span className="text-xs text-gray-400 p-2">Loading groups...</span>
-                                    ) : formGroups.length > 0 ? (
-                                        <div className="flex flex-wrap gap-2 border border-gray-300 rounded-xl p-3 max-h-32 overflow-y-auto">
-                                            {formGroups.map((grp) => {
-                                                const checked = formData.groups.includes(grp.id);
-                                                return (
-                                                    <label
-                                                        key={grp.id}
-                                                        className={`flex items-center space-x-1.5 text-xs px-2.5 py-1.5 rounded-lg border cursor-pointer transition-colors ${checked
-                                                                ? 'bg-purple-50 border-purple-200 text-purple-700 font-medium'
-                                                                : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
-                                                            }`}
-                                                    >
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={checked}
-                                                            onChange={(e) => {
-                                                                const newGrps = e.target.checked
-                                                                    ? [...formData.groups, grp.id]
-                                                                    : formData.groups.filter((id) => id !== grp.id);
-                                                                setFormData({ ...formData, groups: newGrps });
-                                                            }}
-                                                            className="rounded accent-[var(--primary)] cursor-pointer"
-                                                        />
-                                                        <span>{grp.name}</span>
-                                                    </label>
-                                                );
-                                            })}
-                                        </div>
-                                    ) : (
-                                        <span className="text-xs text-gray-400 italic">No groups registered for this class.</span>
-                                    )}
+                                    <div className="space-y-2 max-h-72 overflow-y-auto p-1">
+                                        {classes.length > 0 ? (
+                                            classes.map((cls) => renderClassChecklistRow(cls, { checkable: true }))
+                                        ) : (
+                                            <span className="text-xs text-gray-400 italic">No classes available.</span>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* All Classes Mode */}
+                            {formData.mode === MODE_ALL && (
+                                <div className="flex flex-col">
+                                    <div className="text-xs text-gray-600 bg-blue-50 border border-blue-100 rounded-xl p-3 mb-2">
+                                        This test will be assigned to <strong>all {classes.length} classes</strong>.
+                                        You can still optionally restrict individual classes to specific sections or groups below.
+                                    </div>
+                                    <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">
+                                        Classes ({classes.length})
+                                    </label>
+                                    <div className="space-y-2 max-h-72 overflow-y-auto p-1">
+                                        {classes.length > 0 ? (
+                                            classes.map((cls) => renderClassChecklistRow(cls, { checkable: false }))
+                                        ) : (
+                                            <span className="text-xs text-gray-400 italic">No classes available.</span>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Global-scope warning: sections/groups apply across ALL
+                                selected classes at once (see services.py), so a class
+                                whose students don't match any checked section/group
+                                would end up with zero eligible students. */}
+                            {formData.mode !== MODE_SINGLE && riskyClassNames.length > 0 && (
+                                <div className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3">
+                                    <strong>Heads up:</strong> sections and groups apply across every selected class at
+                                    once — they aren't scoped per class. Based on your current picks,{' '}
+                                    <strong>{riskyClassNames.join(', ')}</strong>{' '}
+                                    {riskyClassNames.length === 1 ? 'has' : 'have'} no matching section/group selected
+                                    and would end up with <strong>zero eligible students</strong>. Either check at least
+                                    one section/group that belongs to {riskyClassNames.length === 1 ? 'that class' : 'those classes'},
+                                    or leave sections/groups empty to include everyone.
                                 </div>
                             )}
 
