@@ -87,15 +87,12 @@ const Examination = () => {
     // ==================================================================
     // ========================= TEST TIMETABLE ========================
     // ==================================================================
-    // Mirrors the Class Timetable state above, but adapted to the
-    // TestTimetable / TestTimetableEntry backend shape:
-    //   TestTimetable   -> { id, name, student_class, entries, created_at, updated_at }
-    //   TestTimetableEntry -> { subject, date, start_time, end_time, room_number }
-    // Unlike Class Timetable, a class CAN have multiple test timetables
-    // (no OneToOne / uniqueness constraint on the backend), and entries
-    // are flat rows (no day-of-week / period_number grouping).
+    // Backend workflow:
+    //   Existing Test -> assigned classes -> one selected class
+    //   -> subjects of that class -> TestTimetable entries.
+    // TestTimetable is identified by test + student_class; there is no
+    // separate timetable name field in the backend.
 
-    // ---------- SECTION SWITCHER ----------
     const [section, setSection] = useState("class"); // 'class' | 'test'
 
     // ---------- TEST LIST STATE ----------
@@ -108,24 +105,45 @@ const Examination = () => {
     const [deleteTestTarget, setDeleteTestTarget] = useState(null);
     const [deletingTest, setDeletingTest] = useState(false);
 
+    // ---------- TEST REFERENCE DATA ----------
+    const [tests, setTests] = useState([]);
+    const [loadingTests, setLoadingTests] = useState(false);
+
     // ---------- TEST FORM STATE ----------
     const [testActiveTab, setTestActiveTab] = useState("list"); // 'list' | 'form'
     const [editingTestId, setEditingTestId] = useState(null);
+    const [selectedTestId, setSelectedTestId] = useState("");
     const [selectedTestClassId, setSelectedTestClassId] = useState("");
-    const [testName, setTestName] = useState("");
-    // Flat array of entry rows: [{ subject, date, start_time, end_time, room_number }]
-    const emptyTestEntry = () => ({
-        subject: "",
+
+    // One row is created for every subject of the selected class.
+    const emptyTestEntry = (subject = "") => ({
+        subject: subject ? String(subject) : "",
         date: "",
         start_time: "",
         end_time: "",
         room_number: "",
     });
-    const [testEntries, setTestEntries] = useState([emptyTestEntry()]);
-
+    const [testEntries, setTestEntries] = useState([]);
     const [savingTest, setSavingTest] = useState(false);
 
-    // ---------- LOAD TEST TIMETABLES (search + filter) ----------
+    // ---------- LOAD AVAILABLE TESTS ----------
+    const fetchTestsForTimetable = useCallback(async () => {
+        setLoadingTests(true);
+        try {
+            const res = await api.get("/tests/", { headers });
+            const data = Array.isArray(res.data) ? res.data : res.data?.results || [];
+            setTests(data);
+        } catch (error) {
+            console.error("Error loading tests:", error);
+            setTests([]);
+            setTestListError("Failed to load tests. Please try again.");
+        } finally {
+            setLoadingTests(false);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [token]);
+
+    // ---------- LOAD TEST TIMETABLES ----------
     const fetchTestTimetables = useCallback(async () => {
         setLoadingTestList(true);
         setTestListError("");
@@ -149,15 +167,43 @@ const Examination = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [testSearchTerm, testFilterClassId, token]);
 
-    // Debounce search/filter changes
     useEffect(() => {
-        const timer = setTimeout(() => {
-            fetchTestTimetables();
-        }, 350);
+        const timer = setTimeout(() => fetchTestTimetables(), 350);
         return () => clearTimeout(timer);
     }, [fetchTestTimetables]);
 
-    // ---------- SUBJECTS FOR SELECTED TEST CLASS ----------
+    useEffect(() => {
+        if (!token) return;
+        fetchTestsForTimetable();
+    }, [token, fetchTestsForTimetable]);
+
+    // ---------- SELECTED TEST / ASSIGNED CLASSES ----------
+    const selectedTest = useMemo(
+        () => tests.find((test) => String(test.id) === String(selectedTestId)),
+        [tests, selectedTestId]
+    );
+
+    const assignedClassIds = useMemo(() => {
+        if (!selectedTest) return [];
+
+        if (Array.isArray(selectedTest.classes_detail) && selectedTest.classes_detail.length) {
+            return selectedTest.classes_detail.map((cls) => Number(cls.id));
+        }
+
+        if (Array.isArray(selectedTest.classes)) {
+            return selectedTest.classes
+                .map((cls) => Number(getClassIdOf(cls)))
+                .filter((id) => Number.isFinite(id));
+        }
+
+        return [];
+    }, [selectedTest]);
+
+    const assignedClasses = useMemo(
+        () => classes.filter((cls) => assignedClassIds.includes(Number(cls.id))),
+        [classes, assignedClassIds]
+    );
+
     const subjectsForTestClass = useMemo(() => {
         if (!selectedTestClassId) return [];
         return subjects.filter(
@@ -165,16 +211,53 @@ const Examination = () => {
         );
     }, [subjects, selectedTestClassId]);
 
-    // ---------- ENTRY ROW HELPERS ----------
-    const addTestEntry = () => {
-        setTestEntries((prev) => [...prev, emptyTestEntry()]);
+    const populateTestEntriesForClass = useCallback(
+        (classId, existingEntries = null) => {
+            if (!classId) {
+                setTestEntries([]);
+                return;
+            }
+
+            const classSubjects = subjects.filter(
+                (subject) => String(getSubjectClassId(subject)) === String(classId)
+            );
+
+            if (existingEntries) {
+                const existingBySubject = new Map(
+                    existingEntries.map((entry) => [
+                        String(getClassIdOf(entry.subject) ?? entry.subject),
+                        {
+                            subject: String(getClassIdOf(entry.subject) ?? entry.subject),
+                            date: entry.date || "",
+                            start_time: formatTimeForInput(entry.start_time),
+                            end_time: formatTimeForInput(entry.end_time),
+                            room_number: entry.room_number || "",
+                        },
+                    ])
+                );
+
+                setTestEntries(
+                    classSubjects.map((subject) =>
+                        existingBySubject.get(String(subject.id)) || emptyTestEntry(subject.id)
+                    )
+                );
+                return;
+            }
+
+            setTestEntries(classSubjects.map((subject) => emptyTestEntry(subject.id)));
+        },
+        [subjects]
+    );
+
+    const handleSelectedTestChange = (testId) => {
+        setSelectedTestId(testId);
+        setSelectedTestClassId("");
+        setTestEntries([]);
     };
 
-    const removeTestEntry = (index) => {
-        setTestEntries((prev) => {
-            if (prev.length === 1) return [emptyTestEntry()];
-            return prev.filter((_, i) => i !== index);
-        });
+    const handleSelectedTestClassChange = (classId) => {
+        setSelectedTestClassId(classId);
+        populateTestEntriesForClass(classId);
     };
 
     const updateTestEntry = (index, field, value) => {
@@ -185,7 +268,6 @@ const Examination = () => {
         );
     };
 
-    // Only rows with all required fields filled count as real entries
     const validTestEntries = useMemo(
         () =>
             testEntries.filter(
@@ -194,76 +276,89 @@ const Examination = () => {
         [testEntries]
     );
 
-    // ---------- ADD NEW / EDIT / CANCEL (TEST) ----------
-    const startAddNewTest = () => {
+    const startAddNewTest = async () => {
         setEditingTestId(null);
+        setSelectedTestId("");
         setSelectedTestClassId("");
-        setTestName("");
-        setTestEntries([emptyTestEntry()]);
+        setTestEntries([]);
+        setTestListError("");
+
+        if (!tests.length) await fetchTestsForTimetable();
         setTestActiveTab("form");
     };
 
     const startEditTest = (timetable) => {
         const classId = getClassIdOf(timetable.student_class);
+        const testId = getClassIdOf(timetable.test);
+
         setEditingTestId(timetable.id);
+        setSelectedTestId(String(testId));
         setSelectedTestClassId(String(classId));
-        setTestName(timetable.name || "");
-
-        const entries = (timetable.entries || []).map((entry) => ({
-            subject: String(getClassIdOf(entry.subject) ?? entry.subject),
-            date: entry.date || "",
-            start_time: formatTimeForInput(entry.start_time),
-            end_time: formatTimeForInput(entry.end_time),
-            room_number: entry.room_number || "",
-        }));
-
-        setTestEntries(entries.length ? entries : [emptyTestEntry()]);
+        populateTestEntriesForClass(classId, timetable.entries || []);
         setTestActiveTab("form");
     };
 
     const cancelTestForm = () => {
-        startAddNewTest();
+        setEditingTestId(null);
+        setSelectedTestId("");
+        setSelectedTestClassId("");
+        setTestEntries([]);
         setTestActiveTab("list");
     };
 
-    // ---------- SUBMIT (CREATE or UPDATE) TEST ----------
+    // ---------- SUBMIT (CREATE / UPDATE) ----------
     const handleTestSubmit = async (e) => {
         e.preventDefault();
 
-        if (!testName.trim()) {
-            Swal.fire({
+        if (!selectedTestId) {
+            return Swal.fire({
                 icon: "warning",
-                title: "Name required",
-                text: "Please give this test timetable a name.",
+                title: "Select a test",
+                text: "Please select an existing test first.",
                 confirmButtonColor: "#dc2626",
             });
-            return;
         }
 
         if (!selectedTestClassId) {
-            Swal.fire({
+            return Swal.fire({
                 icon: "warning",
                 title: "Select a class",
-                text: "Please select a class first.",
+                text: "Please select one of the classes assigned to this test.",
                 confirmButtonColor: "#dc2626",
             });
-            return;
         }
 
-        if (validTestEntries.length === 0) {
-            Swal.fire({
+        if (!assignedClassIds.includes(Number(selectedTestClassId))) {
+            return Swal.fire({
                 icon: "warning",
-                title: "Nothing to save",
-                text: "Add at least one complete entry (subject, date, start & end time).",
+                title: "Class not assigned",
+                text: "The selected class is not assigned to this test.",
                 confirmButtonColor: "#dc2626",
             });
-            return;
+        }
+
+        if (subjectsForTestClass.length === 0) {
+            return Swal.fire({
+                icon: "warning",
+                title: "No subjects",
+                text: "No subjects were found for the selected class.",
+                confirmButtonColor: "#dc2626",
+            });
+        }
+
+        if (validTestEntries.length === 0 || validTestEntries.length !== testEntries.length) {
+            return Swal.fire({
+                icon: "warning",
+                title: "Incomplete timetable",
+                text: "Please complete the date, start time, and end time for every subject shown.",
+                confirmButtonColor: "#dc2626",
+            });
         }
 
         setSavingTest(true);
 
         const payload = {
-            name: testName.trim(),
+            test: Number(selectedTestId),
             student_class: Number(selectedTestClassId),
             entries: validTestEntries.map((entry) => ({
                 subject: Number(entry.subject),
@@ -276,11 +371,7 @@ const Examination = () => {
 
         try {
             if (editingTestId) {
-                await api.put(
-                    `examination/test-timetables/${editingTestId}/`,
-                    payload,
-                    { headers }
-                );
+                await api.put(`examination/test-timetables/${editingTestId}/`, payload, { headers });
             } else {
                 await api.post("examination/test-timetables/", payload, { headers });
             }
@@ -289,9 +380,7 @@ const Examination = () => {
 
             await Swal.fire({
                 icon: "success",
-                title: editingTestId
-                    ? "Test timetable updated!"
-                    : "Test timetable created!",
+                title: editingTestId ? "Test timetable updated!" : "Test timetable created!",
                 text: editingTestId
                     ? "Test timetable updated successfully!"
                     : "Test timetable created successfully!",
@@ -300,42 +389,29 @@ const Examination = () => {
                 timerProgressBar: true,
             });
 
-            setEditingTestId(null);
-            setSelectedTestClassId("");
-            setTestName("");
-            setTestEntries([emptyTestEntry()]);
-            setTestActiveTab("list");
+            cancelTestForm();
         } catch (error) {
             console.error("Error saving test timetable:", error);
-
-            const errorText = extractErrorMessage(
-                error,
-                "Failed to save test timetable. Please check the details and try again."
-            );
-
             Swal.fire({
                 icon: "error",
                 title: "Could not save test timetable",
-                text: errorText,
+                text: extractErrorMessage(
+                    error,
+                    "Failed to save test timetable. Please check the details and try again."
+                ),
                 confirmButtonColor: "#dc2626",
             });
-            // Intentionally NOT resetting the form here -- keep the user's
-            // entries so they can fix the offending field and resubmit.
         } finally {
             setSavingTest(false);
         }
     };
 
-    // ---------- DELETE (TEST) ----------
     const handleDeleteTest = async () => {
         if (!deleteTestTarget) return;
 
         setDeletingTest(true);
         try {
-            await api.delete(
-                `examination/test-timetables/${deleteTestTarget.id}/`,
-                { headers }
-            );
+            await api.delete(`examination/test-timetables/${deleteTestTarget.id}/`, { headers });
             setDeleteTestTarget(null);
             await fetchTestTimetables();
         } catch (error) {
@@ -343,10 +419,7 @@ const Examination = () => {
             Swal.fire({
                 icon: "error",
                 title: "Could not delete test timetable",
-                text: extractErrorMessage(
-                    error,
-                    "Failed to delete test timetable. Please try again."
-                ),
+                text: extractErrorMessage(error, "Failed to delete test timetable. Please try again."),
                 confirmButtonColor: "#dc2626",
             });
         } finally {
@@ -1428,466 +1501,467 @@ const Examination = () => {
             {/* ========================= TEST TIMETABLE ==================== */}
             {/* ============================================================ */}
             {section === "test" && (
-            <>
-            {/* Tabs */}
-            <div className="flex items-center gap-2 mb-6 border-b border-gray-200">
-                <button
-                    type="button"
-                    onClick={() => setTestActiveTab("list")}
-                    className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors cursor-pointer ${
-                        testActiveTab === "list"
-                            ? "border-[var(--primary)] text-[var(--primary)]"
-                            : "border-transparent text-gray-500 hover:text-[var(--quinary)]"
-                    }`}
-                >
-                    All Test Timetables
-                </button>
-                <button
-                    type="button"
-                    onClick={() =>
-                        testActiveTab === "form" ? null : startAddNewTest()
-                    }
-                    className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors cursor-pointer ${
-                        testActiveTab === "form"
-                            ? "border-[var(--primary)] text-[var(--primary)]"
-                            : "border-transparent text-gray-500 hover:text-[var(--quinary)]"
-                    }`}
-                >
-                    {editingTestId ? "Edit Test Timetable" : "Add New"}
-                </button>
-            </div>
+                <>
+                    <div className="flex items-center gap-2 mb-6 border-b border-gray-200">
+                        <button
+                            type="button"
+                            onClick={() => setTestActiveTab("list")}
+                            className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors cursor-pointer ${
+                                testActiveTab === "list"
+                                    ? "border-[var(--primary)] text-[var(--primary)]"
+                                    : "border-transparent text-gray-500 hover:text-[var(--quinary)]"
+                            }`}
+                        >
+                            All Test Timetables
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => (testActiveTab === "form" ? null : startAddNewTest())}
+                            className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors cursor-pointer ${
+                                testActiveTab === "form"
+                                    ? "border-[var(--primary)] text-[var(--primary)]"
+                                    : "border-transparent text-gray-500 hover:text-[var(--quinary)]"
+                            }`}
+                        >
+                            {editingTestId ? "Edit Test Timetable" : "Add New"}
+                        </button>
+                    </div>
 
-            {/* ================= LIST TAB ================= */}
-            {testActiveTab === "list" && (
-                <div>
-                    {testListError && (
-                        <div className="p-3 rounded-xl text-sm mb-6 text-center border max-w-xl bg-red-50 text-red-700 border-red-200">
-                            {testListError}
+                    {testActiveTab === "list" && (
+                        <div>
+                            {testListError && (
+                                <div className="p-3 rounded-xl text-sm mb-6 text-center border max-w-xl bg-red-50 text-red-700 border-red-200">
+                                    {testListError}
+                                </div>
+                            )}
+
+                            <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
+                                <div className="flex items-center gap-3 flex-wrap">
+                                    <input
+                                        type="text"
+                                        value={testSearchTerm}
+                                        onChange={(e) => setTestSearchTerm(e.target.value)}
+                                        placeholder="Search by test or class..."
+                                        className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl px-4 py-2.5 outline-none focus:border-[var(--primary)] transition-colors text-sm w-64 placeholder-gray-400"
+                                    />
+                                    <select
+                                        value={testFilterClassId}
+                                        onChange={(e) => setTestFilterClassId(e.target.value)}
+                                        className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl px-4 py-2.5 outline-none focus:border-[var(--primary)] transition-colors text-sm cursor-pointer"
+                                    >
+                                        <option value="">All Classes</option>
+                                        {classes.map((cls) => (
+                                            <option key={cls.id} value={cls.id}>
+                                                {cls.display_name || cls.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {(testSearchTerm || testFilterClassId) && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setTestSearchTerm("");
+                                                setTestFilterClassId("");
+                                            }}
+                                            className="text-xs text-gray-500 hover:text-[var(--quinary)] underline cursor-pointer"
+                                        >
+                                            Clear
+                                        </button>
+                                    )}
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={fetchTestTimetables}
+                                        disabled={loadingTestList}
+                                        className="bg-white hover:bg-gray-50 disabled:opacity-50 text-[var(--quinary)] font-medium py-2.5 px-4 rounded-xl border border-gray-300 transition-colors text-sm cursor-pointer"
+                                    >
+                                        {loadingTestList ? "Refreshing..." : "Refresh"}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={startAddNewTest}
+                                        className="bg-[var(--primary)] hover:bg-[var(--quinary)] text-white font-medium py-2.5 px-4 rounded-xl transition-colors text-sm cursor-pointer"
+                                    >
+                                        + Add New Test Timetable
+                                    </button>
+                                </div>
+                            </div>
+
+                            {loadingTestList ? (
+                                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center text-gray-400 text-sm">
+                                    Loading test timetables...
+                                </div>
+                            ) : testTimetables.length === 0 ? (
+                                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center text-gray-400 text-sm">
+                                    {testSearchTerm || testFilterClassId
+                                        ? "No test timetables match your search/filter."
+                                        : 'No test timetables yet. Click "Add New Test Timetable" to create one.'}
+                                </div>
+                            ) : (
+                                <div className="space-y-4 max-w-4xl">
+                                    {testTimetables.map((timetable) => {
+                                        const isExpanded = testExpandedIds.has(timetable.id);
+                                        const entryCount = (timetable.entries || []).length;
+                                        const classLabel =
+                                            timetable.student_class_name ||
+                                            getClassLabel(timetable.student_class);
+                                        const testLabel =
+                                            timetable.test_name ||
+                                            (typeof timetable.test === "object"
+                                                ? timetable.test.name
+                                                : tests.find((t) => t.id === timetable.test)?.name) ||
+                                            `Test #${getClassIdOf(timetable.test)}`;
+
+                                        const entriesByDate = {};
+                                        (timetable.entries || []).forEach((entry) => {
+                                            if (!entriesByDate[entry.date]) entriesByDate[entry.date] = [];
+                                            entriesByDate[entry.date].push(entry);
+                                        });
+                                        const sortedDates = Object.keys(entriesByDate).sort();
+
+                                        return (
+                                            <div
+                                                key={timetable.id}
+                                                className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6"
+                                            >
+                                                <div className="flex items-start justify-between flex-wrap gap-3">
+                                                    <div>
+                                                        <div className="text-lg font-semibold text-[var(--quinary)]">
+                                                            {testLabel}
+                                                        </div>
+                                                        <div className="text-sm text-gray-500 mt-1">
+                                                            {classLabel}
+                                                        </div>
+                                                        <div className="text-xs text-gray-400 mt-1">
+                                                            {entryCount} {entryCount === 1 ? "subject" : "subjects"}
+                                                            {timetable.updated_at
+                                                                ? ` • Updated ${new Date(timetable.updated_at).toLocaleDateString()}`
+                                                                : ""}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => toggleTestExpanded(timetable.id)}
+                                                            className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-300 text-[var(--quinary)] hover:bg-gray-50 transition-colors cursor-pointer"
+                                                        >
+                                                            {isExpanded ? "Hide Entries" : "View Entries"}
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => startEditTest(timetable)}
+                                                            className="text-xs font-medium px-3 py-1.5 rounded-lg border border-[var(--primary)] text-[var(--primary)] hover:bg-[var(--primary)] hover:text-white transition-colors cursor-pointer"
+                                                        >
+                                                            Edit
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setDeleteTestTarget(timetable)}
+                                                            className="text-xs font-medium px-3 py-1.5 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                                                        >
+                                                            Delete
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                {isExpanded && (
+                                                    <div className="mt-4 border-t border-gray-100 pt-4 space-y-3">
+                                                        {sortedDates.map((date) => (
+                                                            <div key={date}>
+                                                                <div className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-2">
+                                                                    {date}
+                                                                </div>
+                                                                <div className="space-y-1.5">
+                                                                    {entriesByDate[date].map((entry, i) => (
+                                                                        <div
+                                                                            key={entry.id ?? i}
+                                                                            className="flex items-center gap-3 flex-wrap text-sm bg-gray-50 rounded-lg px-3 py-2"
+                                                                        >
+                                                                            <span className="font-medium text-[var(--quinary)]">
+                                                                                {getSubjectName(entry.subject)}
+                                                                            </span>
+                                                                            <span className="text-gray-500 text-xs">
+                                                                                {formatTimeForInput(entry.start_time)} – {formatTimeForInput(entry.end_time)}
+                                                                            </span>
+                                                                            {entry.room_number && (
+                                                                                <span className="text-gray-400 text-xs">
+                                                                                    Room {entry.room_number}
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
                     )}
 
-                    {/* Controls */}
-                    <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
-                        <div className="flex items-center gap-3 flex-wrap">
-                            <input
-                                type="text"
-                                value={testSearchTerm}
-                                onChange={(e) => setTestSearchTerm(e.target.value)}
-                                placeholder="Search by name or class..."
-                                className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl px-4 py-2.5 outline-none focus:border-[var(--primary)] transition-colors text-sm w-64 placeholder-gray-400"
-                            />
-
-                            <select
-                                value={testFilterClassId}
-                                onChange={(e) => setTestFilterClassId(e.target.value)}
-                                className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl px-4 py-2.5 outline-none focus:border-[var(--primary)] transition-colors text-sm cursor-pointer"
-                            >
-                                <option value="">All Classes</option>
-                                {classes.map((cls) => (
-                                    <option key={cls.id} value={cls.id}>
-                                        {cls.display_name || cls.name}
-                                    </option>
-                                ))}
-                            </select>
-
-                            {(testSearchTerm || testFilterClassId) && (
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setTestSearchTerm("");
-                                        setTestFilterClassId("");
-                                    }}
-                                    className="text-xs text-gray-500 hover:text-[var(--quinary)] underline cursor-pointer"
-                                >
-                                    Clear
-                                </button>
-                            )}
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                            <span
-                                title="PDF export isn't available for test timetables yet."
-                                className="bg-white opacity-50 cursor-not-allowed text-[var(--quinary)] font-medium py-2.5 px-4 rounded-xl border border-gray-300 text-sm"
-                            >
-                                Download All (PDF)
-                            </span>
-
-                            <button
-                                type="button"
-                                onClick={fetchTestTimetables}
-                                disabled={loadingTestList}
-                                className="bg-white hover:bg-gray-50 disabled:opacity-50 text-[var(--quinary)] font-medium py-2.5 px-4 rounded-xl border border-gray-300 transition-colors text-sm cursor-pointer"
-                            >
-                                {loadingTestList ? "Refreshing..." : "Refresh"}
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={startAddNewTest}
-                                className="bg-[var(--primary)] hover:bg-[var(--quinary)] text-white font-medium py-2.5 px-4 rounded-xl transition-colors text-sm cursor-pointer"
-                            >
-                                + Add New Test Timetable
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* List */}
-                    {loadingTestList ? (
-                        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center text-gray-400 text-sm">
-                            Loading test timetables...
-                        </div>
-                    ) : testTimetables.length === 0 ? (
-                        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center text-gray-400 text-sm">
-                            {testSearchTerm || testFilterClassId
-                                ? "No test timetables match your search/filter."
-                                : 'No test timetables yet. Click "Add New Test Timetable" to create one.'}
-                        </div>
-                    ) : (
-                        <div className="space-y-4 max-w-4xl">
-                            {testTimetables.map((timetable) => {
-                                const isExpanded = testExpandedIds.has(timetable.id);
-                                const entryCount = (timetable.entries || []).length;
-                                const label = getClassLabel(timetable.student_class);
-
-                                // Group entries by date for a readable summary
-                                const entriesByDate = {};
-                                (timetable.entries || []).forEach((entry) => {
-                                    if (!entriesByDate[entry.date]) entriesByDate[entry.date] = [];
-                                    entriesByDate[entry.date].push(entry);
-                                });
-                                const sortedDates = Object.keys(entriesByDate).sort();
-
-                                return (
-                                    <div
-                                        key={timetable.id}
-                                        className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6"
-                                    >
-                                        <div className="flex items-start justify-between flex-wrap gap-3">
-                                            <div>
-                                                <div className="text-lg font-semibold text-[var(--quinary)]">
-                                                    {timetable.name}
-                                                </div>
-                                                <div className="text-xs text-gray-400 mt-1">
-                                                    {label} • {entryCount} entr
-                                                    {entryCount === 1 ? "y" : "ies"}
-                                                    {timetable.updated_at
-                                                        ? ` • Updated ${new Date(
-                                                              timetable.updated_at
-                                                          ).toLocaleDateString()}`
-                                                        : ""}
-                                                </div>
-                                            </div>
-
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => toggleTestExpanded(timetable.id)}
-                                                    className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-300 text-[var(--quinary)] hover:bg-gray-50 transition-colors cursor-pointer"
-                                                >
-                                                    {isExpanded ? "Hide Entries" : "View Entries"}
-                                                </button>
-
-                                                <span
-                                                    title="PDF export isn't available for test timetables yet."
-                                                    className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-300 text-[var(--quinary)] opacity-50 cursor-not-allowed"
-                                                >
-                                                    PDF
-                                                </span>
-
-                                                <button
-                                                    type="button"
-                                                    onClick={() => startEditTest(timetable)}
-                                                    className="text-xs font-medium px-3 py-1.5 rounded-lg border border-[var(--primary)] text-[var(--primary)] hover:bg-[var(--primary)] hover:text-white transition-colors cursor-pointer"
-                                                >
-                                                    Edit
-                                                </button>
-
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setDeleteTestTarget(timetable)}
-                                                    className="text-xs font-medium px-3 py-1.5 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
-                                                >
-                                                    Delete
-                                                </button>
-                                            </div>
+                    {testActiveTab === "form" && (
+                        <form onSubmit={handleTestSubmit} className="space-y-6">
+                            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 max-w-3xl space-y-5">
+                                <div className="flex items-center justify-between mb-1">
+                                    <div>
+                                        <div className="text-xs uppercase tracking-wider text-gray-500 font-semibold">
+                                            Test Timetable Details
                                         </div>
+                                        <div className="text-sm text-gray-400 mt-1">
+                                            Select an existing test, then choose one of its assigned classes.
+                                        </div>
+                                    </div>
+                                    {editingTestId && (
+                                        <span className="text-xs text-[var(--primary)] font-medium">
+                                            Editing test timetable
+                                        </span>
+                                    )}
+                                </div>
 
-                                        {isExpanded && (
-                                            <div className="mt-4 border-t border-gray-100 pt-4 space-y-3">
-                                                {sortedDates.map((date) => (
-                                                    <div key={date}>
-                                                        <div className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-2">
-                                                            {date}
-                                                        </div>
-                                                        <div className="space-y-1.5">
-                                                            {entriesByDate[date].map((entry, i) => (
-                                                                <div
-                                                                    key={entry.id ?? i}
-                                                                    className="flex items-center gap-3 flex-wrap text-sm bg-gray-50 rounded-lg px-3 py-2"
-                                                                >
-                                                                    <span className="font-medium text-[var(--quinary)]">
-                                                                        {getSubjectName(entry.subject)}
-                                                                    </span>
-                                                                    <span className="text-gray-500 text-xs">
-                                                                        {formatTimeForInput(entry.start_time)} –{" "}
-                                                                        {formatTimeForInput(entry.end_time)}
-                                                                    </span>
-                                                                    {entry.room_number && (
-                                                                        <span className="text-gray-400 text-xs">
-                                                                            Room {entry.room_number}
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                ))}
+                                <div>
+                                    <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold block mb-1">
+                                        Test *
+                                    </label>
+                                    <select
+                                        value={selectedTestId}
+                                        onChange={(e) => handleSelectedTestChange(e.target.value)}
+                                        disabled={Boolean(editingTestId) || loadingTests}
+                                        required
+                                        className="w-full bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm cursor-pointer disabled:opacity-60"
+                                    >
+                                        <option value="">
+                                            {loadingTests ? "Loading tests..." : "Select Test"}
+                                        </option>
+                                        {tests.map((test) => (
+                                            <option key={test.id} value={test.id}>
+                                                {test.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {selectedTest && (
+                                        <div className="mt-2 text-xs text-gray-500">
+                                            {selectedTest.date ? `Scheduled date: ${selectedTest.date}` : ""}
+                                            {selectedTest.description ? ` • ${selectedTest.description}` : ""}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {selectedTestId && (
+                                    <div>
+                                        <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold block mb-2">
+                                            Classes assigned to this test *
+                                        </label>
+
+                                        {assignedClasses.length === 0 ? (
+                                            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
+                                                This test has no assigned classes, so a timetable cannot be created for it.
+                                            </div>
+                                        ) : (
+                                            <div className="flex flex-wrap gap-2">
+                                                {assignedClasses.map((cls) => {
+                                                    const active = String(selectedTestClassId) === String(cls.id);
+                                                    return (
+                                                        <button
+                                                            key={cls.id}
+                                                            type="button"
+                                                            onClick={() => handleSelectedTestClassChange(String(cls.id))}
+                                                            className={`px-4 py-2.5 rounded-xl border text-sm font-medium transition-colors cursor-pointer ${
+                                                                active
+                                                                    ? "bg-[var(--primary)] text-white border-[var(--primary)]"
+                                                                    : "bg-white text-[var(--quinary)] border-gray-300 hover:bg-gray-50"
+                                                            }`}
+                                                        >
+                                                            {cls.display_name || cls.name}
+                                                        </button>
+                                                    );
+                                                })}
                                             </div>
                                         )}
                                     </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
-            )}
+                                )}
 
-            {/* ================= FORM TAB (CREATE / EDIT) ================= */}
-            {testActiveTab === "form" && (
-                <form onSubmit={handleTestSubmit} className="space-y-6">
-                    {/* ---------------- NAME + CLASS SELECTOR ---------------- */}
-                    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 max-w-xl space-y-4">
-                        <div className="flex items-center justify-between mb-1">
-                            <span className="text-xs uppercase tracking-wider text-gray-500 font-semibold">
-                                Test Timetable Details
-                            </span>
-                            {editingTestId && (
-                                <span className="text-xs text-[var(--primary)] font-medium">
-                                    Editing test timetable
-                                </span>
-                            )}
-                        </div>
-
-                        <div>
-                            <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold block mb-1">
-                                Name
-                            </label>
-                            <input
-                                type="text"
-                                value={testName}
-                                onChange={(e) => setTestName(e.target.value)}
-                                placeholder="e.g. Mid-Term Examination 2026"
-                                required
-                                className="w-full bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm placeholder-gray-400"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold block mb-1">
-                                Class
-                            </label>
-                            <select
-                                value={selectedTestClassId}
-                                onChange={(e) => setSelectedTestClassId(e.target.value)}
-                                required
-                                className="w-full bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm cursor-pointer"
-                            >
-                                <option value="">Select Class</option>
-                                {classes.map((cls) => (
-                                    <option key={cls.id} value={cls.id}>
-                                        {cls.display_name || cls.name}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                    </div>
-
-                    {/* ---------------- ENTRY ROWS ---------------- */}
-                    {selectedTestClassId && (
-                        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 max-w-4xl">
-                            <div className="flex items-center justify-between mb-4">
-                                <span className="text-xs uppercase tracking-wider text-gray-500 font-semibold">
-                                    Entries
-                                </span>
-                                <button
-                                    type="button"
-                                    onClick={addTestEntry}
-                                    className="text-xs font-medium px-3 py-1.5 rounded-lg border border-[var(--primary)] text-[var(--primary)] hover:bg-[var(--primary)] hover:text-white transition-colors cursor-pointer"
-                                >
-                                    + Add Entry
-                                </button>
-                            </div>
-
-                            {subjectsForTestClass.length === 0 ? (
-                                <div className="text-center text-gray-400 text-sm py-6">
-                                    No subjects found for this class. Add subjects to this
-                                    class first.
-                                </div>
-                            ) : (
-                                <div className="space-y-3">
-                                    {testEntries.map((entry, index) => (
-                                        <div
-                                            key={index}
-                                            className="flex items-center gap-2 flex-wrap bg-gray-50 rounded-xl border border-gray-200 p-3"
-                                        >
-                                            <select
-                                                value={entry.subject}
-                                                onChange={(e) =>
-                                                    updateTestEntry(
-                                                        index,
-                                                        "subject",
-                                                        e.target.value
-                                                    )
-                                                }
-                                                required
-                                                className="bg-white text-[var(--quinary)] border border-gray-300 rounded-lg p-2 outline-none focus:border-[var(--primary)] transition-colors text-sm cursor-pointer min-w-[160px]"
-                                            >
-                                                <option value="">Select Subject</option>
-                                                {subjectsForTestClass.map((subject) => (
-                                                    <option key={subject.id} value={subject.id}>
-                                                        {subject.name}
-                                                    </option>
-                                                ))}
-                                            </select>
-
-                                            <input
-                                                type="date"
-                                                value={entry.date}
-                                                onChange={(e) =>
-                                                    updateTestEntry(index, "date", e.target.value)
-                                                }
-                                                required
-                                                className="bg-white text-[var(--quinary)] border border-gray-300 rounded-lg p-2 outline-none focus:border-[var(--primary)] transition-colors text-sm"
-                                            />
-
-                                            <input
-                                                type="time"
-                                                value={entry.start_time}
-                                                onChange={(e) =>
-                                                    updateTestEntry(
-                                                        index,
-                                                        "start_time",
-                                                        e.target.value
-                                                    )
-                                                }
-                                                required
-                                                className="bg-white text-[var(--quinary)] border border-gray-300 rounded-lg p-2 outline-none focus:border-[var(--primary)] transition-colors text-sm"
-                                            />
-
-                                            <span className="text-gray-400 text-sm">to</span>
-
-                                            <input
-                                                type="time"
-                                                value={entry.end_time}
-                                                onChange={(e) =>
-                                                    updateTestEntry(
-                                                        index,
-                                                        "end_time",
-                                                        e.target.value
-                                                    )
-                                                }
-                                                required
-                                                className="bg-white text-[var(--quinary)] border border-gray-300 rounded-lg p-2 outline-none focus:border-[var(--primary)] transition-colors text-sm"
-                                            />
-
-                                            <input
-                                                type="text"
-                                                value={entry.room_number}
-                                                onChange={(e) =>
-                                                    updateTestEntry(
-                                                        index,
-                                                        "room_number",
-                                                        e.target.value
-                                                    )
-                                                }
-                                                placeholder="Room no. (optional)"
-                                                className="flex-1 min-w-[140px] bg-white text-[var(--quinary)] border border-gray-300 rounded-lg p-2 outline-none focus:border-[var(--primary)] transition-colors text-sm placeholder-gray-400"
-                                            />
-
-                                            <button
-                                                type="button"
-                                                onClick={() => removeTestEntry(index)}
-                                                className="text-xs font-medium px-3 py-2 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
-                                            >
-                                                Remove
-                                            </button>
+                                {selectedTestClassId && (
+                                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                                        <div className="text-xs uppercase tracking-wider text-gray-500 font-semibold">
+                                            Selected class
                                         </div>
-                                    ))}
+                                        <div className="text-base font-semibold text-[var(--quinary)] mt-1">
+                                            {selectedTestClass?.display_name || selectedTestClass?.name || `Class #${selectedTestClassId}`}
+                                        </div>
+                                        <div className="text-xs text-gray-500 mt-1">
+                                            {subjectsForTestClass.length} {subjectsForTestClass.length === 1 ? "subject" : "subjects"} found for this class.
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {selectedTestClassId && (
+                                subjectsForTestClass.length === 0 ? (
+                                    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center text-gray-400 text-sm max-w-4xl">
+                                        No subjects found for this class. Add subjects to this class first.
+                                    </div>
+                                ) : (
+                                    <div className="space-y-4 max-w-4xl">
+                                        {testEntries.map((entry, index) => {
+                                            const subject = subjects.find((item) => String(item.id) === String(entry.subject));
+                                            return (
+                                                <div
+                                                    key={subject?.id ?? `extra-${index}`}
+                                                    className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6"
+                                                >
+                                                    <div className="flex items-center justify-between gap-3 mb-4">
+                                                        <div>
+                                                            <div className="text-lg font-semibold text-[var(--quinary)]">
+                                                                {subject?.name || `Subject #${entry.subject}`}
+                                                            </div>
+                                                            <div className="text-xs text-gray-400 mt-1">
+                                                                Configure the examination date and time for this subject.
+                                                            </div>
+                                                        </div>
+                                                        {!subject && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => removeTestEntry(index)}
+                                                                className="text-xs font-medium px-3 py-2 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                                                            >
+                                                                Remove
+                                                            </button>
+                                                        )}
+                                                    </div>
+
+                                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                                                        <div>
+                                                            <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold block mb-1">
+                                                                Date *
+                                                            </label>
+                                                            <input
+                                                                type="date"
+                                                                value={entry.date}
+                                                                onChange={(e) => updateTestEntry(index, "date", e.target.value)}
+                                                                required
+                                                                className="w-full bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold block mb-1">
+                                                                Start Time *
+                                                            </label>
+                                                            <input
+                                                                type="time"
+                                                                value={entry.start_time}
+                                                                onChange={(e) => updateTestEntry(index, "start_time", e.target.value)}
+                                                                required
+                                                                className="w-full bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold block mb-1">
+                                                                End Time *
+                                                            </label>
+                                                            <input
+                                                                type="time"
+                                                                value={entry.end_time}
+                                                                onChange={(e) => updateTestEntry(index, "end_time", e.target.value)}
+                                                                required
+                                                                className="w-full bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold block mb-1">
+                                                                Room
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                value={entry.room_number}
+                                                                onChange={(e) => updateTestEntry(index, "room_number", e.target.value)}
+                                                                placeholder="Optional"
+                                                                className="w-full bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm placeholder-gray-400"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )
+                            )}
+
+                            {selectedTestClassId && subjectsForTestClass.length > 0 && (
+                                <div className="flex items-center justify-between max-w-4xl">
+                                    <span className="text-xs text-gray-400">
+                                        {validTestEntries.length} of {testEntries.length} subjects configured.
+                                    </span>
+                                    <div className="flex items-center gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={cancelTestForm}
+                                            className="text-[var(--quinary)] font-medium py-3 px-6 rounded-xl border border-gray-300 hover:bg-gray-50 transition-colors text-sm cursor-pointer"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            disabled={savingTest || validTestEntries.length !== testEntries.length || testEntries.length === 0}
+                                            className="bg-[var(--primary)] hover:bg-[var(--quinary)] disabled:opacity-50 text-white font-medium py-3 px-6 rounded-xl transition-all duration-300 shadow-md transform active:scale-[0.98] cursor-pointer"
+                                        >
+                                            {savingTest
+                                                ? "Saving..."
+                                                : editingTestId
+                                                ? "Update Test Timetable"
+                                                : "Create Test Timetable"}
+                                        </button>
+                                    </div>
                                 </div>
                             )}
-                        </div>
+                        </form>
                     )}
 
-                    {/* ---------------- ACTIONS ---------------- */}
-                    {selectedTestClassId && subjectsForTestClass.length > 0 && (
-                        <div className="flex items-center justify-between max-w-4xl">
-                            <span className="text-xs text-gray-400">
-                                {validTestEntries.length} entr
-                                {validTestEntries.length === 1 ? "y" : "ies"} will be saved.
-                            </span>
-
-                            <div className="flex items-center gap-3">
-                                <button
-                                    type="button"
-                                    onClick={cancelTestForm}
-                                    className="text-[var(--quinary)] font-medium py-3 px-6 rounded-xl border border-gray-300 hover:bg-gray-50 transition-colors text-sm cursor-pointer"
-                                >
-                                    Cancel
-                                </button>
-
-                                <button
-                                    type="submit"
-                                    disabled={savingTest || validTestEntries.length === 0}
-                                    className="bg-[var(--primary)] hover:bg-[var(--quinary)] disabled:opacity-50 text-white font-medium py-3 px-6 rounded-xl transition-all duration-300 shadow-md transform active:scale-[0.98] cursor-pointer"
-                                >
-                                    {savingTest
-                                        ? "Saving..."
-                                        : editingTestId
-                                        ? "Update Test Timetable"
-                                        : "Create Test Timetable"}
-                                </button>
+                    {deleteTestTarget && (
+                        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+                            <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6">
+                                <div className="text-lg font-semibold text-[var(--quinary)] mb-2">
+                                    Delete Test Timetable?
+                                </div>
+                                <p className="text-sm text-gray-500 mb-6">
+                                    This will permanently delete the timetable for{" "}
+                                    <span className="font-medium text-[var(--quinary)]">
+                                        {deleteTestTarget.test_name || `Test #${getClassIdOf(deleteTestTarget.test)}`}
+                                    </span>{" "}
+                                    for{" "}
+                                    <span className="font-medium text-[var(--quinary)]">
+                                        {deleteTestTarget.student_class_name || getClassLabel(deleteTestTarget.student_class)}
+                                    </span>{" "}
+                                    and all of its entries. This action cannot be undone.
+                                </p>
+                                <div className="flex items-center justify-end gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setDeleteTestTarget(null)}
+                                        disabled={deletingTest}
+                                        className="text-[var(--quinary)] font-medium py-2.5 px-4 rounded-xl border border-gray-300 hover:bg-gray-50 disabled:opacity-50 transition-colors text-sm cursor-pointer"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleDeleteTest}
+                                        disabled={deletingTest}
+                                        className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-medium py-2.5 px-4 rounded-xl transition-colors text-sm cursor-pointer"
+                                    >
+                                        {deletingTest ? "Deleting..." : "Delete"}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     )}
-                </form>
-            )}
-
-            {/* ================= DELETE CONFIRMATION MODAL ================= */}
-            {deleteTestTarget && (
-                <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6">
-                        <div className="text-lg font-semibold text-[var(--quinary)] mb-2">
-                            Delete Test Timetable?
-                        </div>
-                        <p className="text-sm text-gray-500 mb-6">
-                            This will permanently delete{" "}
-                            <span className="font-medium text-[var(--quinary)]">
-                                {deleteTestTarget.name}
-                            </span>{" "}
-                            and all of its entries. This action cannot be undone.
-                        </p>
-                        <div className="flex items-center justify-end gap-3">
-                            <button
-                                type="button"
-                                onClick={() => setDeleteTestTarget(null)}
-                                disabled={deletingTest}
-                                className="text-[var(--quinary)] font-medium py-2.5 px-4 rounded-xl border border-gray-300 hover:bg-gray-50 disabled:opacity-50 transition-colors text-sm cursor-pointer"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleDeleteTest}
-                                disabled={deletingTest}
-                                className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-medium py-2.5 px-4 rounded-xl transition-colors text-sm cursor-pointer"
-                            >
-                                {deletingTest ? "Deleting..." : "Delete"}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-            </>
+                </>
             )}
         </div>
     );

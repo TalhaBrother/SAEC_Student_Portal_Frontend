@@ -191,6 +191,8 @@ function MarkAttendanceTab({ token, Classes, sectionOptionsFor, groupOptionsFor 
     const [rosterLoading, setRosterLoading] = useState(false);
     const [attendanceData, setAttendanceData] = useState({});
     const [saving, setSaving] = useState(false);
+    const [pdfLoading, setPdfLoading] = useState(false);
+    const [attendanceType, setAttendanceType] = useState("class");
     const [lastSummary, setLastSummary] = useState(null);
 
     // Reset the section/group narrowing whenever the class changes.
@@ -283,6 +285,52 @@ function MarkAttendanceTab({ token, Classes, sectionOptionsFor, groupOptionsFor 
         }
     };
 
+    const printAttendanceSheet = async () => {
+        if (!classId) return toast("warning", "Please select a class before generating the attendance sheet!");
+        if (!date) return toast("warning", "Please select a date before generating the attendance sheet!");
+
+        setPdfLoading(true);
+
+        // Open the tab immediately so popup blockers do not prevent the
+        // browser from displaying the generated PDF.
+        const printWindow = window.open("", "_blank");
+
+        try {
+            const params = new URLSearchParams({
+                class_id: classId,
+                date,
+                attendance_type: attendanceType,
+            });
+
+            if (sectionId) params.set("section_id", sectionId);
+            if (groupId) params.set("group_id", groupId);
+
+            const res = await api.get(`/attendance/attendance-sheet/?${params.toString()}`, {
+                ...authHeaders(token),
+                responseType: "blob",
+            });
+
+            const blob = new Blob([res.data], { type: "application/pdf" });
+            const objectUrl = URL.createObjectURL(blob);
+
+            if (printWindow) {
+                printWindow.location.href = objectUrl;
+            } else {
+                window.location.href = objectUrl;
+            }
+
+            // Keep the blob alive long enough for the PDF viewer to load it.
+            setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+
+            toast("success", `Attendance sheet generated for ${date}.`);
+        } catch (err) {
+            if (printWindow && !printWindow.closed) printWindow.close();
+            toast("error", await extractErrorMessage(err));
+        } finally {
+            setPdfLoading(false);
+        }
+    };
+
     return (
         <div>
             <div className="flex flex-col sm:flex-row gap-4 mb-4 items-end flex-wrap">
@@ -301,6 +349,19 @@ function MarkAttendanceTab({ token, Classes, sectionOptionsFor, groupOptionsFor 
                 <div className="flex flex-col min-w-[180px]">
                     <label className={labelClass}>Date</label>
                     <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={`${inputClass} cursor-pointer`} />
+                </div>
+
+                <div className="flex flex-col min-w-[170px]">
+                    <label className={labelClass}>Attendance Type</label>
+                    <select
+                        value={attendanceType}
+                        onChange={(e) => setAttendanceType(e.target.value)}
+                        disabled={!classId}
+                        className={`${inputClass} cursor-pointer disabled:opacity-50`}
+                    >
+                        <option value="class">Class Attendance</option>
+                        <option value="exam">Exam Attendance</option>
+                    </select>
                 </div>
 
                 <div className="flex flex-col min-w-[160px]">
@@ -349,6 +410,27 @@ function MarkAttendanceTab({ token, Classes, sectionOptionsFor, groupOptionsFor 
                     />
                 </div>
             </div>
+
+            {classId && (
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 mb-4 flex flex-wrap justify-between items-center gap-3">
+                    <div>
+                        <div className="text-sm font-semibold text-[var(--quinary)]">Daily Attendance Sheet</div>
+                        <div className="text-xs text-gray-400">
+                            {date} · {attendanceType === "class" ? "Class Attendance" : "Exam Attendance"}
+                            {sectionId ? " · Selected Section" : " · All Sections"}
+                            {groupId ? " · Selected Group" : " · All Groups"}
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={printAttendanceSheet}
+                        disabled={pdfLoading || rosterLoading}
+                        className="border border-[var(--primary)] text-[var(--primary)] font-semibold py-2.5 px-4 rounded-xl hover:bg-blue-50 transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                        {pdfLoading ? "Preparing Sheet..." : "Print Attendance Sheet"}
+                    </button>
+                </div>
+            )}
 
             {classId && filteredRoster.length > 0 && (
                 <div className="flex justify-between items-center mb-3">

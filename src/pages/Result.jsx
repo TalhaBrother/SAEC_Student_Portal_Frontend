@@ -39,6 +39,10 @@ const Result = () => {
     const [loadingClassTests, setLoadingClassTests] = useState(false);
     const [selectedZipTestId, setSelectedZipTestId] = useState("");
 
+    // Per-student test selection for the row-level Format 2 (individual)
+    // download — keyed by studentId, since Format 2 always needs one test.
+    const [rowTestSelection, setRowTestSelection] = useState({});
+
     // ---------------------------------------------------------
     // Debounce the search box so we don't hammer the API on every keystroke
     // ---------------------------------------------------------
@@ -119,6 +123,7 @@ const Result = () => {
         setGroups([]);
         setStudents([]);
         setExpandedStudentId(null);
+        setRowTestSelection({});
 
         if (!SelectedClass || !token) return;
 
@@ -475,13 +480,6 @@ const Result = () => {
                         >
                             {downloadingZip ? "Generating ZIP..." : "📦 Generate Complete Class Reports"}
                         </button>
-                        <button
-                            disabled
-                            title="Coming soon"
-                            className="text-xs bg-gray-100 text-gray-400 font-semibold py-2 px-4 rounded-xl border border-gray-200 cursor-not-allowed"
-                        >
-                            💬 WhatsApp All Parents (Coming soon)
-                        </button>
                     </div>
                 </div>
             )}
@@ -520,6 +518,49 @@ const Result = () => {
                                         >
                                             {downloadingId === `${student.id}` ? "Generating..." : "Full Report Card (Format 1)"}
                                         </button>
+                                        <div className="flex items-center gap-1">
+                                            <select
+                                                value={rowTestSelection[student.id] || ""}
+                                                onChange={(e) =>
+                                                    setRowTestSelection((prev) => ({
+                                                        ...prev,
+                                                        [student.id]: e.target.value,
+                                                    }))
+                                                }
+                                                disabled={loadingClassTests || classTests.length === 0}
+                                                className="text-xs bg-white text-[var(--quinary)] border border-gray-300 rounded-xl py-2 px-2 outline-none focus:border-[var(--primary)] cursor-pointer font-medium disabled:opacity-50 max-w-[130px]"
+                                            >
+                                                <option value="">
+                                                    {loadingClassTests
+                                                        ? "Loading tests..."
+                                                        : classTests.length === 0
+                                                        ? "No tests"
+                                                        : "Select test"}
+                                                </option>
+                                                {classTests.map((t) => (
+                                                    <option key={t.id} value={t.id}>{t.name}</option>
+                                                ))}
+                                            </select>
+                                            <button
+                                                onClick={() =>
+                                                    handleDownloadTestReport(
+                                                        student.id,
+                                                        student.full_name,
+                                                        rowTestSelection[student.id],
+                                                        "individual"
+                                                    )
+                                                }
+                                                disabled={
+                                                    !rowTestSelection[student.id] ||
+                                                    downloadingId === `${student.id}-${rowTestSelection[student.id]}-individual`
+                                                }
+                                                className="text-xs bg-indigo-50 hover:bg-indigo-600 hover:text-white text-indigo-600 font-semibold py-2 px-3 rounded-xl transition-all cursor-pointer disabled:opacity-40 border border-indigo-200"
+                                            >
+                                                {downloadingId === `${student.id}-${rowTestSelection[student.id]}-individual`
+                                                    ? "..."
+                                                    : "Format 2"}
+                                            </button>
+                                        </div>
                                         <button
                                             onClick={() => handleToggleAvailableTests(student.id)}
                                             className="text-xs bg-gray-100 hover:bg-[var(--quinary)] hover:text-white text-gray-600 font-semibold py-2 px-3 rounded-xl transition-all cursor-pointer"

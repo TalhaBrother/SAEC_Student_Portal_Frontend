@@ -43,6 +43,11 @@ const Students = () => {
   // Master class list (with nested sections & groups) — powers form dropdowns AND filters
   const [classes, setClasses] = useState([]);
 
+
+  const [selectedDate, setSelectedDate] = useState(
+    new Date().toISOString().split("T")[0]
+  );
+
   // Student list + fetch state
   const [students, setStudents] = useState([]);
   const [fetching, setFetching] = useState(true);
@@ -451,6 +456,37 @@ const Students = () => {
     return password;
   };
 
+  const handleDownloadAdmissionReport = async (reportType, selectedDate) => {
+    try {
+      const response = await api.get('/students/reports/admission/pdf/', {
+        params: {
+          type: reportType, // 'daily', 'weekly', or 'monthly'
+          date: selectedDate,
+        },
+        headers: {
+          Authorization: `Bearer ${token}`, // Passing token explicitly in headers
+        },
+        responseType: 'blob', // Critical for binary PDF files
+      });
+
+      // Create a Blob URL and trigger browser download / open
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+
+      // To open in a new tab for instant printing:
+      window.open(url, '_blank');
+
+      // Or to force download directly:
+      // const link = document.createElement('a');
+      // link.href = url;
+      // link.setAttribute('download', `Admission_Report_${selectedDate}.pdf`);
+      // document.body.appendChild(link);
+      // link.click();
+      // link.remove();
+    } catch (error) {
+      console.error('Failed to generate admission report PDF:', error);
+    }
+  };
 
   return (
     <div className="p-6 bg-[var(--secondary)] text-[var(--quinary)] min-h-screen font-sans">
@@ -1031,7 +1067,26 @@ const Students = () => {
               >
                 Clear Filters
               </button>
+
             </form>
+            <div className="flex items-center gap-3 my-4">
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-2 outline-none focus:border-[var(--primary)] text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => handleDownloadAdmissionReport('daily', selectedDate)}
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded shadow transition-colors text-sm cursor-pointer"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 000-4H9a2 2 0 000 4zm8-12V5a2 2 0 00-2-2H7a2 2 0 00-2 2v4h14z" />
+                </svg>
+                Print PDF Report
+              </button>
+            </div>
           </div>
 
           {/* Results Table */}
