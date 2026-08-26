@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { HiOutlineArrowDownTray, HiOutlineArrowPath } from 'react-icons/hi2';
 import Swal from 'sweetalert2';
 import api from '../api/axios';
 import useAuthStore from '../store/authStore';
+
+
 
 // Backend choices (examination/models.py -> ClassTimetableEntry.DAYS)
 const DAY_OPTIONS = [
@@ -114,6 +117,9 @@ const Examination = () => {
     const [editingTestId, setEditingTestId] = useState(null);
     const [selectedTestId, setSelectedTestId] = useState("");
     const [selectedTestClassId, setSelectedTestClassId] = useState("");
+
+    // 1. Add state for tracking the bulk PDF download status
+    const [downloadingAllTestPdf, setDownloadingAllTestPdf] = useState(false);
 
     // One row is created for every subject of the selected class.
     const emptyTestEntry = (subject = "") => ({
@@ -519,7 +525,7 @@ const Examination = () => {
     // A class already has a timetable UNLESS it's the one we're currently editing
     const classAlreadyHasTimetable = selectedClassId
         ? existingClassIds.has(Number(selectedClassId)) &&
-          Number(selectedClassId) !== Number(editingOriginalClassId)
+        Number(selectedClassId) !== Number(editingOriginalClassId)
         : false;
 
     // Reset / repopulate the builder whenever the selected class (or the
@@ -862,29 +868,44 @@ const Examination = () => {
         }
     };
 
-    const handleDownloadAllPDF = async () => {
-        setDownloadingAll(true);
-        try {
-            const res = await api.get("examination/class-timetables/pdf/", {
-                headers,
-                responseType: "blob",
-            });
-            downloadBlob(res.data, "all_class_timetables.pdf");
-        } catch (error) {
-            console.error("Error downloading all timetables PDF:", error);
-            Swal.fire({
-                icon: "error",
-                title: "Download failed",
-                text: extractErrorMessage(
-                    error,
-                    "Failed to download PDF. Please try again."
-                ),
-                confirmButtonColor: "#dc2626",
-            });
-        } finally {
-            setDownloadingAll(false);
+  const handleDownloadAllPDF = async () => {
+    setDownloadingAll(true);
+    try {
+        const res = await api.get("examination/class-timetables/pdf/", {
+            headers,
+            responseType: "blob",
+            params: {
+                class_id: filterClassId || undefined, // Sends selected class filter if active
+            },
+        });
+        downloadBlob(res.data, "all_class_timetables.pdf");
+    } catch (error) {
+        console.error("Error downloading all timetables PDF:", error);
+
+        // If backend returns a JSON/text error inside a Blob, extract it
+        let message = "Failed to download PDF. Please try again.";
+        if (error.response && error.response.data instanceof Blob) {
+            try {
+                const text = await error.response.data.text();
+                const parsed = JSON.parse(text);
+                message = parsed.detail || parsed.error || text || message;
+            } catch (e) {
+                // Fallback to default message
+            }
+        } else {
+            message = extractErrorMessage(error, message);
         }
-    };
+
+        Swal.fire({
+            icon: "error",
+            title: "Download failed",
+            text: message,
+            confirmButtonColor: "#dc2626",
+        });
+    } finally {
+        setDownloadingAll(false);
+    }
+};
 
     const toggleExpanded = (id) => {
         setExpandedIds((prev) => {
@@ -902,6 +923,65 @@ const Examination = () => {
     };
 
     const selectedClass = classes.find((c) => String(c.id) === String(selectedClassId));
+
+ const handleDownloadAllTestPDF = async () => {
+  if (!selectedTestId) {
+    Swal.fire({
+      icon: "warning",
+      title: "Select a Test",
+      text: "Please select a test from the dropdown first to download its PDF.",
+      confirmButtonColor: "#dc2626",
+    });
+    return;
+  }
+
+  setDownloadingAllTestPdf(true);
+  try {
+    const response = await api.get("examination/test-timetables/pdf/", {
+      headers,
+      responseType: "blob",
+      params: {
+        test: selectedTestId, // Sends ?test=<selectedTestId>
+      },
+    });
+
+    // Extract selected test name for filename
+    const testObj = tests.find((t) => String(t.id) === String(selectedTestId));
+    const testName = testObj ? testObj.name.replace(/\s+/g, "_") : selectedTestId;
+
+    downloadBlob(response.data, `Test_Timetables_${testName}.pdf`);
+
+    Swal.fire({
+      icon: "success",
+      title: "Success!",
+      text: "Test timetable PDF downloaded successfully.",
+      timer: 2000,
+      showConfirmButton: false,
+    });
+  } catch (error) {
+    console.error("Error downloading test timetable PDF:", error);
+
+    let errorMessage = "Failed to download test timetable PDF.";
+
+    if (error.response && error.response.data instanceof Blob) {
+      try {
+        const errorText = await error.response.data.text();
+        errorMessage = errorText || errorMessage;
+      } catch (e) {
+        // Fallback if blob text reading fails
+      }
+    }
+
+    Swal.fire({
+      icon: "error",
+      title: "Download Failed",
+      text: errorMessage,
+      confirmButtonColor: "#dc2626",
+    });
+  } finally {
+    setDownloadingAllTestPdf(false);
+  }
+};
 
     return (
         <div className="p-6 bg-[var(--secondary)] text-[var(--quinary)] min-h-screen font-sans">
@@ -924,577 +1004,571 @@ const Examination = () => {
                 <button
                     type="button"
                     onClick={() => setSection("class")}
-                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors cursor-pointer ${
-                        section === "class"
-                            ? "bg-[var(--primary)] text-white"
-                            : "text-gray-500 hover:text-[var(--quinary)]"
-                    }`}
+                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors cursor-pointer ${section === "class"
+                        ? "bg-[var(--primary)] text-white"
+                        : "text-gray-500 hover:text-[var(--quinary)]"
+                        }`}
                 >
                     Class Timetable
                 </button>
                 <button
                     type="button"
                     onClick={() => setSection("test")}
-                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors cursor-pointer ${
-                        section === "test"
-                            ? "bg-[var(--primary)] text-white"
-                            : "text-gray-500 hover:text-[var(--quinary)]"
-                    }`}
+                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors cursor-pointer ${section === "test"
+                        ? "bg-[var(--primary)] text-white"
+                        : "text-gray-500 hover:text-[var(--quinary)]"
+                        }`}
                 >
                     Test Timetable
                 </button>
             </div>
 
             {section === "class" && (
-            <>
-            {/* Tabs */}
-            <div className="flex items-center gap-2 mb-6 border-b border-gray-200">
-                <button
-                    type="button"
-                    onClick={() => setActiveTab("list")}
-                    className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors cursor-pointer ${
-                        activeTab === "list"
-                            ? "border-[var(--primary)] text-[var(--primary)]"
-                            : "border-transparent text-gray-500 hover:text-[var(--quinary)]"
-                    }`}
-                >
-                    All Timetables
-                </button>
-                <button
-                    type="button"
-                    onClick={() => (activeTab === "form" ? null : startAddNew())}
-                    className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors cursor-pointer ${
-                        activeTab === "form"
-                            ? "border-[var(--primary)] text-[var(--primary)]"
-                            : "border-transparent text-gray-500 hover:text-[var(--quinary)]"
-                    }`}
-                >
-                    {editingId ? "Edit Timetable" : "Add New"}
-                </button>
-            </div>
-
-            {/* ================= LIST TAB ================= */}
-            {activeTab === "list" && (
-                <div>
-                    {listError && (
-                        <div className="p-3 rounded-xl text-sm mb-6 text-center border max-w-xl bg-red-50 text-red-700 border-red-200">
-                            {listError}
-                        </div>
-                    )}
-
-                    {/* Controls */}
-                    <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
-                        <div className="flex items-center gap-3 flex-wrap">
-                            <input
-                                type="text"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                placeholder="Search by class name..."
-                                className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl px-4 py-2.5 outline-none focus:border-[var(--primary)] transition-colors text-sm w-64 placeholder-gray-400"
-                            />
-
-                            <select
-                                value={filterClassId}
-                                onChange={(e) => setFilterClassId(e.target.value)}
-                                className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl px-4 py-2.5 outline-none focus:border-[var(--primary)] transition-colors text-sm cursor-pointer"
-                            >
-                                <option value="">All Classes</option>
-                                {classes.map((cls) => (
-                                    <option key={cls.id} value={cls.id}>
-                                        {cls.display_name || cls.name}
-                                    </option>
-                                ))}
-                            </select>
-
-                            {(searchTerm || filterClassId) && (
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setSearchTerm("");
-                                        setFilterClassId("");
-                                    }}
-                                    className="text-xs text-gray-500 hover:text-[var(--quinary)] underline cursor-pointer"
-                                >
-                                    Clear
-                                </button>
-                            )}
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                            <button
-                                type="button"
-                                onClick={handleDownloadAllPDF}
-                                disabled={downloadingAll || timetables.length === 0}
-                                className="bg-white hover:bg-gray-50 disabled:opacity-50 text-[var(--quinary)] font-medium py-2.5 px-4 rounded-xl border border-gray-300 transition-colors text-sm cursor-pointer"
-                            >
-                                {downloadingAll ? "Preparing..." : "Download All (PDF)"}
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={fetchTimetables}
-                                disabled={loadingList}
-                                className="bg-white hover:bg-gray-50 disabled:opacity-50 text-[var(--quinary)] font-medium py-2.5 px-4 rounded-xl border border-gray-300 transition-colors text-sm cursor-pointer"
-                            >
-                                {loadingList ? "Refreshing..." : "Refresh"}
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={startAddNew}
-                                className="bg-[var(--primary)] hover:bg-[var(--quinary)] text-white font-medium py-2.5 px-4 rounded-xl transition-colors text-sm cursor-pointer"
-                            >
-                                + Add New Timetable
-                            </button>
-                        </div>
+                <>
+                    {/* Tabs */}
+                    <div className="flex items-center gap-2 mb-6 border-b border-gray-200">
+                        <button
+                            type="button"
+                            onClick={() => setActiveTab("list")}
+                            className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors cursor-pointer ${activeTab === "list"
+                                ? "border-[var(--primary)] text-[var(--primary)]"
+                                : "border-transparent text-gray-500 hover:text-[var(--quinary)]"
+                                }`}
+                        >
+                            All Timetables
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => (activeTab === "form" ? null : startAddNew())}
+                            className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors cursor-pointer ${activeTab === "form"
+                                ? "border-[var(--primary)] text-[var(--primary)]"
+                                : "border-transparent text-gray-500 hover:text-[var(--quinary)]"
+                                }`}
+                        >
+                            {editingId ? "Edit Timetable" : "Add New"}
+                        </button>
                     </div>
 
-                    {/* List */}
-                    {loadingList ? (
-                        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center text-gray-400 text-sm">
-                            Loading timetables...
-                        </div>
-                    ) : timetables.length === 0 ? (
-                        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center text-gray-400 text-sm">
-                            {searchTerm || filterClassId
-                                ? "No timetables match your search/filter."
-                                : "No class timetables yet. Click \"Add New Timetable\" to create one."}
-                        </div>
-                    ) : (
-                        <div className="space-y-4 max-w-4xl">
-                            {timetables.map((timetable) => {
-                                const isExpanded = expandedIds.has(timetable.id);
-                                const entryCount = (timetable.entries || []).length;
-                                const label = getClassLabel(timetable.student_class);
-
-                                // Group entries by day for a readable summary
-                                const entriesByDay = {};
-                                (timetable.entries || []).forEach((entry) => {
-                                    if (!entriesByDay[entry.day]) entriesByDay[entry.day] = [];
-                                    entriesByDay[entry.day].push(entry);
-                                });
-
-                                return (
-                                    <div
-                                        key={timetable.id}
-                                        className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6"
-                                    >
-                                        <div className="flex items-start justify-between flex-wrap gap-3">
-                                            <div>
-                                                <div className="text-lg font-semibold text-[var(--quinary)]">
-                                                    {label}
-                                                </div>
-                                                <div className="text-xs text-gray-400 mt-1">
-                                                    {entryCount} period{entryCount === 1 ? "" : "s"}
-                                                    {timetable.updated_at
-                                                        ? ` • Updated ${new Date(
-                                                              timetable.updated_at
-                                                          ).toLocaleDateString()}`
-                                                        : ""}
-                                                </div>
-                                            </div>
-
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => toggleExpanded(timetable.id)}
-                                                    className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-300 text-[var(--quinary)] hover:bg-gray-50 transition-colors cursor-pointer"
-                                                >
-                                                    {isExpanded ? "Hide Entries" : "View Entries"}
-                                                </button>
-
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleDownloadPDF(timetable)}
-                                                    disabled={downloadingId === timetable.id}
-                                                    className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-300 text-[var(--quinary)] hover:bg-gray-50 disabled:opacity-50 transition-colors cursor-pointer"
-                                                >
-                                                    {downloadingId === timetable.id
-                                                        ? "Downloading..."
-                                                        : "PDF"}
-                                                </button>
-
-                                                <button
-                                                    type="button"
-                                                    onClick={() => startEdit(timetable)}
-                                                    className="text-xs font-medium px-3 py-1.5 rounded-lg border border-[var(--primary)] text-[var(--primary)] hover:bg-[var(--primary)] hover:text-white transition-colors cursor-pointer"
-                                                >
-                                                    Edit
-                                                </button>
-
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setDeleteTarget(timetable)}
-                                                    className="text-xs font-medium px-3 py-1.5 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
-                                                >
-                                                    Delete
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        {isExpanded && (
-                                            <div className="mt-4 border-t border-gray-100 pt-4 space-y-3">
-                                                {DAY_OPTIONS.filter(
-                                                    (day) => entriesByDay[day.value]
-                                                ).map((day) => (
-                                                    <div key={day.value}>
-                                                        <div className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-2">
-                                                            {day.label}
-                                                        </div>
-                                                        <div className="space-y-1.5">
-                                                            {[...entriesByDay[day.value]]
-                                                                .sort(
-                                                                    (a, b) =>
-                                                                        a.period_number -
-                                                                        b.period_number
-                                                                )
-                                                                .map((entry) => (
-                                                                    <div
-                                                                        key={entry.id}
-                                                                        className="flex items-center gap-3 flex-wrap text-sm bg-gray-50 rounded-lg px-3 py-2"
-                                                                    >
-                                                                        <span className="text-gray-400 text-xs w-16 shrink-0">
-                                                                            Period {entry.period_number}
-                                                                        </span>
-                                                                        <span className="font-medium text-[var(--quinary)]">
-                                                                            {getSubjectName(entry.subject)}
-                                                                        </span>
-                                                                        <span className="text-gray-500 text-xs">
-                                                                            {formatTimeForInput(entry.start_time)} –{" "}
-                                                                            {formatTimeForInput(entry.end_time)}
-                                                                        </span>
-                                                                        {entry.room_number && (
-                                                                            <span className="text-gray-400 text-xs">
-                                                                                Room {entry.room_number}
-                                                                            </span>
-                                                                        )}
-                                                                    </div>
-                                                                ))}
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* ================= FORM TAB (CREATE / EDIT) ================= */}
-            {activeTab === "form" && (
-                <>
-                    {/* Status Message Display */}
-                    {message.text && (
-                        <div
-                            className={`p-3 rounded-xl text-sm mb-6 text-center border max-w-xl ${
-                                message.type === "success"
-                                    ? "bg-green-50 text-green-700 border-green-200"
-                                    : "bg-red-50 text-red-700 border-red-200"
-                            }`}
-                        >
-                            {message.text}
-                        </div>
-                    )}
-
-                    {loadingMeta ? (
-                        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center text-gray-400 text-sm max-w-xl">
-                            Loading classes and subjects...
-                        </div>
-                    ) : (
-                        <form onSubmit={handleSubmit} className="space-y-6">
-                            {/* ---------------- CLASS SELECTOR ---------------- */}
-                            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 max-w-xl">
-                                <div className="flex items-center justify-between mb-1">
-                                    <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold block">
-                                        Class
-                                    </label>
-                                    {editingId && (
-                                        <span className="text-xs text-[var(--primary)] font-medium">
-                                            Editing timetable
-                                        </span>
-                                    )}
+                    {/* ================= LIST TAB ================= */}
+                    {activeTab === "list" && (
+                        <div>
+                            {listError && (
+                                <div className="p-3 rounded-xl text-sm mb-6 text-center border max-w-xl bg-red-50 text-red-700 border-red-200">
+                                    {listError}
                                 </div>
-                                <select
-                                    value={selectedClassId}
-                                    onChange={(e) => setSelectedClassId(e.target.value)}
-                                    required
-                                    className="w-full bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm cursor-pointer"
-                                >
-                                    <option value="">Select Class</option>
-                                    {classes.map((cls) => (
-                                        <option key={cls.id} value={cls.id}>
-                                            {cls.display_name}
-                                            {existingClassIds.has(cls.id) &&
-                                            cls.id !== Number(editingOriginalClassId)
-                                                ? " (timetable exists)"
-                                                : ""}
-                                        </option>
-                                    ))}
-                                </select>
-
-                                {classAlreadyHasTimetable && (
-                                    <p className="text-amber-600 text-xs mt-3">
-                                        Class {selectedClass?.name} already has a timetable. Edit
-                                        that timetable from "All Timetables", or pick another
-                                        class.
-                                    </p>
-                                )}
-                            </div>
-
-                            {/* ---------------- SUBJECT / DAY / PERIOD BUILDER ---------------- */}
-                            {selectedClassId && !classAlreadyHasTimetable && (
-                                <>
-                                    {subjectsForClass.length === 0 ? (
-                                        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center text-gray-400 text-sm max-w-xl">
-                                            No subjects found for this class. Add subjects to this
-                                            class first.
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-4 max-w-4xl">
-                                            {subjectsForClass.map((subject) => (
-                                                <div
-                                                    key={subject.id}
-                                                    className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6"
-                                                >
-                                                    <div className="text-lg font-semibold text-[var(--quinary)] mb-4">
-                                                        {subject.name}
-                                                    </div>
-
-                                                    {/* Day toggle pills */}
-                                                    <div className="flex flex-wrap gap-2 mb-4">
-                                                        {DAY_OPTIONS.map((day) => {
-                                                            const isSelected =
-                                                                timetableData[subject.id]?.[day.value]
-                                                                    ?.selected;
-                                                            return (
-                                                                <button
-                                                                    key={day.value}
-                                                                    type="button"
-                                                                    onClick={() =>
-                                                                        toggleDay(subject.id, day.value)
-                                                                    }
-                                                                    className={`text-sm font-medium px-4 py-2 rounded-xl border transition-colors cursor-pointer ${
-                                                                        isSelected
-                                                                            ? "bg-[var(--primary)] text-white border-[var(--primary)]"
-                                                                            : "bg-white text-[var(--quinary)] border-gray-300 hover:bg-gray-50"
-                                                                    }`}
-                                                                >
-                                                                    {day.label}
-                                                                </button>
-                                                            );
-                                                        })}
-                                                    </div>
-
-                                                    {/* Per selected day: periods + time slots */}
-                                                    <div className="space-y-4">
-                                                        {DAY_OPTIONS.filter(
-                                                            (day) =>
-                                                                timetableData[subject.id]?.[day.value]
-                                                                    ?.selected
-                                                        ).map((day) => {
-                                                            const dayData =
-                                                                timetableData[subject.id][day.value];
-
-                                                            return (
-                                                                <div
-                                                                    key={day.value}
-                                                                    className="bg-gray-50 rounded-xl border border-gray-200 p-4"
-                                                                >
-                                                                    <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
-                                                                        <span className="text-sm font-semibold text-[var(--quinary)]">
-                                                                            {day.label}
-                                                                        </span>
-
-                                                                        <div className="flex items-center gap-2">
-                                                                            <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold">
-                                                                                Periods
-                                                                            </label>
-                                                                            <select
-                                                                                value={dayData.periods}
-                                                                                onChange={(e) =>
-                                                                                    changePeriods(
-                                                                                        subject.id,
-                                                                                        day.value,
-                                                                                        Number(
-                                                                                            e.target.value
-                                                                                        )
-                                                                                    )
-                                                                                }
-                                                                                className="bg-white text-[var(--quinary)] border border-gray-300 rounded-lg px-3 py-1.5 outline-none focus:border-[var(--primary)] transition-colors text-sm cursor-pointer"
-                                                                            >
-                                                                                {PERIOD_CHOICES.map((n) => (
-                                                                                    <option
-                                                                                        key={n}
-                                                                                        value={n}
-                                                                                    >
-                                                                                        {n}
-                                                                                    </option>
-                                                                                ))}
-                                                                            </select>
-                                                                        </div>
-                                                                    </div>
-
-                                                                    <div className="space-y-2">
-                                                                        {dayData.slots.map(
-                                                                            (slot, index) => (
-                                                                                <div
-                                                                                    key={index}
-                                                                                    className="flex items-center gap-2 flex-wrap"
-                                                                                >
-                                                                                    <span className="text-xs text-gray-400 font-medium w-16 shrink-0">
-                                                                                        Period {index + 1}
-                                                                                    </span>
-
-                                                                                    <input
-                                                                                        type="time"
-                                                                                        value={
-                                                                                            slot.start_time
-                                                                                        }
-                                                                                        onChange={(e) =>
-                                                                                            updateSlot(
-                                                                                                subject.id,
-                                                                                                day.value,
-                                                                                                index,
-                                                                                                "start_time",
-                                                                                                e.target
-                                                                                                    .value
-                                                                                            )
-                                                                                        }
-                                                                                        required
-                                                                                        className="bg-white text-[var(--quinary)] border border-gray-300 rounded-lg p-2 outline-none focus:border-[var(--primary)] transition-colors text-sm"
-                                                                                    />
-
-                                                                                    <span className="text-gray-400 text-sm">
-                                                                                        to
-                                                                                    </span>
-
-                                                                                    <input
-                                                                                        type="time"
-                                                                                        value={
-                                                                                            slot.end_time
-                                                                                        }
-                                                                                        onChange={(e) =>
-                                                                                            updateSlot(
-                                                                                                subject.id,
-                                                                                                day.value,
-                                                                                                index,
-                                                                                                "end_time",
-                                                                                                e.target
-                                                                                                    .value
-                                                                                            )
-                                                                                        }
-                                                                                        required
-                                                                                        className="bg-white text-[var(--quinary)] border border-gray-300 rounded-lg p-2 outline-none focus:border-[var(--primary)] transition-colors text-sm"
-                                                                                    />
-
-                                                                                    <input
-                                                                                        type="text"
-                                                                                        value={
-                                                                                            slot.room_number
-                                                                                        }
-                                                                                        onChange={(e) =>
-                                                                                            updateSlot(
-                                                                                                subject.id,
-                                                                                                day.value,
-                                                                                                index,
-                                                                                                "room_number",
-                                                                                                e.target
-                                                                                                    .value
-                                                                                            )
-                                                                                        }
-                                                                                        placeholder="Room no. (optional)"
-                                                                                        className="flex-1 min-w-[140px] bg-white text-[var(--quinary)] border border-gray-300 rounded-lg p-2 outline-none focus:border-[var(--primary)] transition-colors text-sm placeholder-gray-400"
-                                                                                    />
-                                                                                </div>
-                                                                            )
-                                                                        )}
-                                                                    </div>
-                                                                </div>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </>
                             )}
 
-                            {/* ---------------- ACTIONS ---------------- */}
-                            {subjectsForClass.length > 0 && !classAlreadyHasTimetable && (
-                                <div className="flex items-center justify-between max-w-4xl">
-                                    <span className="text-xs text-gray-400">
-                                        {selectedEntryCount} period
-                                        {selectedEntryCount === 1 ? "" : "s"} will be saved.
-                                    </span>
+                            {/* Controls */}
+                            <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
+                                <div className="flex items-center gap-3 flex-wrap">
+                                    <input
+                                        type="text"
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        placeholder="Search by class name..."
+                                        className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl px-4 py-2.5 outline-none focus:border-[var(--primary)] transition-colors text-sm w-64 placeholder-gray-400"
+                                    />
 
-                                    <div className="flex items-center gap-3">
+                                    <select
+                                        value={filterClassId}
+                                        onChange={(e) => setFilterClassId(e.target.value)}
+                                        className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl px-4 py-2.5 outline-none focus:border-[var(--primary)] transition-colors text-sm cursor-pointer"
+                                    >
+                                        <option value="">All Classes</option>
+                                        {classes.map((cls) => (
+                                            <option key={cls.id} value={cls.id}>
+                                                {cls.display_name || cls.name}
+                                            </option>
+                                        ))}
+                                    </select>
+
+                                    {(searchTerm || filterClassId) && (
                                         <button
                                             type="button"
-                                            onClick={cancelForm}
-                                            className="text-[var(--quinary)] font-medium py-3 px-6 rounded-xl border border-gray-300 hover:bg-gray-50 transition-colors text-sm cursor-pointer"
+                                            onClick={() => {
+                                                setSearchTerm("");
+                                                setFilterClassId("");
+                                            }}
+                                            className="text-xs text-gray-500 hover:text-[var(--quinary)] underline cursor-pointer"
                                         >
-                                            Cancel
+                                            Clear
                                         </button>
+                                    )}
+                                </div>
 
-                                        <button
-                                            type="submit"
-                                            disabled={saving || selectedEntryCount === 0}
-                                            className="bg-[var(--primary)] hover:bg-[var(--quinary)] disabled:opacity-50 text-white font-medium py-3 px-6 rounded-xl transition-all duration-300 shadow-md transform active:scale-[0.98] cursor-pointer"
-                                        >
-                                            {saving
-                                                ? "Saving..."
-                                                : editingId
-                                                ? "Update Timetable"
-                                                : "Create Timetable"}
-                                        </button>
-                                    </div>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={handleDownloadAllPDF}
+                                        disabled={downloadingAll || timetables.length === 0}
+                                        className="bg-white hover:bg-gray-50 disabled:opacity-50 text-[var(--quinary)] font-medium py-2.5 px-4 rounded-xl border border-gray-300 transition-colors text-sm cursor-pointer"
+                                    >
+                                        {downloadingAll ? "Preparing..." : "Download All (PDF)"}
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={fetchTimetables}
+                                        disabled={loadingList}
+                                        className="bg-white hover:bg-gray-50 disabled:opacity-50 text-[var(--quinary)] font-medium py-2.5 px-4 rounded-xl border border-gray-300 transition-colors text-sm cursor-pointer"
+                                    >
+                                        {loadingList ? "Refreshing..." : "Refresh"}
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={startAddNew}
+                                        className="bg-[var(--primary)] hover:bg-[var(--quinary)] text-white font-medium py-2.5 px-4 rounded-xl transition-colors text-sm cursor-pointer"
+                                    >
+                                        + Add New Timetable
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* List */}
+                            {loadingList ? (
+                                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center text-gray-400 text-sm">
+                                    Loading timetables...
+                                </div>
+                            ) : timetables.length === 0 ? (
+                                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center text-gray-400 text-sm">
+                                    {searchTerm || filterClassId
+                                        ? "No timetables match your search/filter."
+                                        : "No class timetables yet. Click \"Add New Timetable\" to create one."}
+                                </div>
+                            ) : (
+                                <div className="space-y-4 max-w-4xl">
+                                    {timetables.map((timetable) => {
+                                        const isExpanded = expandedIds.has(timetable.id);
+                                        const entryCount = (timetable.entries || []).length;
+                                        const label = getClassLabel(timetable.student_class);
+
+                                        // Group entries by day for a readable summary
+                                        const entriesByDay = {};
+                                        (timetable.entries || []).forEach((entry) => {
+                                            if (!entriesByDay[entry.day]) entriesByDay[entry.day] = [];
+                                            entriesByDay[entry.day].push(entry);
+                                        });
+
+                                        return (
+                                            <div
+                                                key={timetable.id}
+                                                className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6"
+                                            >
+                                                <div className="flex items-start justify-between flex-wrap gap-3">
+                                                    <div>
+                                                        <div className="text-lg font-semibold text-[var(--quinary)]">
+                                                            {label}
+                                                        </div>
+                                                        <div className="text-xs text-gray-400 mt-1">
+                                                            {entryCount} period{entryCount === 1 ? "" : "s"}
+                                                            {timetable.updated_at
+                                                                ? ` • Updated ${new Date(
+                                                                    timetable.updated_at
+                                                                ).toLocaleDateString()}`
+                                                                : ""}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => toggleExpanded(timetable.id)}
+                                                            className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-300 text-[var(--quinary)] hover:bg-gray-50 transition-colors cursor-pointer"
+                                                        >
+                                                            {isExpanded ? "Hide Entries" : "View Entries"}
+                                                        </button>
+
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleDownloadPDF(timetable)}
+                                                            disabled={downloadingId === timetable.id}
+                                                            className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-300 text-[var(--quinary)] hover:bg-gray-50 disabled:opacity-50 transition-colors cursor-pointer"
+                                                        >
+                                                            {downloadingId === timetable.id
+                                                                ? "Downloading..."
+                                                                : "PDF"}
+                                                        </button>
+
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => startEdit(timetable)}
+                                                            className="text-xs font-medium px-3 py-1.5 rounded-lg border border-[var(--primary)] text-[var(--primary)] hover:bg-[var(--primary)] hover:text-white transition-colors cursor-pointer"
+                                                        >
+                                                            Edit
+                                                        </button>
+
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setDeleteTarget(timetable)}
+                                                            className="text-xs font-medium px-3 py-1.5 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                                                        >
+                                                            Delete
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                {isExpanded && (
+                                                    <div className="mt-4 border-t border-gray-100 pt-4 space-y-3">
+                                                        {DAY_OPTIONS.filter(
+                                                            (day) => entriesByDay[day.value]
+                                                        ).map((day) => (
+                                                            <div key={day.value}>
+                                                                <div className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-2">
+                                                                    {day.label}
+                                                                </div>
+                                                                <div className="space-y-1.5">
+                                                                    {[...entriesByDay[day.value]]
+                                                                        .sort(
+                                                                            (a, b) =>
+                                                                                a.period_number -
+                                                                                b.period_number
+                                                                        )
+                                                                        .map((entry) => (
+                                                                            <div
+                                                                                key={entry.id}
+                                                                                className="flex items-center gap-3 flex-wrap text-sm bg-gray-50 rounded-lg px-3 py-2"
+                                                                            >
+                                                                                <span className="text-gray-400 text-xs w-16 shrink-0">
+                                                                                    Period {entry.period_number}
+                                                                                </span>
+                                                                                <span className="font-medium text-[var(--quinary)]">
+                                                                                    {getSubjectName(entry.subject)}
+                                                                                </span>
+                                                                                <span className="text-gray-500 text-xs">
+                                                                                    {formatTimeForInput(entry.start_time)} –{" "}
+                                                                                    {formatTimeForInput(entry.end_time)}
+                                                                                </span>
+                                                                                {entry.room_number && (
+                                                                                    <span className="text-gray-400 text-xs">
+                                                                                        Room {entry.room_number}
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
+                                                                        ))}
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             )}
-                        </form>
+                        </div>
+                    )}
+
+                    {/* ================= FORM TAB (CREATE / EDIT) ================= */}
+                    {activeTab === "form" && (
+                        <>
+                            {/* Status Message Display */}
+                            {message.text && (
+                                <div
+                                    className={`p-3 rounded-xl text-sm mb-6 text-center border max-w-xl ${message.type === "success"
+                                        ? "bg-green-50 text-green-700 border-green-200"
+                                        : "bg-red-50 text-red-700 border-red-200"
+                                        }`}
+                                >
+                                    {message.text}
+                                </div>
+                            )}
+
+                            {loadingMeta ? (
+                                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center text-gray-400 text-sm max-w-xl">
+                                    Loading classes and subjects...
+                                </div>
+                            ) : (
+                                <form onSubmit={handleSubmit} className="space-y-6">
+                                    {/* ---------------- CLASS SELECTOR ---------------- */}
+                                    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 max-w-xl">
+                                        <div className="flex items-center justify-between mb-1">
+                                            <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold block">
+                                                Class
+                                            </label>
+                                            {editingId && (
+                                                <span className="text-xs text-[var(--primary)] font-medium">
+                                                    Editing timetable
+                                                </span>
+                                            )}
+                                        </div>
+                                        <select
+                                            value={selectedClassId}
+                                            onChange={(e) => setSelectedClassId(e.target.value)}
+                                            required
+                                            className="w-full bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm cursor-pointer"
+                                        >
+                                            <option value="">Select Class</option>
+                                            {classes.map((cls) => (
+                                                <option key={cls.id} value={cls.id}>
+                                                    {cls.display_name}
+                                                    {existingClassIds.has(cls.id) &&
+                                                        cls.id !== Number(editingOriginalClassId)
+                                                        ? " (timetable exists)"
+                                                        : ""}
+                                                </option>
+                                            ))}
+                                        </select>
+
+                                        {classAlreadyHasTimetable && (
+                                            <p className="text-amber-600 text-xs mt-3">
+                                                Class {selectedClass?.name} already has a timetable. Edit
+                                                that timetable from "All Timetables", or pick another
+                                                class.
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    {/* ---------------- SUBJECT / DAY / PERIOD BUILDER ---------------- */}
+                                    {selectedClassId && !classAlreadyHasTimetable && (
+                                        <>
+                                            {subjectsForClass.length === 0 ? (
+                                                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center text-gray-400 text-sm max-w-xl">
+                                                    No subjects found for this class. Add subjects to this
+                                                    class first.
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-4 max-w-4xl">
+                                                    {subjectsForClass.map((subject) => (
+                                                        <div
+                                                            key={subject.id}
+                                                            className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6"
+                                                        >
+                                                            <div className="text-lg font-semibold text-[var(--quinary)] mb-4">
+                                                                {subject.name}
+                                                            </div>
+
+                                                            {/* Day toggle pills */}
+                                                            <div className="flex flex-wrap gap-2 mb-4">
+                                                                {DAY_OPTIONS.map((day) => {
+                                                                    const isSelected =
+                                                                        timetableData[subject.id]?.[day.value]
+                                                                            ?.selected;
+                                                                    return (
+                                                                        <button
+                                                                            key={day.value}
+                                                                            type="button"
+                                                                            onClick={() =>
+                                                                                toggleDay(subject.id, day.value)
+                                                                            }
+                                                                            className={`text-sm font-medium px-4 py-2 rounded-xl border transition-colors cursor-pointer ${isSelected
+                                                                                ? "bg-[var(--primary)] text-white border-[var(--primary)]"
+                                                                                : "bg-white text-[var(--quinary)] border-gray-300 hover:bg-gray-50"
+                                                                                }`}
+                                                                        >
+                                                                            {day.label}
+                                                                        </button>
+                                                                    );
+                                                                })}
+                                                            </div>
+
+                                                            {/* Per selected day: periods + time slots */}
+                                                            <div className="space-y-4">
+                                                                {DAY_OPTIONS.filter(
+                                                                    (day) =>
+                                                                        timetableData[subject.id]?.[day.value]
+                                                                            ?.selected
+                                                                ).map((day) => {
+                                                                    const dayData =
+                                                                        timetableData[subject.id][day.value];
+
+                                                                    return (
+                                                                        <div
+                                                                            key={day.value}
+                                                                            className="bg-gray-50 rounded-xl border border-gray-200 p-4"
+                                                                        >
+                                                                            <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+                                                                                <span className="text-sm font-semibold text-[var(--quinary)]">
+                                                                                    {day.label}
+                                                                                </span>
+
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold">
+                                                                                        Periods
+                                                                                    </label>
+                                                                                    <select
+                                                                                        value={dayData.periods}
+                                                                                        onChange={(e) =>
+                                                                                            changePeriods(
+                                                                                                subject.id,
+                                                                                                day.value,
+                                                                                                Number(
+                                                                                                    e.target.value
+                                                                                                )
+                                                                                            )
+                                                                                        }
+                                                                                        className="bg-white text-[var(--quinary)] border border-gray-300 rounded-lg px-3 py-1.5 outline-none focus:border-[var(--primary)] transition-colors text-sm cursor-pointer"
+                                                                                    >
+                                                                                        {PERIOD_CHOICES.map((n) => (
+                                                                                            <option
+                                                                                                key={n}
+                                                                                                value={n}
+                                                                                            >
+                                                                                                {n}
+                                                                                            </option>
+                                                                                        ))}
+                                                                                    </select>
+                                                                                </div>
+                                                                            </div>
+
+                                                                            <div className="space-y-2">
+                                                                                {dayData.slots.map(
+                                                                                    (slot, index) => (
+                                                                                        <div
+                                                                                            key={index}
+                                                                                            className="flex items-center gap-2 flex-wrap"
+                                                                                        >
+                                                                                            <span className="text-xs text-gray-400 font-medium w-16 shrink-0">
+                                                                                                Period {index + 1}
+                                                                                            </span>
+
+                                                                                            <input
+                                                                                                type="time"
+                                                                                                value={
+                                                                                                    slot.start_time
+                                                                                                }
+                                                                                                onChange={(e) =>
+                                                                                                    updateSlot(
+                                                                                                        subject.id,
+                                                                                                        day.value,
+                                                                                                        index,
+                                                                                                        "start_time",
+                                                                                                        e.target
+                                                                                                            .value
+                                                                                                    )
+                                                                                                }
+                                                                                                required
+                                                                                                className="bg-white text-[var(--quinary)] border border-gray-300 rounded-lg p-2 outline-none focus:border-[var(--primary)] transition-colors text-sm"
+                                                                                            />
+
+                                                                                            <span className="text-gray-400 text-sm">
+                                                                                                to
+                                                                                            </span>
+
+                                                                                            <input
+                                                                                                type="time"
+                                                                                                value={
+                                                                                                    slot.end_time
+                                                                                                }
+                                                                                                onChange={(e) =>
+                                                                                                    updateSlot(
+                                                                                                        subject.id,
+                                                                                                        day.value,
+                                                                                                        index,
+                                                                                                        "end_time",
+                                                                                                        e.target
+                                                                                                            .value
+                                                                                                    )
+                                                                                                }
+                                                                                                required
+                                                                                                className="bg-white text-[var(--quinary)] border border-gray-300 rounded-lg p-2 outline-none focus:border-[var(--primary)] transition-colors text-sm"
+                                                                                            />
+
+                                                                                            <input
+                                                                                                type="text"
+                                                                                                value={
+                                                                                                    slot.room_number
+                                                                                                }
+                                                                                                onChange={(e) =>
+                                                                                                    updateSlot(
+                                                                                                        subject.id,
+                                                                                                        day.value,
+                                                                                                        index,
+                                                                                                        "room_number",
+                                                                                                        e.target
+                                                                                                            .value
+                                                                                                    )
+                                                                                                }
+                                                                                                placeholder="Room no. (optional)"
+                                                                                                className="flex-1 min-w-[140px] bg-white text-[var(--quinary)] border border-gray-300 rounded-lg p-2 outline-none focus:border-[var(--primary)] transition-colors text-sm placeholder-gray-400"
+                                                                                            />
+                                                                                        </div>
+                                                                                    )
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+
+                                    {/* ---------------- ACTIONS ---------------- */}
+                                    {subjectsForClass.length > 0 && !classAlreadyHasTimetable && (
+                                        <div className="flex items-center justify-between max-w-4xl">
+                                            <span className="text-xs text-gray-400">
+                                                {selectedEntryCount} period
+                                                {selectedEntryCount === 1 ? "" : "s"} will be saved.
+                                            </span>
+
+                                            <div className="flex items-center gap-3">
+                                                <button
+                                                    type="button"
+                                                    onClick={cancelForm}
+                                                    className="text-[var(--quinary)] font-medium py-3 px-6 rounded-xl border border-gray-300 hover:bg-gray-50 transition-colors text-sm cursor-pointer"
+                                                >
+                                                    Cancel
+                                                </button>
+
+                                                <button
+                                                    type="submit"
+                                                    disabled={saving || selectedEntryCount === 0}
+                                                    className="bg-[var(--primary)] hover:bg-[var(--quinary)] disabled:opacity-50 text-white font-medium py-3 px-6 rounded-xl transition-all duration-300 shadow-md transform active:scale-[0.98] cursor-pointer"
+                                                >
+                                                    {saving
+                                                        ? "Saving..."
+                                                        : editingId
+                                                            ? "Update Timetable"
+                                                            : "Create Timetable"}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </form>
+                            )}
+                        </>
+                    )}
+
+                    {/* ================= DELETE CONFIRMATION MODAL ================= */}
+                    {deleteTarget && (
+                        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+                            <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6">
+                                <div className="text-lg font-semibold text-[var(--quinary)] mb-2">
+                                    Delete Timetable?
+                                </div>
+                                <p className="text-sm text-gray-500 mb-6">
+                                    This will permanently delete the timetable for{" "}
+                                    <span className="font-medium text-[var(--quinary)]">
+                                        {getClassLabel(deleteTarget.student_class)}
+                                    </span>{" "}
+                                    and all of its entries. This action cannot be undone.
+                                </p>
+                                <div className="flex items-center justify-end gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setDeleteTarget(null)}
+                                        disabled={deleting}
+                                        className="text-[var(--quinary)] font-medium py-2.5 px-4 rounded-xl border border-gray-300 hover:bg-gray-50 disabled:opacity-50 transition-colors text-sm cursor-pointer"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleDelete}
+                                        disabled={deleting}
+                                        className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-medium py-2.5 px-4 rounded-xl transition-colors text-sm cursor-pointer"
+                                    >
+                                        {deleting ? "Deleting..." : "Delete"}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     )}
                 </>
-            )}
-
-            {/* ================= DELETE CONFIRMATION MODAL ================= */}
-            {deleteTarget && (
-                <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6">
-                        <div className="text-lg font-semibold text-[var(--quinary)] mb-2">
-                            Delete Timetable?
-                        </div>
-                        <p className="text-sm text-gray-500 mb-6">
-                            This will permanently delete the timetable for{" "}
-                            <span className="font-medium text-[var(--quinary)]">
-                                {getClassLabel(deleteTarget.student_class)}
-                            </span>{" "}
-                            and all of its entries. This action cannot be undone.
-                        </p>
-                        <div className="flex items-center justify-end gap-3">
-                            <button
-                                type="button"
-                                onClick={() => setDeleteTarget(null)}
-                                disabled={deleting}
-                                className="text-[var(--quinary)] font-medium py-2.5 px-4 rounded-xl border border-gray-300 hover:bg-gray-50 disabled:opacity-50 transition-colors text-sm cursor-pointer"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleDelete}
-                                disabled={deleting}
-                                className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-medium py-2.5 px-4 rounded-xl transition-colors text-sm cursor-pointer"
-                            >
-                                {deleting ? "Deleting..." : "Delete"}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-            </>
             )}
 
             {/* ============================================================ */}
@@ -1506,22 +1580,20 @@ const Examination = () => {
                         <button
                             type="button"
                             onClick={() => setTestActiveTab("list")}
-                            className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors cursor-pointer ${
-                                testActiveTab === "list"
-                                    ? "border-[var(--primary)] text-[var(--primary)]"
-                                    : "border-transparent text-gray-500 hover:text-[var(--quinary)]"
-                            }`}
+                            className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors cursor-pointer ${testActiveTab === "list"
+                                ? "border-[var(--primary)] text-[var(--primary)]"
+                                : "border-transparent text-gray-500 hover:text-[var(--quinary)]"
+                                }`}
                         >
                             All Test Timetables
                         </button>
                         <button
                             type="button"
                             onClick={() => (testActiveTab === "form" ? null : startAddNewTest())}
-                            className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors cursor-pointer ${
-                                testActiveTab === "form"
-                                    ? "border-[var(--primary)] text-[var(--primary)]"
-                                    : "border-transparent text-gray-500 hover:text-[var(--quinary)]"
-                            }`}
+                            className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors cursor-pointer ${testActiveTab === "form"
+                                ? "border-[var(--primary)] text-[var(--primary)]"
+                                : "border-transparent text-gray-500 hover:text-[var(--quinary)]"
+                                }`}
                         >
                             {editingTestId ? "Edit Test Timetable" : "Add New"}
                         </button>
@@ -1544,6 +1616,21 @@ const Examination = () => {
                                         placeholder="Search by test or class..."
                                         className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl px-4 py-2.5 outline-none focus:border-[var(--primary)] transition-colors text-sm w-64 placeholder-gray-400"
                                     />
+
+                                    {/* Select Test for PDF Download / Filtering */}
+                                    <select
+                                        value={selectedTestId}
+                                        onChange={(e) => setSelectedTestId(e.target.value)}
+                                        className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl px-4 py-2.5 outline-none focus:border-[var(--primary)] transition-colors text-sm cursor-pointer"
+                                    >
+                                        <option value="">Select Test for PDF</option>
+                                        {tests.map((t) => (
+                                            <option key={t.id} value={t.id}>
+                                                {t.name}
+                                            </option>
+                                        ))}
+                                    </select>
+
                                     <select
                                         value={testFilterClassId}
                                         onChange={(e) => setTestFilterClassId(e.target.value)}
@@ -1556,12 +1643,14 @@ const Examination = () => {
                                             </option>
                                         ))}
                                     </select>
-                                    {(testSearchTerm || testFilterClassId) && (
+
+                                    {(testSearchTerm || testFilterClassId || selectedTestId) && (
                                         <button
                                             type="button"
                                             onClick={() => {
                                                 setTestSearchTerm("");
                                                 setTestFilterClassId("");
+                                                setSelectedTestId("");
                                             }}
                                             className="text-xs text-gray-500 hover:text-[var(--quinary)] underline cursor-pointer"
                                         >
@@ -1587,6 +1676,35 @@ const Examination = () => {
                                         + Add New Test Timetable
                                     </button>
                                 </div>
+
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={handleDownloadAllTestPDF}
+                                        disabled={downloadingAllTestPdf}
+                                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        {downloadingAllTestPdf ? (
+                                            <>
+                                                <HiOutlineArrowPath className="w-4 h-4 animate-spin text-indigo-600" />
+                                                <span>Downloading...</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <HiOutlineArrowDownTray className="w-4 h-4 text-gray-500" />
+                                                <span>Download All (PDF)</span>
+                                            </>
+                                        )}
+                                    </button>
+
+                                    <button
+                                        onClick={fetchTestTimetables}
+                                        title="Refresh"
+                                        className="p-2 text-gray-500 bg-white border border-gray-300 rounded-lg shadow-sm hover:text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors"
+                                    >
+                                        <HiOutlineArrowPath className="w-4 h-4" />
+                                    </button>
+                                </div>
+
                             </div>
 
                             {loadingTestList ? (
@@ -1772,11 +1890,10 @@ const Examination = () => {
                                                             key={cls.id}
                                                             type="button"
                                                             onClick={() => handleSelectedTestClassChange(String(cls.id))}
-                                                            className={`px-4 py-2.5 rounded-xl border text-sm font-medium transition-colors cursor-pointer ${
-                                                                active
-                                                                    ? "bg-[var(--primary)] text-white border-[var(--primary)]"
-                                                                    : "bg-white text-[var(--quinary)] border-gray-300 hover:bg-gray-50"
-                                                            }`}
+                                                            className={`px-4 py-2.5 rounded-xl border text-sm font-medium transition-colors cursor-pointer ${active
+                                                                ? "bg-[var(--primary)] text-white border-[var(--primary)]"
+                                                                : "bg-white text-[var(--quinary)] border-gray-300 hover:bg-gray-50"
+                                                                }`}
                                                         >
                                                             {cls.display_name || cls.name}
                                                         </button>
@@ -1914,8 +2031,8 @@ const Examination = () => {
                                             {savingTest
                                                 ? "Saving..."
                                                 : editingTestId
-                                                ? "Update Test Timetable"
-                                                : "Create Test Timetable"}
+                                                    ? "Update Test Timetable"
+                                                    : "Create Test Timetable"}
                                         </button>
                                     </div>
                                 </div>
