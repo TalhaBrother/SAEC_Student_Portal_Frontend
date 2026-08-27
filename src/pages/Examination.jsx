@@ -120,6 +120,8 @@ const Examination = () => {
 
     // 1. Add state for tracking the bulk PDF download status
     const [downloadingAllTestPdf, setDownloadingAllTestPdf] = useState(false);
+    // Per-row PDF download status, keyed by the row's test id
+    const [downloadingTestId, setDownloadingTestId] = useState(null);
 
     // One row is created for every subject of the selected class.
     const emptyTestEntry = (subject = "") => ({
@@ -924,37 +926,25 @@ const Examination = () => {
 
     const selectedClass = classes.find((c) => String(c.id) === String(selectedClassId));
 
+ // Global button: always combines every test timetable that currently
+ // exists into a single PDF. Deliberately does NOT depend on
+ // selectedTestId (that state belongs to the Add/Edit form only) —
+ // that coupling was the bug causing this to silently scope to
+ // whatever test was last touched in the form.
  const handleDownloadAllTestPDF = async () => {
-  if (!selectedTestId) {
-    Swal.fire({
-      icon: "warning",
-      title: "Select a Test",
-      text: "Please select a test from the dropdown first to download its PDF.",
-      confirmButtonColor: "#dc2626",
-    });
-    return;
-  }
-
   setDownloadingAllTestPdf(true);
   try {
     const response = await api.get("examination/test-timetables/pdf/", {
       headers,
       responseType: "blob",
-      params: {
-        test: selectedTestId, // Sends ?test=<selectedTestId>
-      },
     });
 
-    // Extract selected test name for filename
-    const testObj = tests.find((t) => String(t.id) === String(selectedTestId));
-    const testName = testObj ? testObj.name.replace(/\s+/g, "_") : selectedTestId;
-
-    downloadBlob(response.data, `Test_Timetables_${testName}.pdf`);
+    downloadBlob(response.data, "all_test_timetables.pdf");
 
     Swal.fire({
       icon: "success",
       title: "Success!",
-      text: "Test timetable PDF downloaded successfully.",
+      text: "All test timetables PDF downloaded successfully.",
       timer: 2000,
       showConfirmButton: false,
     });
@@ -980,6 +970,50 @@ const Examination = () => {
     });
   } finally {
     setDownloadingAllTestPdf(false);
+  }
+};
+
+ // Per-row button on each test timetable card: downloads the PDF for
+ // that row's TEST (i.e. every class assigned to that test), not just
+ // the single class of the row that was clicked.
+ const handleDownloadTestPdf = async (timetable) => {
+  const testId = getClassIdOf(timetable.test);
+  setDownloadingTestId(testId);
+  try {
+    const response = await api.get("examination/test-timetables/pdf/", {
+      headers,
+      responseType: "blob",
+      params: { test: testId },
+    });
+
+    const testLabel =
+      timetable.test_name ||
+      tests.find((t) => String(t.id) === String(testId))?.name ||
+      `Test_${testId}`;
+
+    downloadBlob(response.data, `Test_Timetable_${String(testLabel).replace(/\s+/g, "_")}.pdf`);
+  } catch (error) {
+    console.error("Error downloading test timetable PDF:", error);
+
+    let errorMessage = "Failed to download test timetable PDF.";
+
+    if (error.response && error.response.data instanceof Blob) {
+      try {
+        const errorText = await error.response.data.text();
+        errorMessage = errorText || errorMessage;
+      } catch (e) {
+        // Fallback if blob text reading fails
+      }
+    }
+
+    Swal.fire({
+      icon: "error",
+      title: "Download Failed",
+      text: errorMessage,
+      confirmButtonColor: "#dc2626",
+    });
+  } finally {
+    setDownloadingTestId(null);
   }
 };
 
@@ -1617,20 +1651,6 @@ const Examination = () => {
                                         className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl px-4 py-2.5 outline-none focus:border-[var(--primary)] transition-colors text-sm w-64 placeholder-gray-400"
                                     />
 
-                                    {/* Select Test for PDF Download / Filtering */}
-                                    <select
-                                        value={selectedTestId}
-                                        onChange={(e) => setSelectedTestId(e.target.value)}
-                                        className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl px-4 py-2.5 outline-none focus:border-[var(--primary)] transition-colors text-sm cursor-pointer"
-                                    >
-                                        <option value="">Select Test for PDF</option>
-                                        {tests.map((t) => (
-                                            <option key={t.id} value={t.id}>
-                                                {t.name}
-                                            </option>
-                                        ))}
-                                    </select>
-
                                     <select
                                         value={testFilterClassId}
                                         onChange={(e) => setTestFilterClassId(e.target.value)}
@@ -1644,13 +1664,12 @@ const Examination = () => {
                                         ))}
                                     </select>
 
-                                    {(testSearchTerm || testFilterClassId || selectedTestId) && (
+                                    {(testSearchTerm || testFilterClassId) && (
                                         <button
                                             type="button"
                                             onClick={() => {
                                                 setTestSearchTerm("");
                                                 setTestFilterClassId("");
-                                                setSelectedTestId("");
                                             }}
                                             className="text-xs text-gray-500 hover:text-[var(--quinary)] underline cursor-pointer"
                                         >
@@ -1768,6 +1787,18 @@ const Examination = () => {
                                                         >
                                                             {isExpanded ? "Hide Entries" : "View Entries"}
                                                         </button>
+
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleDownloadTestPdf(timetable)}
+                                                            disabled={downloadingTestId === getClassIdOf(timetable.test)}
+                                                            className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-300 text-[var(--quinary)] hover:bg-gray-50 disabled:opacity-50 transition-colors cursor-pointer"
+                                                        >
+                                                            {downloadingTestId === getClassIdOf(timetable.test)
+                                                                ? "Downloading..."
+                                                                : "PDF"}
+                                                        </button>
+
                                                         <button
                                                             type="button"
                                                             onClick={() => startEditTest(timetable)}
