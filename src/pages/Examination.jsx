@@ -116,12 +116,29 @@ const Examination = () => {
     const [testActiveTab, setTestActiveTab] = useState("list"); // 'list' | 'form'
     const [editingTestId, setEditingTestId] = useState(null);
     const [selectedTestId, setSelectedTestId] = useState("");
+
+    // EDIT MODE ONLY: one existing timetable = one class. Kept separate
+    // from the create-mode multi-class state below so batch creation
+    // never interferes with the edit flow (PUT /test-timetables/<id>/).
     const [selectedTestClassId, setSelectedTestClassId] = useState("");
+    const [testEntries, setTestEntries] = useState([]);
+
+    // CREATE MODE ONLY: one or more classes, entries kept per-class.
+    // { [classId]: [ { subject, date, start_time, end_time, room_number }, ... ] }
+    const [selectedTestClassIds, setSelectedTestClassIds] = useState([]);
+    const [testEntriesByClass, setTestEntriesByClass] = useState({});
 
     // 1. Add state for tracking the bulk PDF download status
     const [downloadingAllTestPdf, setDownloadingAllTestPdf] = useState(false);
-    // Per-row PDF download status, keyed by the row's test id
+    // Per-row PDF download status, keyed by the row's timetable id
     const [downloadingTestId, setDownloadingTestId] = useState(null);
+
+    // "Download Selected Test (PDF)" control (combines every class for one test)
+    const [selectedPdfTestId, setSelectedPdfTestId] = useState("");
+    const [downloadingSelectedTestPdf, setDownloadingSelectedTestPdf] = useState(false);
+
+    // Explicit "All Tests" filter for the list, on top of search + class filter
+    const [testFilterTestId, setTestFilterTestId] = useState("");
 
     // One row is created for every subject of the selected class.
     const emptyTestEntry = (subject = "") => ({
@@ -131,7 +148,6 @@ const Examination = () => {
         end_time: "",
         room_number: "",
     });
-    const [testEntries, setTestEntries] = useState([]);
     const [savingTest, setSavingTest] = useState(false);
 
     // ---------- LOAD AVAILABLE TESTS ----------
@@ -159,6 +175,7 @@ const Examination = () => {
             const params = {};
             if (testSearchTerm.trim()) params.search = testSearchTerm.trim();
             if (testFilterClassId) params.student_class = testFilterClassId;
+            if (testFilterTestId) params.test = testFilterTestId;
 
             const res = await api.get("examination/test-timetables/", {
                 headers,
@@ -173,7 +190,7 @@ const Examination = () => {
             setLoadingTestList(false);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [testSearchTerm, testFilterClassId, token]);
+    }, [testSearchTerm, testFilterClassId, testFilterTestId, token]);
 
     useEffect(() => {
         const timer = setTimeout(() => fetchTestTimetables(), 350);
@@ -257,15 +274,57 @@ const Examination = () => {
         [subjects]
     );
 
+    // CREATE MODE helper: returns a fresh entries array for one class
+    // instead of writing directly to state, so it can be used per-class
+    // inside testEntriesByClass.
+    const buildTestEntriesForClass = useCallback(
+        (classId) => {
+            const classSubjects = subjects.filter(
+                (subject) => String(getSubjectClassId(subject)) === String(classId)
+            );
+            return classSubjects.map((subject) => emptyTestEntry(subject.id));
+        },
+        [subjects]
+    );
+
     const handleSelectedTestChange = (testId) => {
         setSelectedTestId(testId);
+        // Changing the test clears both the edit-mode selection and the
+        // create-mode multi-select so nothing from the previous test lingers.
         setSelectedTestClassId("");
         setTestEntries([]);
+        setSelectedTestClassIds([]);
+        setTestEntriesByClass({});
     };
 
+    // EDIT MODE ONLY (single class)
     const handleSelectedTestClassChange = (classId) => {
         setSelectedTestClassId(classId);
         populateTestEntriesForClass(classId);
+    };
+
+    // CREATE MODE ONLY: toggles a class in/out of the multi-select and
+    // builds/removes its entries accordingly.
+    const toggleTestClassSelection = (classId) => {
+        const id = Number(classId);
+        setSelectedTestClassIds((prev) => {
+            const isSelected = prev.includes(id);
+
+            if (isSelected) {
+                setTestEntriesByClass((current) => {
+                    const next = { ...current };
+                    delete next[id];
+                    return next;
+                });
+                return prev.filter((selectedId) => selectedId !== id);
+            }
+
+            setTestEntriesByClass((current) => ({
+                ...current,
+                [id]: buildTestEntriesForClass(id),
+            }));
+            return [...prev, id];
+        });
     };
 
     const updateTestEntry = (index, field, value) => {
@@ -276,6 +335,27 @@ const Examination = () => {
         );
     };
 
+    const removeTestEntry = (index) => {
+        setTestEntries((prev) => prev.filter((_, i) => i !== index));
+    };
+
+    // CREATE MODE ONLY: updates one field of one entry for one class.
+    const updateBatchTestEntry = (classId, index, field, value) => {
+        setTestEntriesByClass((prev) => ({
+            ...prev,
+            [classId]: prev[classId].map((entry, i) =>
+                i === index ? { ...entry, [field]: value } : entry
+            ),
+        }));
+    };
+
+    const removeBatchTestEntry = (classId, index) => {
+        setTestEntriesByClass((prev) => ({
+            ...prev,
+            [classId]: prev[classId].filter((_, i) => i !== index),
+        }));
+    };
+
     const validTestEntries = useMemo(
         () =>
             testEntries.filter(
@@ -284,14 +364,53 @@ const Examination = () => {
         [testEntries]
     );
 
+    // A class's batch entries are "complete" once every row has a subject,
+    // date, start time, and end time -- mirrors validTestEntries above but
+    // scoped to one class inside testEntriesByClass.
+    const isClassBatchComplete = useCallback(
+        (classId) => {
+            const entries = testEntriesByClass[classId] || [];
+            if (entries.length === 0) return false;
+            return entries.every(
+                (e) => e.subject && e.date && e.start_time && e.end_time
+            );
+        },
+        [testEntriesByClass]
+    );
+
+    const allBatchClassesComplete =
+        selectedTestClassIds.length > 0 &&
+        selectedTestClassIds.every((id) => isClassBatchComplete(id));
+
+    // Classes that already have a timetable for the selected test --
+    // used to disable them in the create-mode class picker so admins
+    // can't accidentally try to create a duplicate.
+    const existingTestTimetableClassIds = useMemo(() => {
+        if (!selectedTestId) return new Set();
+
+        return new Set(
+            testTimetables
+                .filter(
+                    (timetable) =>
+                        String(getClassIdOf(timetable.test)) === String(selectedTestId)
+                )
+                .map((timetable) => Number(getClassIdOf(timetable.student_class)))
+        );
+    }, [testTimetables, selectedTestId]);
+
     const startAddNewTest = async () => {
         setEditingTestId(null);
         setSelectedTestId("");
         setSelectedTestClassId("");
         setTestEntries([]);
+        setSelectedTestClassIds([]);
+        setTestEntriesByClass({});
         setTestListError("");
 
         if (!tests.length) await fetchTestsForTimetable();
+        // Refresh the timetable list so "already created" class detection
+        // reflects anything created since the page was last loaded.
+        await fetchTestTimetables();
         setTestActiveTab("form");
     };
 
@@ -302,6 +421,10 @@ const Examination = () => {
         setEditingTestId(timetable.id);
         setSelectedTestId(String(testId));
         setSelectedTestClassId(String(classId));
+        // Editing is always single-class -- make sure no leftover
+        // multi-select state from a previous create attempt sticks around.
+        setSelectedTestClassIds([]);
+        setTestEntriesByClass({});
         populateTestEntriesForClass(classId, timetable.entries || []);
         setTestActiveTab("form");
     };
@@ -311,10 +434,12 @@ const Examination = () => {
         setSelectedTestId("");
         setSelectedTestClassId("");
         setTestEntries([]);
+        setSelectedTestClassIds([]);
+        setTestEntriesByClass({});
         setTestActiveTab("list");
     };
 
-    // ---------- SUBMIT (CREATE / UPDATE) ----------
+    // ---------- SUBMIT (EDIT: single PUT | CREATE: batch POST) ----------
     const handleTestSubmit = async (e) => {
         e.preventDefault();
 
@@ -327,71 +452,148 @@ const Examination = () => {
             });
         }
 
-        if (!selectedTestClassId) {
+        // ================= EDIT MODE: unchanged single-timetable flow =================
+        if (editingTestId) {
+            if (!selectedTestClassId) {
+                return Swal.fire({
+                    icon: "warning",
+                    title: "Select a class",
+                    text: "Please select one of the classes assigned to this test.",
+                    confirmButtonColor: "#dc2626",
+                });
+            }
+
+            if (!assignedClassIds.includes(Number(selectedTestClassId))) {
+                return Swal.fire({
+                    icon: "warning",
+                    title: "Class not assigned",
+                    text: "The selected class is not assigned to this test.",
+                    confirmButtonColor: "#dc2626",
+                });
+            }
+
+            if (subjectsForTestClass.length === 0) {
+                return Swal.fire({
+                    icon: "warning",
+                    title: "No subjects",
+                    text: "No subjects were found for the selected class.",
+                    confirmButtonColor: "#dc2626",
+                });
+            }
+
+            if (validTestEntries.length === 0 || validTestEntries.length !== testEntries.length) {
+                return Swal.fire({
+                    icon: "warning",
+                    title: "Incomplete timetable",
+                    text: "Please complete the date, start time, and end time for every subject shown.",
+                    confirmButtonColor: "#dc2626",
+                });
+            }
+
+            setSavingTest(true);
+
+            const payload = {
+                test: Number(selectedTestId),
+                student_class: Number(selectedTestClassId),
+                entries: validTestEntries.map((entry) => ({
+                    subject: Number(entry.subject),
+                    date: entry.date,
+                    start_time: entry.start_time,
+                    end_time: entry.end_time,
+                    room_number: entry.room_number.trim() || null,
+                })),
+            };
+
+            try {
+                await api.put(`examination/test-timetables/${editingTestId}/`, payload, { headers });
+
+                await fetchTestTimetables();
+
+                await Swal.fire({
+                    icon: "success",
+                    title: "Test timetable updated!",
+                    text: "Test timetable updated successfully!",
+                    confirmButtonColor: "var(--primary)",
+                    timer: 2000,
+                    timerProgressBar: true,
+                });
+
+                cancelTestForm();
+            } catch (error) {
+                console.error("Error saving test timetable:", error);
+                Swal.fire({
+                    icon: "error",
+                    title: "Could not save test timetable",
+                    text: extractErrorMessage(
+                        error,
+                        "Failed to save test timetable. Please check the details and try again."
+                    ),
+                    confirmButtonColor: "#dc2626",
+                });
+            } finally {
+                setSavingTest(false);
+            }
+
+            return;
+        }
+
+        // ================= CREATE MODE: batch, one or more classes =================
+        if (selectedTestClassIds.length === 0) {
             return Swal.fire({
                 icon: "warning",
-                title: "Select a class",
-                text: "Please select one of the classes assigned to this test.",
+                title: "Select at least one class",
+                text: "Please select one or more classes assigned to this test.",
                 confirmButtonColor: "#dc2626",
             });
         }
 
-        if (!assignedClassIds.includes(Number(selectedTestClassId))) {
+        const notAssigned = selectedTestClassIds.filter(
+            (id) => !assignedClassIds.includes(Number(id))
+        );
+        if (notAssigned.length > 0) {
             return Swal.fire({
                 icon: "warning",
                 title: "Class not assigned",
-                text: "The selected class is not assigned to this test.",
+                text: "One or more selected classes are not assigned to this test.",
                 confirmButtonColor: "#dc2626",
             });
         }
 
-        if (subjectsForTestClass.length === 0) {
-            return Swal.fire({
-                icon: "warning",
-                title: "No subjects",
-                text: "No subjects were found for the selected class.",
-                confirmButtonColor: "#dc2626",
-            });
-        }
-
-        if (validTestEntries.length === 0 || validTestEntries.length !== testEntries.length) {
+        if (!allBatchClassesComplete) {
             return Swal.fire({
                 icon: "warning",
                 title: "Incomplete timetable",
-                text: "Please complete the date, start time, and end time for every subject shown.",
+                text: "Please complete the date, start time, and end time for every subject in every selected class.",
                 confirmButtonColor: "#dc2626",
             });
         }
 
         setSavingTest(true);
 
-        const payload = {
+        const batchPayload = {
             test: Number(selectedTestId),
-            student_class: Number(selectedTestClassId),
-            entries: validTestEntries.map((entry) => ({
-                subject: Number(entry.subject),
-                date: entry.date,
-                start_time: entry.start_time,
-                end_time: entry.end_time,
-                room_number: entry.room_number.trim() || null,
+            timetables: selectedTestClassIds.map((classId) => ({
+                student_class: Number(classId),
+                entries: (testEntriesByClass[classId] || []).map((entry) => ({
+                    subject: Number(entry.subject),
+                    date: entry.date,
+                    start_time: entry.start_time,
+                    end_time: entry.end_time,
+                    room_number: entry.room_number.trim() || null,
+                })),
             })),
         };
 
         try {
-            if (editingTestId) {
-                await api.put(`examination/test-timetables/${editingTestId}/`, payload, { headers });
-            } else {
-                await api.post("examination/test-timetables/", payload, { headers });
-            }
+            await api.post("examination/test-timetables/batch-create/", batchPayload, { headers });
 
             await fetchTestTimetables();
 
+            const classCount = selectedTestClassIds.length;
             await Swal.fire({
                 icon: "success",
-                title: editingTestId ? "Test timetable updated!" : "Test timetable created!",
-                text: editingTestId
-                    ? "Test timetable updated successfully!"
-                    : "Test timetable created successfully!",
+                title: "Test timetables created!",
+                text: `Created ${classCount} test ${classCount === 1 ? "timetable" : "timetables"} successfully!`,
                 confirmButtonColor: "var(--primary)",
                 timer: 2000,
                 timerProgressBar: true,
@@ -399,13 +601,13 @@ const Examination = () => {
 
             cancelTestForm();
         } catch (error) {
-            console.error("Error saving test timetable:", error);
+            console.error("Error creating test timetables:", error);
             Swal.fire({
                 icon: "error",
-                title: "Could not save test timetable",
+                title: "Could not create test timetables",
                 text: extractErrorMessage(
                     error,
-                    "Failed to save test timetable. Please check the details and try again."
+                    "Failed to create test timetables. Please check the details and try again."
                 ),
                 confirmButtonColor: "#dc2626",
             });
@@ -973,36 +1175,99 @@ const Examination = () => {
   }
 };
 
- // Per-row button on each test timetable card: downloads the PDF for
- // that row's TEST (i.e. every class assigned to that test), not just
- // the single class of the row that was clicked.
- const handleDownloadTestPdf = async (timetable) => {
-  const testId = getClassIdOf(timetable.test);
-  setDownloadingTestId(testId);
+ // "Download Selected Test (PDF)" control near "Download All (PDF)":
+ // downloads every class's timetable for ONE chosen test, combined.
+ // Separate state (selectedPdfTestId) on purpose -- never reuse
+ // selectedTestId, which belongs to the Add/Edit form.
+ const handleDownloadSelectedTestPDF = async () => {
+  if (!selectedPdfTestId) {
+    return Swal.fire({
+      icon: "warning",
+      title: "Select a test",
+      text: "Please select a test first.",
+      confirmButtonColor: "#dc2626",
+    });
+  }
+
+  setDownloadingSelectedTestPdf(true);
   try {
     const response = await api.get("examination/test-timetables/pdf/", {
       headers,
       responseType: "blob",
-      params: { test: testId },
+      params: { test: selectedPdfTestId },
     });
+
+    const selectedTestForPdf = tests.find(
+      (test) => String(test.id) === String(selectedPdfTestId)
+    );
+    const testName = selectedTestForPdf?.name || `test_${selectedPdfTestId}`;
+
+    downloadBlob(
+      response.data,
+      `test_timetable_${testName.replace(/\s+/g, "_")}.pdf`
+    );
+  } catch (error) {
+    console.error("Error downloading selected test PDF:", error);
+
+    let errorMessage = "Failed to download test timetable PDF.";
+    if (error.response && error.response.data instanceof Blob) {
+      try {
+        const errorText = await error.response.data.text();
+        const parsed = JSON.parse(errorText);
+        errorMessage = parsed.detail || parsed.error || errorText || errorMessage;
+      } catch {
+        // Keep default message
+      }
+    }
+
+    Swal.fire({
+      icon: "error",
+      title: "Download Failed",
+      text: errorMessage,
+      confirmButtonColor: "#dc2626",
+    });
+  } finally {
+    setDownloadingSelectedTestPdf(false);
+  }
+};
+
+ // Per-row button on each test timetable card: downloads the PDF for
+ // THAT SPECIFIC (test, class) timetable row only -- uses timetable.id,
+ // not the test id, so it no longer bundles every class of the test.
+ const handleDownloadTestPdf = async (timetable) => {
+  setDownloadingTestId(timetable.id);
+  try {
+    const response = await api.get(
+      `examination/test-timetables/${timetable.id}/pdf/`,
+      { headers, responseType: "blob" }
+    );
 
     const testLabel =
       timetable.test_name ||
-      tests.find((t) => String(t.id) === String(testId))?.name ||
-      `Test_${testId}`;
+      (typeof timetable.test === "object"
+        ? timetable.test.name
+        : tests.find((t) => String(t.id) === String(timetable.test))?.name) ||
+      `Test_${getClassIdOf(timetable.test)}`;
 
-    downloadBlob(response.data, `Test_Timetable_${String(testLabel).replace(/\s+/g, "_")}.pdf`);
+    const classLabel =
+      timetable.student_class_name || getClassLabel(timetable.student_class);
+
+    downloadBlob(
+      response.data,
+      `test_timetable_${testLabel}_${classLabel}.pdf`.replace(/\s+/g, "_")
+    );
   } catch (error) {
-    console.error("Error downloading test timetable PDF:", error);
+    console.error("Error downloading individual test timetable PDF:", error);
 
-    let errorMessage = "Failed to download test timetable PDF.";
+    let errorMessage = "Failed to download the test timetable PDF.";
 
     if (error.response && error.response.data instanceof Blob) {
       try {
         const errorText = await error.response.data.text();
-        errorMessage = errorText || errorMessage;
-      } catch (e) {
-        // Fallback if blob text reading fails
+        const parsed = JSON.parse(errorText);
+        errorMessage = parsed.detail || parsed.error || errorText || errorMessage;
+      } catch {
+        // Keep default message
       }
     }
 
@@ -1652,6 +1917,19 @@ const Examination = () => {
                                     />
 
                                     <select
+                                        value={testFilterTestId}
+                                        onChange={(e) => setTestFilterTestId(e.target.value)}
+                                        className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl px-4 py-2.5 outline-none focus:border-[var(--primary)] transition-colors text-sm cursor-pointer"
+                                    >
+                                        <option value="">All Tests</option>
+                                        {tests.map((test) => (
+                                            <option key={test.id} value={test.id}>
+                                                {test.name}
+                                            </option>
+                                        ))}
+                                    </select>
+
+                                    <select
                                         value={testFilterClassId}
                                         onChange={(e) => setTestFilterClassId(e.target.value)}
                                         className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl px-4 py-2.5 outline-none focus:border-[var(--primary)] transition-colors text-sm cursor-pointer"
@@ -1664,12 +1942,13 @@ const Examination = () => {
                                         ))}
                                     </select>
 
-                                    {(testSearchTerm || testFilterClassId) && (
+                                    {(testSearchTerm || testFilterClassId || testFilterTestId) && (
                                         <button
                                             type="button"
                                             onClick={() => {
                                                 setTestSearchTerm("");
                                                 setTestFilterClassId("");
+                                                setTestFilterTestId("");
                                             }}
                                             className="text-xs text-gray-500 hover:text-[var(--quinary)] underline cursor-pointer"
                                         >
@@ -1715,6 +1994,28 @@ const Examination = () => {
                                         )}
                                     </button>
 
+                                    <select
+                                        value={selectedPdfTestId}
+                                        onChange={(e) => setSelectedPdfTestId(e.target.value)}
+                                        className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl px-4 py-2.5 outline-none focus:border-[var(--primary)] transition-colors text-sm cursor-pointer"
+                                    >
+                                        <option value="">Select Test for PDF</option>
+                                        {tests.map((test) => (
+                                            <option key={test.id} value={test.id}>
+                                                {test.name}
+                                            </option>
+                                        ))}
+                                    </select>
+
+                                    <button
+                                        type="button"
+                                        onClick={handleDownloadSelectedTestPDF}
+                                        disabled={downloadingSelectedTestPdf || !selectedPdfTestId}
+                                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        {downloadingSelectedTestPdf ? "Downloading..." : "Download Selected Test (PDF)"}
+                                    </button>
+
                                     <button
                                         onClick={fetchTestTimetables}
                                         title="Refresh"
@@ -1732,7 +2033,7 @@ const Examination = () => {
                                 </div>
                             ) : testTimetables.length === 0 ? (
                                 <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center text-gray-400 text-sm">
-                                    {testSearchTerm || testFilterClassId
+                                    {testSearchTerm || testFilterClassId || testFilterTestId
                                         ? "No test timetables match your search/filter."
                                         : 'No test timetables yet. Click "Add New Test Timetable" to create one.'}
                                 </div>
@@ -1791,10 +2092,10 @@ const Examination = () => {
                                                         <button
                                                             type="button"
                                                             onClick={() => handleDownloadTestPdf(timetable)}
-                                                            disabled={downloadingTestId === getClassIdOf(timetable.test)}
+                                                            disabled={downloadingTestId === timetable.id}
                                                             className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-300 text-[var(--quinary)] hover:bg-gray-50 disabled:opacity-50 transition-colors cursor-pointer"
                                                         >
-                                                            {downloadingTestId === getClassIdOf(timetable.test)
+                                                            {downloadingTestId === timetable.id
                                                                 ? "Downloading..."
                                                                 : "PDF"}
                                                         </button>
@@ -1902,7 +2203,8 @@ const Examination = () => {
                                     )}
                                 </div>
 
-                                {selectedTestId && (
+                                {/* ===== EDIT MODE: single class picker (unchanged) ===== */}
+                                {selectedTestId && editingTestId && (
                                     <div>
                                         <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold block mb-2">
                                             Classes assigned to this test *
@@ -1935,7 +2237,51 @@ const Examination = () => {
                                     </div>
                                 )}
 
-                                {selectedTestClassId && (
+                                {/* ===== CREATE MODE: multi-select class picker, disables classes that already have a timetable for this test ===== */}
+                                {selectedTestId && !editingTestId && (
+                                    <div>
+                                        <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold block mb-2">
+                                            Classes assigned to this test * <span className="normal-case text-gray-400 font-normal">(select one or more)</span>
+                                        </label>
+
+                                        {assignedClasses.length === 0 ? (
+                                            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
+                                                This test has no assigned classes, so a timetable cannot be created for it.
+                                            </div>
+                                        ) : (
+                                            <div className="flex flex-wrap gap-2">
+                                                {assignedClasses.map((cls) => {
+                                                    const active = selectedTestClassIds.includes(Number(cls.id));
+                                                    const alreadyCreated = existingTestTimetableClassIds.has(Number(cls.id));
+                                                    return (
+                                                        <button
+                                                            key={cls.id}
+                                                            type="button"
+                                                            disabled={alreadyCreated}
+                                                            onClick={() => toggleTestClassSelection(cls.id)}
+                                                            title={alreadyCreated ? "A timetable already exists for this class and test" : undefined}
+                                                            className={`px-4 py-2.5 rounded-xl border text-sm font-medium transition-colors ${alreadyCreated
+                                                                ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+                                                                : active
+                                                                    ? "bg-[var(--primary)] text-white border-[var(--primary)] cursor-pointer"
+                                                                    : "bg-white text-[var(--quinary)] border-gray-300 hover:bg-gray-50 cursor-pointer"
+                                                                }`}
+                                                        >
+                                                            {cls.display_name || cls.name}
+                                                            {alreadyCreated
+                                                                ? " — Already Created"
+                                                                : active
+                                                                    ? " ✓"
+                                                                    : ""}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {editingTestId && selectedTestClassId && (
                                     <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
                                         <div className="text-xs uppercase tracking-wider text-gray-500 font-semibold">
                                             Selected class
@@ -1948,9 +2294,24 @@ const Examination = () => {
                                         </div>
                                     </div>
                                 )}
+
+                                {!editingTestId && selectedTestClassIds.length > 0 && (
+                                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                                        <div className="text-xs uppercase tracking-wider text-gray-500 font-semibold">
+                                            Selected classes
+                                        </div>
+                                        <div className="text-base font-semibold text-[var(--quinary)] mt-1">
+                                            {selectedTestClassIds.length} {selectedTestClassIds.length === 1 ? "class" : "classes"} selected
+                                        </div>
+                                        <div className="text-xs text-gray-500 mt-1">
+                                            A timetable will be created for each selected class below.
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
-                            {selectedTestClassId && (
+                            {/* ===== EDIT MODE: single-class entry form (unchanged) ===== */}
+                            {editingTestId && selectedTestClassId && (
                                 subjectsForTestClass.length === 0 ? (
                                     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center text-gray-400 text-sm max-w-4xl">
                                         No subjects found for this class. Add subjects to this class first.
@@ -2041,7 +2402,124 @@ const Examination = () => {
                                 )
                             )}
 
-                            {selectedTestClassId && subjectsForTestClass.length > 0 && (
+                            {/* ===== CREATE MODE: one entry block per selected class ===== */}
+                            {!editingTestId && selectedTestClassIds.length > 0 && (
+                                <div className="space-y-8 max-w-4xl">
+                                    {selectedTestClassIds.map((classId) => {
+                                        const cls = classes.find((c) => String(c.id) === String(classId));
+                                        const classLabel = cls?.display_name || cls?.name || `Class #${classId}`;
+                                        const classSubjects = subjects.filter(
+                                            (s) => String(getSubjectClassId(s)) === String(classId)
+                                        );
+                                        const entries = testEntriesByClass[classId] || [];
+
+                                        return (
+                                            <div key={classId} className="space-y-4">
+                                                <div className="flex items-center gap-2 border-b border-gray-200 pb-2">
+                                                    <span className="text-sm font-semibold uppercase tracking-wider text-[var(--primary)]">
+                                                        {classLabel}
+                                                    </span>
+                                                    <span className="text-xs text-gray-400">
+                                                        {entries.filter((e) => e.subject && e.date && e.start_time && e.end_time).length} of {entries.length} subjects configured
+                                                    </span>
+                                                </div>
+
+                                                {classSubjects.length === 0 ? (
+                                                    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 text-center text-gray-400 text-sm">
+                                                        No subjects found for this class. Add subjects to this class first.
+                                                    </div>
+                                                ) : (
+                                                    entries.map((entry, index) => {
+                                                        const subject = subjects.find(
+                                                            (item) => String(item.id) === String(entry.subject)
+                                                        );
+                                                        return (
+                                                            <div
+                                                                key={subject?.id ?? `${classId}-extra-${index}`}
+                                                                className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6"
+                                                            >
+                                                                <div className="flex items-center justify-between gap-3 mb-4">
+                                                                    <div>
+                                                                        <div className="text-lg font-semibold text-[var(--quinary)]">
+                                                                            {subject?.name || `Subject #${entry.subject}`}
+                                                                        </div>
+                                                                        <div className="text-xs text-gray-400 mt-1">
+                                                                            Configure the examination date and time for this subject.
+                                                                        </div>
+                                                                    </div>
+                                                                    {!subject && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => removeBatchTestEntry(classId, index)}
+                                                                            className="text-xs font-medium px-3 py-2 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                                                                        >
+                                                                            Remove
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+
+                                                                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                                                                    <div>
+                                                                        <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold block mb-1">
+                                                                            Date *
+                                                                        </label>
+                                                                        <input
+                                                                            type="date"
+                                                                            value={entry.date}
+                                                                            onChange={(e) => updateBatchTestEntry(classId, index, "date", e.target.value)}
+                                                                            required
+                                                                            className="w-full bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm"
+                                                                        />
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold block mb-1">
+                                                                            Start Time *
+                                                                        </label>
+                                                                        <input
+                                                                            type="time"
+                                                                            value={entry.start_time}
+                                                                            onChange={(e) => updateBatchTestEntry(classId, index, "start_time", e.target.value)}
+                                                                            required
+                                                                            className="w-full bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm"
+                                                                        />
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold block mb-1">
+                                                                            End Time *
+                                                                        </label>
+                                                                        <input
+                                                                            type="time"
+                                                                            value={entry.end_time}
+                                                                            onChange={(e) => updateBatchTestEntry(classId, index, "end_time", e.target.value)}
+                                                                            required
+                                                                            className="w-full bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm"
+                                                                        />
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold block mb-1">
+                                                                            Room
+                                                                        </label>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={entry.room_number}
+                                                                            onChange={(e) => updateBatchTestEntry(classId, index, "room_number", e.target.value)}
+                                                                            placeholder="Optional"
+                                                                            className="w-full bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm placeholder-gray-400"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+
+                            {/* ===== EDIT MODE footer ===== */}
+                            {editingTestId && selectedTestClassId && subjectsForTestClass.length > 0 && (
                                 <div className="flex items-center justify-between max-w-4xl">
                                     <span className="text-xs text-gray-400">
                                         {validTestEntries.length} of {testEntries.length} subjects configured.
@@ -2059,11 +2537,32 @@ const Examination = () => {
                                             disabled={savingTest || validTestEntries.length !== testEntries.length || testEntries.length === 0}
                                             className="bg-[var(--primary)] hover:bg-[var(--quinary)] disabled:opacity-50 text-white font-medium py-3 px-6 rounded-xl transition-all duration-300 shadow-md transform active:scale-[0.98] cursor-pointer"
                                         >
-                                            {savingTest
-                                                ? "Saving..."
-                                                : editingTestId
-                                                    ? "Update Test Timetable"
-                                                    : "Create Test Timetable"}
+                                            {savingTest ? "Saving..." : "Update Test Timetable"}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ===== CREATE MODE footer ===== */}
+                            {!editingTestId && selectedTestClassIds.length > 0 && (
+                                <div className="flex items-center justify-between max-w-4xl">
+                                    <span className="text-xs text-gray-400">
+                                        {selectedTestClassIds.filter((id) => isClassBatchComplete(id)).length} of {selectedTestClassIds.length} classes fully configured.
+                                    </span>
+                                    <div className="flex items-center gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={cancelTestForm}
+                                            className="text-[var(--quinary)] font-medium py-3 px-6 rounded-xl border border-gray-300 hover:bg-gray-50 transition-colors text-sm cursor-pointer"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            disabled={savingTest || !allBatchClassesComplete}
+                                            className="bg-[var(--primary)] hover:bg-[var(--quinary)] disabled:opacity-50 text-white font-medium py-3 px-6 rounded-xl transition-all duration-300 shadow-md transform active:scale-[0.98] cursor-pointer"
+                                        >
+                                            {savingTest ? "Saving..." : `Create Test Timetable${selectedTestClassIds.length > 1 ? "s" : ""}`}
                                         </button>
                                     </div>
                                 </div>
