@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import api from '../api/axios';
 import { useNavigate } from 'react-router';
 import useAuthStore from '../store/authStore';
-import logo from "../assets/logo.png";
 
 const Login = () => {
   const [username, setUsername] = useState('');
@@ -10,8 +9,33 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  // 'loading' | 'success' | 'error'
+  const [settingsStatus, setSettingsStatus] = useState('loading');
+  const [instituteSettings, setInstituteSettings] = useState(null);
+
   const navigate = useNavigate();
   const login = useAuthStore((state) => state.login);
+
+  useEffect(() => {
+    const fetchInstituteSettings = async () => {
+      try {
+        // GET is public (AllowAny) on this endpoint — no auth token needed here.
+        const res = await api.get('/institute/settings/');
+        setInstituteSettings(res.data);
+        setSettingsStatus('success');
+      } catch (error) {
+        console.error('Failed to load institute settings:', error);
+        setSettingsStatus('error');
+      }
+    };
+
+    fetchInstituteSettings();
+  }, []);
+
+  const showSkeleton = settingsStatus === 'loading' || settingsStatus === 'error';
+  const instituteName = instituteSettings?.institute_name || '';
+  const tagline = instituteSettings?.motto || 'Student Portal & Academic Management System';
+  const logoUrl = instituteSettings?.logo || null;
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -210,28 +234,45 @@ const Login = () => {
         <div className="absolute -top-24 -left-24 w-96 h-96 bg-white/10 rounded-full blur-3xl" />
         <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-black/20 rounded-full blur-3xl" />
 
-        {/* Prominent SAEC Logo Stage */}
+        {/* Prominent Institute Logo Stage */}
         <div className="z-10 flex flex-col items-center justify-center max-w-lg w-full text-center">
           <div className="relative group p-10 bg-white/10 backdrop-blur-2xl rounded-3xl border border-white/20 shadow-2xl transition-all duration-500 hover:scale-[1.02]">
 
             {/* Glow backing behind logo image */}
             <div className="absolute inset-0 bg-white/20 rounded-3xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
-            <img
-              src={logo}
-              alt="SAEC Coaching Center Logo"
-              className="relative z-10 max-h-[320px] w-auto object-contain mx-auto drop-shadow-2xl"
-            />
+            {showSkeleton ? (
+              <div className="relative z-10 h-[320px] w-[320px] max-w-full max-h-[320px] rounded-2xl bg-white/10 animate-pulse" />
+            ) : logoUrl ? (
+              <img
+                src={logoUrl}
+                alt={`${instituteName || 'Institute'} Logo`}
+                className="relative z-10 max-h-[320px] w-auto object-contain mx-auto drop-shadow-2xl"
+              />
+            ) : (
+              <div className="relative z-10 h-[320px] w-[320px] max-w-full flex items-center justify-center rounded-2xl bg-white/10 text-white/40 text-xs font-semibold uppercase tracking-wider">
+                No Logo Configured
+              </div>
+            )}
           </div>
 
           {/* Subheading below Big Emblem */}
-          <div className="mt-8 space-y-1.5">
-            <h2 className="text-white text-2xl font-bold tracking-tight">
-              SAEC Coaching Center
-            </h2>
-            <p className="text-white/70 text-xs font-medium uppercase tracking-widest">
-              Student Portal &amp; Academic Management System
-            </p>
+          <div className="mt-8 space-y-1.5 w-full">
+            {showSkeleton ? (
+              <>
+                <div className="h-7 w-56 mx-auto rounded-lg bg-white/20 animate-pulse" />
+                <div className="h-3 w-72 mx-auto rounded bg-white/10 animate-pulse mt-3" />
+              </>
+            ) : (
+              <>
+                <h2 className="text-white text-2xl font-bold tracking-tight">
+                  {instituteName || 'Institute Name Not Set'}
+                </h2>
+                <p className="text-white/70 text-xs font-medium uppercase tracking-widest">
+                  {tagline}
+                </p>
+              </>
+            )}
           </div>
         </div>
 

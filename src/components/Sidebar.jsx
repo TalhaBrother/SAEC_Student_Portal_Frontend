@@ -16,6 +16,7 @@ import {
   HiOutlineNewspaper,
   HiOutlineReceiptRefund,
   HiOutlineTableCells,
+  HiOutlineServer,
   
 } from "react-icons/hi2";
 
@@ -41,6 +42,7 @@ export default function Sidebar({closeMobileMenu}) {
     // { label: "Fee Report", icon: HiOutlineReceiptRefund,roles:['admin'], path:'/admin/fee-report' },
      { label: "Fees", icon: HiOutlineBanknotes,roles:['admin'], path:'/admin/fees' },
      { label: "Examination", icon: HiOutlineTableCells,roles:['admin'], path:'/admin/examination' },
+      { label: "Settings", icon: HiOutlineServer,roles:['admin'], path:'/admin/settings' },
   ];
 
   const handleNavClick = (label) => {
