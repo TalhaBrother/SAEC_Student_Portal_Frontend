@@ -34,6 +34,21 @@ const emptyForm = () => ({
 // this handles either shape safely.
 const asList = (data) => (Array.isArray(data) ? data : data?.results || []);
 
+// Shape mirrors StudentFeeOverride on the backend — identical to the
+// class-level FeeStructure fields, minus the class FK. Kept blank by
+// default; due_day defaults to 10 to match the class structure form.
+const emptyFeeOverrideForm = () => ({
+  tuition_fee: "",
+  exam_fee: "",
+  arrears_amount: "",
+  amount_within_due_date: "",
+  amount_after_due_date: "",
+  due_day: "10",
+});
+
+const feeInputClass =
+  "bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm";
+
 const Students = () => {
   const token = useAuthStore((state) => state.accessToken);
   const headers = { Authorization: `Bearer ${token}` };
@@ -63,6 +78,17 @@ const Students = () => {
   // Form state
   const [formData, setFormData] = useState(emptyForm());
   const [formLoading, setFormLoading] = useState(false); // loading the detail record for edit
+
+  // Individual (per-student) fee structure — optional, mirrors the
+  // "Individual Student" mode in Fees.jsx (StudentFeeOverride).
+  const [feeOverrideEnabled, setFeeOverrideEnabled] = useState(false);
+  const [feeOverrideId, setFeeOverrideId] = useState(null); // set when editing a student that already has an override
+  const [feeOverrideForm, setFeeOverrideForm] = useState(emptyFeeOverrideForm());
+  const [checkingFeeOverride, setCheckingFeeOverride] = useState(false);
+
+  const updateFeeOverrideField = (field, value) => {
+    setFeeOverrideForm((prev) => ({ ...prev, [field]: value }));
+  };
 
   // Profile image state
   const [imageFile, setImageFile] = useState(null);
@@ -192,6 +218,9 @@ const Students = () => {
   const openCreateForm = () => {
     setFormData(emptyForm());
     clearImagePreview();
+    setFeeOverrideEnabled(false);
+    setFeeOverrideId(null);
+    setFeeOverrideForm(emptyFeeOverrideForm());
     setMessage({ type: "", text: "" });
     setMode("form");
   };
@@ -225,6 +254,30 @@ const Students = () => {
 
       setImageFile(null);
       setImagePreview(detail.image || null);
+
+      // Check whether this student already has an individual fee
+      // override. A 404 just means they currently follow their
+      // class's fee structure — not an error worth surfacing.
+      setCheckingFeeOverride(true);
+      try {
+        const feeRes = await api.get(`/fees/students/${detail.id}/fee-override/`, { headers });
+        setFeeOverrideId(feeRes.data.id);
+        setFeeOverrideEnabled(true);
+        setFeeOverrideForm({
+          tuition_fee: String(feeRes.data.tuition_fee),
+          exam_fee: String(feeRes.data.exam_fee),
+          arrears_amount: String(feeRes.data.arrears_amount),
+          amount_within_due_date: String(feeRes.data.amount_within_due_date),
+          amount_after_due_date: String(feeRes.data.amount_after_due_date),
+          due_day: String(feeRes.data.due_day),
+        });
+      } catch (feeErr) {
+        setFeeOverrideId(null);
+        setFeeOverrideEnabled(false);
+        setFeeOverrideForm(emptyFeeOverrideForm());
+      } finally {
+        setCheckingFeeOverride(false);
+      }
     } catch (err) {
       console.error("Error loading student for edit:", err);
       setMessage({ type: "error", text: "Failed to load student record." });
@@ -237,6 +290,9 @@ const Students = () => {
   const cancelForm = () => {
     setFormData(emptyForm());
     clearImagePreview();
+    setFeeOverrideEnabled(false);
+    setFeeOverrideId(null);
+    setFeeOverrideForm(emptyFeeOverrideForm());
     setMode("list");
   };
 
@@ -312,19 +368,73 @@ const Students = () => {
 
       console.log(isEdit ? "Student Updated Successfully:" : "Student Added Successfully:", res.data);
 
-      Swal.fire({
-        title: "Success!",
-        text: isEdit
-          ? "Student profile updated successfully!"
-          : "Student profile registered successfully!",
-        icon: "success",
-        confirmButtonText: "OK",
-        ...SWAL_THEME,
-      });
+      // On update, the PATCH response may not echo back the id (some
+      // serializers only return changed fields), so fall back to the
+      // id we already had from opening the edit form.
+      const studentId = res.data.id || formData.id;
+
+      // Individual fee structure is saved as a second step, once the
+      // student record itself has an id to attach it to. This mirrors
+      // the upsert behavior of the "Individual Student" mode in Fees.jsx:
+      // PUT creates or updates the override, DELETE reverts the student
+      // back to their class's fee structure.
+      let feeWarning = null;
+      if (feeOverrideEnabled) {
+        const feePayload = {
+          tuition_fee: feeOverrideForm.tuition_fee,
+          exam_fee: feeOverrideForm.exam_fee,
+          arrears_amount: feeOverrideForm.arrears_amount,
+          amount_within_due_date: feeOverrideForm.amount_within_due_date,
+          amount_after_due_date: feeOverrideForm.amount_after_due_date,
+          due_day: feeOverrideForm.due_day,
+        };
+        try {
+          await api.put(`/fees/students/${studentId}/fee-override/`, feePayload, { headers });
+        } catch (feeError) {
+          console.error("Error saving individual fee structure:", feeError.response?.data);
+          const feeData = feeError.response?.data;
+          feeWarning =
+            feeData?.due_day?.[0] ||
+            feeData?.non_field_errors?.[0] ||
+            "Student was saved, but the individual fee structure could not be saved. Please set it from the Fees page.";
+        }
+      } else if (feeOverrideId) {
+        // Was previously enabled but the checkbox has since been unticked.
+        try {
+          await api.delete(`/fees/students/${studentId}/fee-override/`, { headers });
+        } catch (feeError) {
+          console.error("Error removing individual fee structure:", feeError.response?.data);
+          feeWarning =
+            "Student was saved, but the individual fee structure could not be removed. Please remove it from the Fees page.";
+        }
+      }
+
+      if (feeWarning) {
+        Swal.fire({
+          title: "Saved with a warning",
+          text: feeWarning,
+          icon: "warning",
+          confirmButtonText: "OK",
+          ...SWAL_THEME,
+        });
+      } else {
+        Swal.fire({
+          title: "Success!",
+          text: isEdit
+            ? "Student profile updated successfully!"
+            : "Student profile registered successfully!",
+          icon: "success",
+          confirmButtonText: "OK",
+          ...SWAL_THEME,
+        });
+      }
 
       await fetchStudents();
       setFormData(emptyForm());
       clearImagePreview();
+      setFeeOverrideEnabled(false);
+      setFeeOverrideId(null);
+      setFeeOverrideForm(emptyFeeOverrideForm());
       setMode("list");
     } catch (error) {
       console.error(isEdit ? "Update Student Error!" : "Add Student Error!", error.response?.data);
@@ -825,6 +935,142 @@ const Students = () => {
                     </div>
                   )}
                 </div>
+              </div>
+
+              <hr className="border-gray-100" />
+
+              {/* Section: Individual Fee Structure (optional) */}
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
+                    Individual Fee Structure
+                  </h3>
+                  <label className="flex items-center gap-2 text-xs font-semibold text-gray-500 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={feeOverrideEnabled}
+                      onChange={(e) => setFeeOverrideEnabled(e.target.checked)}
+                      disabled={checkingFeeOverride}
+                      className="w-4 h-4 accent-[var(--primary)] cursor-pointer"
+                    />
+                    Set individual fee structure for this student
+                  </label>
+                </div>
+
+                {checkingFeeOverride ? (
+                  <p className="text-xs text-gray-400">Checking for an existing individual fee structure...</p>
+                ) : (
+                  <>
+                    <p className="text-xs text-gray-400 mb-4">
+                      {feeOverrideId
+                        ? "This student has an individual fee structure. Editing below updates it; unchecking the box above removes it and reverts them to their class's fee structure."
+                        : "Optional. When enabled, these amounts override the class's fee structure just for this student — used whenever a voucher is generated for them."}
+                    </p>
+
+                    {feeOverrideEnabled && (
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="flex flex-col">
+                          <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
+                            Tuition Fee
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={feeOverrideForm.tuition_fee}
+                            onChange={(e) => updateFeeOverrideField("tuition_fee", e.target.value)}
+                            placeholder="5000"
+                            required
+                            className={feeInputClass}
+                          />
+                        </div>
+
+                        <div className="flex flex-col">
+                          <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
+                            Exam Fee
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={feeOverrideForm.exam_fee}
+                            onChange={(e) => updateFeeOverrideField("exam_fee", e.target.value)}
+                            placeholder="1000"
+                            required
+                            className={feeInputClass}
+                          />
+                        </div>
+
+                        <div className="flex flex-col">
+                          <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
+                            Arrears Amount
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={feeOverrideForm.arrears_amount}
+                            onChange={(e) => updateFeeOverrideField("arrears_amount", e.target.value)}
+                            placeholder="0"
+                            required
+                            className={feeInputClass}
+                          />
+                        </div>
+
+                        <div className="flex flex-col">
+                          <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
+                            Amount Within Due Date
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={feeOverrideForm.amount_within_due_date}
+                            onChange={(e) => updateFeeOverrideField("amount_within_due_date", e.target.value)}
+                            placeholder="6000"
+                            required
+                            className={feeInputClass}
+                          />
+                        </div>
+
+                        <div className="flex flex-col">
+                          <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
+                            Amount After Due Date
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={feeOverrideForm.amount_after_due_date}
+                            onChange={(e) => updateFeeOverrideField("amount_after_due_date", e.target.value)}
+                            placeholder="6500"
+                            required
+                            className={feeInputClass}
+                          />
+                        </div>
+
+                        <div className="flex flex-col">
+                          <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
+                            Due Day (1–28)
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            max="28"
+                            value={feeOverrideForm.due_day}
+                            onChange={(e) => updateFeeOverrideField("due_day", e.target.value)}
+                            placeholder="10"
+                            required
+                            className={feeInputClass}
+                          />
+                          <p className="text-gray-400 text-xs mt-1">
+                            Day of the month vouchers become due. Kept ≤28 so it's valid every month.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
 
               <hr className="border-gray-100" />
