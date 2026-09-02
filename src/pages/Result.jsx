@@ -2,6 +2,206 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import api from "../api/axios";
 import useAuthStore from "../store/authStore";
 
+// ---------------------------------------------------------------
+// Report card format colors — mirrors the teal palette used in
+// pdf_generator.py / individual_pdf_generator.py, and the gray header
+// used in class_test_result_pdf_generator.py, so the hover previews
+// below actually look like the PDFs they represent.
+// ---------------------------------------------------------------
+const PDF_PRIMARY = "#0f5c5c";
+const PDF_SECONDARY = "#17a2a2";
+const PDF_ACCENT = "#eaf6f6";
+
+// ---------------------------------------------------------------
+// Small CSS mockups of each report card format, shown in a popover on
+// hover so it's clear what each button will generate before clicking it.
+// These are illustrative replicas (fake sample data), not live PDF
+// renders — there's no cheap way to render an actual PDF thumbnail
+// without generating the file first.
+// ---------------------------------------------------------------
+const FormatPreviewCard = ({ format }) => {
+    if (format === 1) {
+        return (
+            <div className="w-[230px] bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden text-left">
+                <div className="px-2 py-1.5" style={{ backgroundColor: PDF_PRIMARY }}>
+                    <div className="text-white text-[9px] font-bold tracking-wide">STUDENT REPORT CARD</div>
+                </div>
+                <div className="p-2">
+                    <table className="w-full border-collapse text-[6px]">
+                        <thead>
+                            <tr style={{ backgroundColor: PDF_ACCENT }}>
+                                <th className="border border-gray-300 px-1 py-0.5">Sr#</th>
+                                <th className="border border-gray-300 px-1 py-0.5">Test</th>
+                                <th className="border border-gray-300 px-1 py-0.5">Eng</th>
+                                <th className="border border-gray-300 px-1 py-0.5">Math</th>
+                                <th className="border border-gray-300 px-1 py-0.5">Sci</th>
+                                <th className="border border-gray-300 px-1 py-0.5">%</th>
+                                <th className="border border-gray-300 px-1 py-0.5">Remarks</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {["Test 1", "Test 2", "Test 3"].map((t, i) => (
+                                <tr key={t}>
+                                    <td className="border border-gray-200 px-1 py-0.5 text-center">{i + 1}</td>
+                                    <td className="border border-gray-200 px-1 py-0.5">{t}</td>
+                                    <td className="border border-gray-200 px-1 py-0.5 text-center">18</td>
+                                    <td className="border border-gray-200 px-1 py-0.5 text-center">22</td>
+                                    <td className="border border-gray-200 px-1 py-0.5 text-center">20</td>
+                                    <td className="border border-gray-200 px-1 py-0.5 text-center">80%</td>
+                                    <td className="border border-gray-200 px-1 py-0.5 text-center">Good</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                    <div className="mt-1.5 h-6 flex items-end gap-0.5">
+                        {[40, 55, 50, 70, 65, 80].map((h, i) => (
+                            <div
+                                key={i}
+                                className="flex-1 rounded-sm"
+                                style={{ height: `${h}%`, backgroundColor: PDF_SECONDARY }}
+                            />
+                        ))}
+                    </div>
+                    <div className="text-[7px] text-gray-400 mt-1">Percentage trend across tests</div>
+                </div>
+                <div className="px-2 py-1 bg-gray-50 border-t border-gray-100 text-[7px] text-gray-500 leading-tight">
+                    One PDF per student — every test they've taken, side-by-side, with a trend chart.
+                </div>
+            </div>
+        );
+    }
+
+    if (format === 2) {
+        return (
+            <div className="w-[230px] bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden text-left">
+                <div className="px-2 py-1.5" style={{ backgroundColor: PDF_PRIMARY }}>
+                    <div className="text-white text-[9px] font-bold tracking-wide">STUDENT REPORT CARD</div>
+                </div>
+                <div
+                    className="px-2 py-1 flex justify-between text-[7px] font-semibold"
+                    style={{ backgroundColor: PDF_ACCENT, color: PDF_PRIMARY }}
+                >
+                    <span>TEST&nbsp;Monthly Test 2</span>
+                    <span>DATE&nbsp;12-Aug-26</span>
+                </div>
+                <div className="p-2">
+                    <table className="w-full border-collapse text-[6px]">
+                        <thead>
+                            <tr style={{ backgroundColor: PDF_ACCENT }}>
+                                <th className="border border-gray-300 px-1 py-0.5">S.No</th>
+                                <th className="border border-gray-300 px-1 py-0.5">Subject</th>
+                                <th className="border border-gray-300 px-1 py-0.5">Obt.</th>
+                                <th className="border border-gray-300 px-1 py-0.5">Total</th>
+                                <th className="border border-gray-300 px-1 py-0.5">%</th>
+                                <th className="border border-gray-300 px-1 py-0.5">Grade</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {[
+                                ["English", 18, 20, "A"],
+                                ["Math", 27, 30, "A+"],
+                                ["Science", 21, 25, "B"],
+                            ].map(([s, o, t, g], i) => (
+                                <tr key={s}>
+                                    <td className="border border-gray-200 px-1 py-0.5 text-center">{i + 1}</td>
+                                    <td className="border border-gray-200 px-1 py-0.5">{s}</td>
+                                    <td className="border border-gray-200 px-1 py-0.5 text-center">{o}</td>
+                                    <td className="border border-gray-200 px-1 py-0.5 text-center">{t}</td>
+                                    <td className="border border-gray-200 px-1 py-0.5 text-center">
+                                        {Math.round((o / t) * 100)}%
+                                    </td>
+                                    <td className="border border-gray-200 px-1 py-0.5 text-center">{g}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                    <div
+                        className="mt-1.5 flex items-center justify-between rounded px-1.5 py-1"
+                        style={{ backgroundColor: PDF_ACCENT }}
+                    >
+                        <span className="text-[7px] font-bold" style={{ color: PDF_PRIMARY }}>
+                            Overall Grade
+                        </span>
+                        <span className="text-[9px] font-extrabold" style={{ color: PDF_PRIMARY }}>
+                            A
+                        </span>
+                    </div>
+                </div>
+                <div className="px-2 py-1 bg-gray-50 border-t border-gray-100 text-[7px] text-gray-500 leading-tight">
+                    One PDF per student — one selected test, with per-subject grades and class average.
+                </div>
+            </div>
+        );
+    }
+
+    // format === 3
+    return (
+        <div className="w-[250px] bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden text-left">
+            <div className="px-2 py-1.5 bg-[#E5E7EB] border-b border-gray-300">
+                <div className="text-[9px] font-bold text-gray-700 text-center">CLASS 9-A · MONTHLY TEST 2 RESULT</div>
+            </div>
+            <div className="p-2">
+                <table className="w-full border-collapse text-[6px]">
+                    <thead>
+                        <tr style={{ backgroundColor: "#E5E7EB" }}>
+                            <th className="border border-gray-400 px-1 py-0.5">S.No</th>
+                            <th className="border border-gray-400 px-1 py-0.5">Student</th>
+                            <th className="border border-gray-400 px-1 py-0.5">Eng</th>
+                            <th className="border border-gray-400 px-1 py-0.5">Math</th>
+                            <th className="border border-gray-400 px-1 py-0.5">Sci</th>
+                            <th className="border border-gray-400 px-1 py-0.5">%</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {[
+                            ["Ali Raza", 18, 27, 21, "82%"],
+                            ["Sara Khan", 20, 25, 23, "89%"],
+                            ["Omar Sheikh", 15, 22, 19, "68%"],
+                        ].map((row, i) => (
+                            <tr key={row[0]}>
+                                <td className="border border-gray-300 px-1 py-0.5 text-center">{i + 1}</td>
+                                <td className="border border-gray-300 px-1 py-0.5">{row[0]}</td>
+                                <td className="border border-gray-300 px-1 py-0.5 text-center">{row[1]}</td>
+                                <td className="border border-gray-300 px-1 py-0.5 text-center">{row[2]}</td>
+                                <td className="border border-gray-300 px-1 py-0.5 text-center">{row[3]}</td>
+                                <td className="border border-gray-300 px-1 py-0.5 text-center">{row[4]}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+            <div className="px-2 py-1 bg-gray-50 border-t border-gray-100 text-[7px] text-gray-500 leading-tight">
+                One PDF for the whole class — every student × every subject, for one test, in a single grid.
+            </div>
+        </div>
+    );
+};
+
+// ---------------------------------------------------------------
+// Wraps a format button/label so hovering it reveals the matching
+// FormatPreviewCard above it. Pure CSS (group/group-hover) — no state,
+// so it's cheap to use on every format button in a long student list.
+// ---------------------------------------------------------------
+const FormatPreviewTrigger = ({ format, children, align = "center" }) => {
+    const alignClass =
+        align === "left"
+            ? "left-0"
+            : align === "right"
+            ? "right-0"
+            : "left-1/2 -translate-x-1/2";
+
+    return (
+        <div className="relative inline-block group">
+            {children}
+            <div
+                className={`pointer-events-none absolute z-50 bottom-full mb-2 ${alignClass} opacity-0 invisible translate-y-1 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-150`}
+            >
+                <FormatPreviewCard format={format} />
+            </div>
+        </div>
+    );
+};
+
 const Result = () => {
     const token = useAuthStore((state) => state.accessToken);
     const authHeaders = { Authorization: `Bearer ${token}` };
@@ -39,6 +239,13 @@ const Result = () => {
     const [loadingClassTests, setLoadingClassTests] = useState(false);
     const [selectedZipTestId, setSelectedZipTestId] = useState("");
 
+    // Format 3 (Class Test Result) — single PDF, whole class, one test,
+    // all subjects. Independent of the ZIP flow above: it hits its own
+    // endpoint (/class-test-result/pdf/) and only needs class_id + test_id,
+    // so it gets its own test selector and loading/downloading state.
+    const [selectedFormat3TestId, setSelectedFormat3TestId] = useState("");
+    const [downloadingFormat3, setDownloadingFormat3] = useState(false);
+
     // Per-student test selection for the row-level Format 2 (individual)
     // download — keyed by studentId, since Format 2 always needs one test.
     const [rowTestSelection, setRowTestSelection] = useState({});
@@ -75,6 +282,7 @@ const Result = () => {
         setClassTests([]);
         setSelectedZipTestId("");
         setClassZipFormat("current");
+        setSelectedFormat3TestId("");
 
         if (!SelectedClass || !token) return;
 
@@ -288,6 +496,40 @@ const Result = () => {
     };
 
     // ---------------------------------------------------------
+    // Format 3: one single PDF listing every student of the selected
+    // class against every subject, for one test. Hits its own endpoint
+    // directly — no ReportCardSetting to flip, no ZIP, no section/group/
+    // search filters (the backend view only accepts class_id + test_id).
+    // ---------------------------------------------------------
+    const handleDownloadClassTestResultPdf = async () => {
+        if (!SelectedClass || !selectedFormat3TestId) return;
+
+        setDownloadingFormat3(true);
+        try {
+            const params = new URLSearchParams({
+                class_id: SelectedClass,
+                test_id: selectedFormat3TestId,
+            });
+
+            const res = await api.get(`/class-test-result/pdf/?${params.toString()}`, {
+                headers: authHeaders,
+                responseType: "blob",
+            });
+
+            const file = new Blob([res.data], { type: "application/pdf" });
+            const fileURL = URL.createObjectURL(file);
+            window.open(fileURL, "_blank");
+        } catch (err) {
+            console.error("Class test result PDF generation failed:", err);
+            alert(
+                "Could not generate the class test result PDF. Make sure marks are assigned for this test."
+            );
+        } finally {
+            setDownloadingFormat3(false);
+        }
+    };
+
+    // ---------------------------------------------------------
     // Expand a student row to show every test they have marks for,
     // each with its own download / WhatsApp action.
     // ---------------------------------------------------------
@@ -422,26 +664,30 @@ const Result = () => {
                     <div className="flex flex-wrap items-center gap-3">
                         <span className="text-xs uppercase tracking-wider text-gray-500 font-bold">Whole Class Format:</span>
                         <div className="flex gap-2">
-                            <button
-                                onClick={() => { setClassZipFormat("current"); setSelectedZipTestId(""); }}
-                                className={`text-xs font-semibold py-1.5 px-3 rounded-lg border transition-all cursor-pointer ${
-                                    classZipFormat === "current"
-                                        ? "bg-[var(--primary)] text-white border-[var(--primary)]"
-                                        : "bg-white text-[var(--quinary)] border-gray-300 hover:border-[var(--primary)]"
-                                }`}
-                            >
-                                Format 1
-                            </button>
-                            <button
-                                onClick={() => setClassZipFormat("individual")}
-                                className={`text-xs font-semibold py-1.5 px-3 rounded-lg border transition-all cursor-pointer ${
-                                    classZipFormat === "individual"
-                                        ? "bg-[var(--primary)] text-white border-[var(--primary)]"
-                                        : "bg-white text-[var(--quinary)] border-gray-300 hover:border-[var(--primary)]"
-                                }`}
-                            >
-                                Format 2
-                            </button>
+                            <FormatPreviewTrigger format={1} align="left">
+                                <button
+                                    onClick={() => { setClassZipFormat("current"); setSelectedZipTestId(""); }}
+                                    className={`text-xs font-semibold py-1.5 px-3 rounded-lg border transition-all cursor-pointer ${
+                                        classZipFormat === "current"
+                                            ? "bg-[var(--primary)] text-white border-[var(--primary)]"
+                                            : "bg-white text-[var(--quinary)] border-gray-300 hover:border-[var(--primary)]"
+                                    }`}
+                                >
+                                    Format 1
+                                </button>
+                            </FormatPreviewTrigger>
+                            <FormatPreviewTrigger format={2} align="left">
+                                <button
+                                    onClick={() => setClassZipFormat("individual")}
+                                    className={`text-xs font-semibold py-1.5 px-3 rounded-lg border transition-all cursor-pointer ${
+                                        classZipFormat === "individual"
+                                            ? "bg-[var(--primary)] text-white border-[var(--primary)]"
+                                            : "bg-white text-[var(--quinary)] border-gray-300 hover:border-[var(--primary)]"
+                                    }`}
+                                >
+                                    Format 2
+                                </button>
+                            </FormatPreviewTrigger>
                         </div>
 
                         {classZipFormat === "individual" && (
@@ -481,6 +727,41 @@ const Result = () => {
                             {downloadingZip ? "Generating ZIP..." : "📦 Generate Complete Class Reports"}
                         </button>
                     </div>
+
+                    {/* Format 3 — single PDF, whole class, one test, all subjects */}
+                    <div className="border-t border-gray-100 pt-3 flex flex-col gap-2">
+                        <div className="flex flex-wrap items-center gap-3">
+                            <span className="text-xs uppercase tracking-wider text-gray-500 font-bold">Class Test Result:</span>
+                            <FormatPreviewTrigger format={3} align="left">
+                                <span className="text-xs font-semibold py-1.5 px-3 rounded-lg border bg-sky-50 text-sky-700 border-sky-200 select-none">
+                                    Format 3
+                                </span>
+                            </FormatPreviewTrigger>
+                            <select
+                                value={selectedFormat3TestId}
+                                onChange={(e) => setSelectedFormat3TestId(e.target.value)}
+                                disabled={loadingClassTests}
+                                className="bg-white text-[var(--quinary)] border border-gray-300 rounded-lg py-1.5 px-3 outline-none focus:border-[var(--primary)] text-xs cursor-pointer font-medium disabled:opacity-50 min-w-[160px]"
+                            >
+                                <option value="">
+                                    {loadingClassTests ? "Loading tests..." : "Select a test"}
+                                </option>
+                                {classTests.map((t) => (
+                                    <option key={t.id} value={t.id}>{t.name}</option>
+                                ))}
+                            </select>
+                            <button
+                                onClick={handleDownloadClassTestResultPdf}
+                                disabled={downloadingFormat3 || !selectedFormat3TestId}
+                                className="text-xs bg-sky-50 hover:bg-sky-600 hover:text-white text-sky-700 font-semibold py-2 px-4 rounded-xl border border-sky-200 transition-all cursor-pointer disabled:opacity-40"
+                            >
+                                {downloadingFormat3 ? "Generating..." : "🧾 Generate Class Result PDF"}
+                            </button>
+                        </div>
+                        <div className="text-xs text-sky-600 bg-sky-50 border border-sky-200 rounded-xl px-3 py-2">
+                            Format 3 produces one PDF listing every student in this class against every subject for the selected test — it's not a ZIP, and section/group/search filters don't apply (it's the whole class).
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -511,13 +792,15 @@ const Result = () => {
                                         </div>
                                     </div>
                                     <div className="flex gap-2 flex-wrap">
-                                        <button
-                                            onClick={() => handleDownloadReportCard(student.id, student.full_name)}
-                                            disabled={downloadingId === `${student.id}`}
-                                            className="text-xs bg-[var(--secondary)] hover:bg-[var(--primary)] hover:text-white text-[var(--primary)] font-semibold py-2 px-3 rounded-xl transition-all cursor-pointer disabled:opacity-40"
-                                        >
-                                            {downloadingId === `${student.id}` ? "Generating..." : "Full Report Card (Format 1)"}
-                                        </button>
+                                        <FormatPreviewTrigger format={1}>
+                                            <button
+                                                onClick={() => handleDownloadReportCard(student.id, student.full_name)}
+                                                disabled={downloadingId === `${student.id}`}
+                                                className="text-xs bg-[var(--secondary)] hover:bg-[var(--primary)] hover:text-white text-[var(--primary)] font-semibold py-2 px-3 rounded-xl transition-all cursor-pointer disabled:opacity-40"
+                                            >
+                                                {downloadingId === `${student.id}` ? "Generating..." : "Full Report Card (Format 1)"}
+                                            </button>
+                                        </FormatPreviewTrigger>
                                         <div className="flex items-center gap-1">
                                             <select
                                                 value={rowTestSelection[student.id] || ""}
@@ -541,25 +824,27 @@ const Result = () => {
                                                     <option key={t.id} value={t.id}>{t.name}</option>
                                                 ))}
                                             </select>
-                                            <button
-                                                onClick={() =>
-                                                    handleDownloadTestReport(
-                                                        student.id,
-                                                        student.full_name,
-                                                        rowTestSelection[student.id],
-                                                        "individual"
-                                                    )
-                                                }
-                                                disabled={
-                                                    !rowTestSelection[student.id] ||
-                                                    downloadingId === `${student.id}-${rowTestSelection[student.id]}-individual`
-                                                }
-                                                className="text-xs bg-indigo-50 hover:bg-indigo-600 hover:text-white text-indigo-600 font-semibold py-2 px-3 rounded-xl transition-all cursor-pointer disabled:opacity-40 border border-indigo-200"
-                                            >
-                                                {downloadingId === `${student.id}-${rowTestSelection[student.id]}-individual`
-                                                    ? "..."
-                                                    : "Format 2"}
-                                            </button>
+                                            <FormatPreviewTrigger format={2} align="right">
+                                                <button
+                                                    onClick={() =>
+                                                        handleDownloadTestReport(
+                                                            student.id,
+                                                            student.full_name,
+                                                            rowTestSelection[student.id],
+                                                            "individual"
+                                                        )
+                                                    }
+                                                    disabled={
+                                                        !rowTestSelection[student.id] ||
+                                                        downloadingId === `${student.id}-${rowTestSelection[student.id]}-individual`
+                                                    }
+                                                    className="text-xs bg-indigo-50 hover:bg-indigo-600 hover:text-white text-indigo-600 font-semibold py-2 px-3 rounded-xl transition-all cursor-pointer disabled:opacity-40 border border-indigo-200"
+                                                >
+                                                    {downloadingId === `${student.id}-${rowTestSelection[student.id]}-individual`
+                                                        ? "..."
+                                                        : "Format 2"}
+                                                </button>
+                                            </FormatPreviewTrigger>
                                         </div>
                                         <button
                                             onClick={() => handleToggleAvailableTests(student.id)}
@@ -587,20 +872,24 @@ const Result = () => {
                                                         <div className="text-xs text-gray-400">{test.date} · {test.percentage}%</div>
                                                     </div>
                                                     <div className="flex gap-2 flex-wrap">
-                                                        <button
-                                                            onClick={() => handleDownloadTestReport(student.id, student.full_name, test.test_id, "current")}
-                                                            disabled={downloadingId === `${student.id}-${test.test_id}-current`}
-                                                            className="text-xs bg-[var(--secondary)] hover:bg-[var(--primary)] hover:text-white text-[var(--primary)] font-semibold py-1.5 px-3 rounded-lg transition-all cursor-pointer disabled:opacity-40"
-                                                        >
-                                                            {downloadingId === `${student.id}-${test.test_id}-current` ? "..." : "Format 1"}
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleDownloadTestReport(student.id, student.full_name, test.test_id, "individual")}
-                                                            disabled={downloadingId === `${student.id}-${test.test_id}-individual`}
-                                                            className="text-xs bg-indigo-50 hover:bg-indigo-600 hover:text-white text-indigo-600 font-semibold py-1.5 px-3 rounded-lg transition-all cursor-pointer disabled:opacity-40 border border-indigo-200"
-                                                        >
-                                                            {downloadingId === `${student.id}-${test.test_id}-individual` ? "..." : "Format 2"}
-                                                        </button>
+                                                        <FormatPreviewTrigger format={1}>
+                                                            <button
+                                                                onClick={() => handleDownloadTestReport(student.id, student.full_name, test.test_id, "current")}
+                                                                disabled={downloadingId === `${student.id}-${test.test_id}-current`}
+                                                                className="text-xs bg-[var(--secondary)] hover:bg-[var(--primary)] hover:text-white text-[var(--primary)] font-semibold py-1.5 px-3 rounded-lg transition-all cursor-pointer disabled:opacity-40"
+                                                            >
+                                                                {downloadingId === `${student.id}-${test.test_id}-current` ? "..." : "Format 1"}
+                                                            </button>
+                                                        </FormatPreviewTrigger>
+                                                        <FormatPreviewTrigger format={2}>
+                                                            <button
+                                                                onClick={() => handleDownloadTestReport(student.id, student.full_name, test.test_id, "individual")}
+                                                                disabled={downloadingId === `${student.id}-${test.test_id}-individual`}
+                                                                className="text-xs bg-indigo-50 hover:bg-indigo-600 hover:text-white text-indigo-600 font-semibold py-1.5 px-3 rounded-lg transition-all cursor-pointer disabled:opacity-40 border border-indigo-200"
+                                                            >
+                                                                {downloadingId === `${student.id}-${test.test_id}-individual` ? "..." : "Format 2"}
+                                                            </button>
+                                                        </FormatPreviewTrigger>
                                                         <button
                                                             onClick={() => handleSendWhatsAppText(student.id, test.test_id)}
                                                             className="text-xs bg-emerald-50 hover:bg-emerald-600 hover:text-white text-emerald-600 font-bold py-1.5 px-3 rounded-lg transition-all cursor-pointer border border-emerald-200"

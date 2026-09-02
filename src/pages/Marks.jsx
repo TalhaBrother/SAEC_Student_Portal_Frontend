@@ -36,6 +36,17 @@ const Marks = () => {
   const [fetchingSheet, setFetchingSheet] = useState(false);
   const [groupsLoading, setGroupsLoading] = useState(false);
 
+  // Row / Column highlight tracking
+  // hoveredRow / hoveredCol = transient (mouse), cleared on mouse leave
+  // activeCell = sticky (keyboard/focus), persists until a different cell is focused
+  const [hoveredRow, setHoveredRow] = useState(null);
+  const [hoveredCol, setHoveredCol] = useState(null);
+  const [activeCell, setActiveCell] = useState({ studentId: null, subjectId: null });
+
+  const setActiveCellFor = (studentId, subjectId) => {
+    setActiveCell({ studentId, subjectId });
+  };
+
   // Fetch initial dropdown metadata
   useEffect(() => {
     const fetchMetadata = async () => {
@@ -372,15 +383,48 @@ const Marks = () => {
     scoresInput,
   ]);
 
-  // Filter visible subject columns
-  const visibleSubjects = useMemo(() => {
-    if (!marksheetData?.students?.[0]?.subjects) return [];
-    if (!selectedSubject) return marksheetData.students[0].subjects;
+  // Students scoped by Section/Group ONLY — used purely to decide which
+  // SUBJECT COLUMNS exist. Deliberately ignores searchQuery/selectedStatus,
+  // since those should only hide/show ROWS, not make columns flicker.
+  const sectionGroupScopedStudents = useMemo(() => {
+    if (!marksheetData?.students) return [];
+    return marksheetData.students.filter((student) => {
+      if (selectedSection && student.section !== selectedSection) return false;
+      if (selectedGroup && student.group !== selectedGroup) return false;
+      return true;
+    });
+  }, [marksheetData, selectedSection, selectedGroup]);
 
-    return marksheetData.students[0].subjects.filter(
-      (s) => Number(s.subject_id) === Number(selectedSubject)
-    );
-  }, [marksheetData, selectedSubject]);
+  // Visible subject columns = UNION of every subject any student in the
+  // current Test + Class + Section + Group scope is eligible for (not just
+  // student[0] — different sections/groups can have different subjects).
+  const visibleSubjects = useMemo(() => {
+    const source = sectionGroupScopedStudents.length
+      ? sectionGroupScopedStudents
+      : marksheetData?.students || [];
+
+    const bySubjectId = new Map();
+    source.forEach((student) => {
+      (student.subjects || []).forEach((subj) => {
+        if (!bySubjectId.has(subj.subject_id)) {
+          bySubjectId.set(subj.subject_id, subj);
+        }
+      });
+    });
+
+    let union = Array.from(bySubjectId.values());
+
+    if (selectedSubject) {
+      union = union.filter((s) => Number(s.subject_id) === Number(selectedSubject));
+    }
+
+    return union;
+  }, [sectionGroupScopedStudents, marksheetData, selectedSubject]);
+
+  // Effective highlight targets: live mouse hover wins, otherwise fall back
+  // to the "sticky" cell that currently has focus.
+  const effectiveRow = hoveredRow ?? activeCell.studentId;
+  const effectiveCol = hoveredCol ?? activeCell.subjectId;
 
   return (
     <div className="p-6 bg-[var(--secondary)] text-[var(--quinary)] min-h-screen font-sans">
@@ -582,110 +626,200 @@ const Marks = () => {
                   <th className="p-4">Sec / Group</th>
                   
                   {/* Column Header per Subject with dynamic Total Marks control */}
-                  {visibleSubjects.map((subj) => (
-                    <th key={subj.subject_id} className="p-4 text-center min-w-[170px] bg-blue-50/50 border-l border-gray-200">
-                      <div className="font-bold text-[var(--quinary)] mb-1.5">{subj.subject_name}</div>
-                      
-                      <div className="flex items-center justify-center gap-1.5 font-normal normal-case">
-                        <span className="text-[11px] text-gray-500">Total:</span>
-                        <input
-                          type="number"
-                          min="1"
-                          value={subjectTotals[subj.subject_id] ?? globalTotalMarks}
-                          onChange={(e) => handleSubjectTotalChange(subj.subject_id, e.target.value)}
-                          className="w-16 bg-white border border-gray-300 rounded-md py-0.5 px-1.5 text-center text-xs font-bold text-[var(--primary)] shadow-sm outline-none focus:border-[var(--primary)]"
-                        />
-                      </div>
-                    </th>
-                  ))}
+                  {visibleSubjects.map((subj) => {
+                    const colActive = effectiveCol === subj.subject_id;
+                    return (
+                      <th
+                        key={subj.subject_id}
+                        onMouseEnter={() => setHoveredCol(subj.subject_id)}
+                        onMouseLeave={() => setHoveredCol(null)}
+                        className={`p-4 text-center min-w-[170px] border-l border-gray-200 transition-colors duration-150 ${
+                          colActive
+                            ? "bg-blue-100 shadow-[inset_0_-2px_0_0_var(--primary)]"
+                            : "bg-blue-50"
+                        }`}
+                      >
+                        <div className={`font-bold mb-1.5 ${colActive ? "text-[var(--primary)]" : "text-[var(--quinary)]"}`}>
+                          {subj.subject_name}
+                        </div>
+
+                        <div className="flex items-center justify-center gap-1.5 font-normal normal-case">
+                          <span className="text-[11px] text-gray-500">Total:</span>
+                          <input
+                            type="number"
+                            min="1"
+                            value={subjectTotals[subj.subject_id] ?? globalTotalMarks}
+                            onChange={(e) => handleSubjectTotalChange(subj.subject_id, e.target.value)}
+                            className="w-16 bg-white border border-gray-300 rounded-md py-0.5 px-1.5 text-center text-xs font-bold text-[var(--primary)] shadow-sm outline-none focus:border-[var(--primary)]"
+                          />
+                        </div>
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               
               <tbody className="divide-y divide-gray-100 text-sm">
                 {filteredStudentsGrid.length > 0 ? (
-                  filteredStudentsGrid.map((student) => (
-                    <tr key={student.student_id} className="hover:bg-blue-50/30 transition-colors">
-                      {/* GR Number */}
-                      <td className="p-4 font-semibold text-gray-500 sticky left-0 bg-white z-10 border-r border-gray-100">
-                        {student.student_gr}
-                      </td>
+                  filteredStudentsGrid.map((student, rowIdx) => {
+                    const rowActive = effectiveRow === student.student_id;
+                    // Zebra banding for rows that aren't currently active
+                    const rowBgClass = rowActive
+                      ? "bg-blue-50"
+                      : rowIdx % 2 === 1
+                      ? "bg-gray-50"
+                      : "bg-white";
 
-                      {/* Student Name */}
-                      <td className="p-4 font-bold text-[var(--quinary)] sticky left-16 bg-white z-10 border-r border-gray-100">
-                        {student.student_name}
-                      </td>
+                    return (
+                      <tr
+                        key={student.student_id}
+                        onMouseEnter={() => setHoveredRow(student.student_id)}
+                        onMouseLeave={() => setHoveredRow(null)}
+                        className={`transition-colors duration-150 ${
+                          rowActive ? "shadow-[inset_2px_0_0_0_var(--primary)]" : ""
+                        }`}
+                      >
+                        {/* GR Number */}
+                        <td
+                          onMouseEnter={() => setHoveredRow(student.student_id)}
+                          className={`p-4 font-semibold text-gray-500 sticky left-0 z-10 border-r border-gray-100 transition-colors duration-150 ${rowBgClass}`}
+                        >
+                          {student.student_gr}
+                        </td>
 
-                      {/* Section & Group Tags */}
-                      <td className="p-4 text-xs text-gray-500 whitespace-nowrap">
-                        <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded font-medium mr-1">
-                          {student.section || "N/A"}
-                        </span>
-                        <span className="bg-blue-50 text-[var(--primary)] px-2 py-0.5 rounded font-medium">
-                          {student.group || "Gen"}
-                        </span>
-                      </td>
+                        {/* Student Name */}
+                        <td
+                          onMouseEnter={() => setHoveredRow(student.student_id)}
+                          className={`p-4 font-bold text-[var(--quinary)] sticky left-16 z-10 border-r border-gray-100 transition-colors duration-150 ${rowBgClass}`}
+                        >
+                          {student.student_name}
+                        </td>
 
-                      {/* Subject Mark Inputs Dynamic Cells */}
-                      {visibleSubjects.map((subj) => {
-                        const cellKey = `${student.student_id}_${subj.subject_id}`;
-                        const currentCell = scoresInput[cellKey] || {
-                          obtained_marks: "",
-                          status: "present",
-                        };
-                        const isAbsent = currentCell.status === "absent";
-                        const maxTotal = subjectTotals[subj.subject_id] || globalTotalMarks;
+                        {/* Section & Group Tags */}
+                        <td
+                          onMouseEnter={() => setHoveredRow(student.student_id)}
+                          className={`p-4 text-xs text-gray-500 whitespace-nowrap transition-colors duration-150 ${rowBgClass}`}
+                        >
+                          <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded font-medium mr-1">
+                            {student.section || "N/A"}
+                          </span>
+                          <span className="bg-blue-50 text-[var(--primary)] px-2 py-0.5 rounded font-medium">
+                            {student.group || "Gen"}
+                          </span>
+                        </td>
 
-                        return (
-                          <td key={subj.subject_id} className="p-3 text-center border-l border-gray-100">
-                            <div className="flex items-center justify-center gap-2">
-                              {/* Attendance Status Toggle Button */}
-                              <button
-                                type="button"
-                                onClick={() => toggleAttendanceStatus(student.student_id, subj.subject_id)}
-                                title={isAbsent ? "Mark Present" : "Mark Absent"}
-                                className={`px-2 py-1 rounded-lg border text-xs font-bold transition-colors ${
-                                  isAbsent
-                                    ? "bg-red-50 border-red-200 text-red-600"
-                                    : "bg-emerald-50 border-emerald-200 text-emerald-600"
-                                }`}
+                        {/* Subject Mark Inputs Dynamic Cells */}
+                        {visibleSubjects.map((subj) => {
+                          // Not every student is eligible for every column once
+                          // columns are the UNION across section/group — check
+                          // whether THIS student actually takes this subject.
+                          const studentTakesSubject = (student.subjects || []).some(
+                            (s) => s.subject_id === subj.subject_id
+                          );
+
+                          const colActive = effectiveCol === subj.subject_id;
+                          const cellActive = rowActive && colActive;
+
+                          // Column tint layers on top of the row's zebra/active background.
+                          // Intersection (row + col both active) gets the strongest tint.
+                          let cellBgClass = rowBgClass;
+                          if (colActive) {
+                            cellBgClass = cellActive ? "bg-indigo-100" : "bg-indigo-50";
+                          }
+
+                          // Ineligible cell: greyed-out, disabled "N/A" placeholder.
+                          if (!studentTakesSubject) {
+                            return (
+                              <td
+                                key={subj.subject_id}
+                                onMouseEnter={() => {
+                                  setHoveredRow(student.student_id);
+                                  setHoveredCol(subj.subject_id);
+                                }}
+                                onMouseLeave={() => setHoveredCol(null)}
+                                className={`p-3 text-center border-l border-gray-100 transition-colors duration-150 ${cellBgClass}`}
                               >
-                                {isAbsent ? "ABS" : "P"}
-                              </button>
+                                <span className="inline-block px-3 py-1.5 rounded-lg bg-gray-100 text-gray-400 text-xs font-semibold border border-gray-200 cursor-not-allowed select-none">
+                                  N/A
+                                </span>
+                              </td>
+                            );
+                          }
 
-                              {/* Obtained Score Input */}
-                              <input
-                                type="number"
-                                disabled={isAbsent}
-                                placeholder={isAbsent ? "ABS" : "0"}
-                                min="0"
-                                max={maxTotal}
-                                value={isAbsent ? "" : currentCell.obtained_marks}
-                                onChange={(e) =>
-                                  handleScoreChange(
-                                    student.student_id,
-                                    subj.subject_id,
-                                    e.target.value
-                                  )
-                                }
-                                className={`w-20 border rounded-lg p-1.5 text-center font-semibold text-sm outline-none transition-all ${
-                                  isAbsent
-                                    ? "bg-gray-100 text-gray-400 border-gray-200"
-                                    : "bg-white text-[var(--quinary)] border-gray-300 focus:border-[var(--primary)]"
-                                }`}
-                              />
+                          const cellKey = `${student.student_id}_${subj.subject_id}`;
+                          const currentCell = scoresInput[cellKey] || {
+                            obtained_marks: "",
+                            status: "present",
+                          };
+                          const isAbsent = currentCell.status === "absent";
+                          const maxTotal = subjectTotals[subj.subject_id] || globalTotalMarks;
 
-                              <span className="text-gray-400 text-xs font-medium">/</span>
+                          return (
+                            <td
+                              key={subj.subject_id}
+                              onMouseEnter={() => {
+                                setHoveredRow(student.student_id);
+                                setHoveredCol(subj.subject_id);
+                              }}
+                              onMouseLeave={() => setHoveredCol(null)}
+                              className={`p-3 text-center border-l border-gray-100 transition-colors duration-150 ${cellBgClass} ${
+                                cellActive ? "ring-2 ring-inset ring-[var(--primary)]/40" : ""
+                              }`}
+                            >
+                              <div className="flex items-center justify-center gap-2">
+                                {/* Attendance Status Toggle Button */}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    toggleAttendanceStatus(student.student_id, subj.subject_id);
+                                    setActiveCellFor(student.student_id, subj.subject_id);
+                                  }}
+                                  title={isAbsent ? "Mark Present" : "Mark Absent"}
+                                  className={`px-2 py-1 rounded-lg border text-xs font-bold transition-colors ${
+                                    isAbsent
+                                      ? "bg-red-50 border-red-200 text-red-600"
+                                      : "bg-emerald-50 border-emerald-200 text-emerald-600"
+                                  }`}
+                                >
+                                  {isAbsent ? "ABS" : "P"}
+                                </button>
 
-                              {/* Static Display of Subject's Uniform Total Marks */}
-                              <span className="text-xs font-bold text-gray-500 w-8 text-left">
-                                {maxTotal}
-                              </span>
-                            </div>
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))
+                                {/* Obtained Score Input */}
+                                <input
+                                  type="number"
+                                  disabled={isAbsent}
+                                  placeholder={isAbsent ? "ABS" : "0"}
+                                  min="0"
+                                  max={maxTotal}
+                                  value={isAbsent ? "" : currentCell.obtained_marks}
+                                  onFocus={() => setActiveCellFor(student.student_id, subj.subject_id)}
+                                  onChange={(e) =>
+                                    handleScoreChange(
+                                      student.student_id,
+                                      subj.subject_id,
+                                      e.target.value
+                                    )
+                                  }
+                                  className={`w-20 border rounded-lg p-1.5 text-center font-semibold text-sm outline-none transition-all ${
+                                    isAbsent
+                                      ? "bg-gray-100 text-gray-400 border-gray-200"
+                                      : "bg-white text-[var(--quinary)] border-gray-300 focus:border-[var(--primary)]"
+                                  }`}
+                                />
+
+                                <span className="text-gray-400 text-xs font-medium">/</span>
+
+                                {/* Static Display of Subject's Uniform Total Marks */}
+                                <span className="text-xs font-bold text-gray-500 w-8 text-left">
+                                  {maxTotal}
+                                </span>
+                              </div>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })
                 ) : (
                   <tr>
                     <td colSpan={3 + visibleSubjects.length} className="p-10 text-center text-gray-400">
