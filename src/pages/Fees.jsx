@@ -386,11 +386,11 @@ const FeeAmountFields = ({ form, updateField }) => (
    ============================================================ */
 
 const EMPTY_STRUCTURE_FORM = {
-  tuition_fee: "",
-  exam_fee: "",
-  arrears_amount: "",
-  amount_within_due_date: "",
-  amount_after_due_date: "",
+  tuition_fee: 0,
+  exam_fee: 0,
+  arrears_amount: 0,
+  amount_within_due_date: 0 ,
+  amount_after_due_date: 0,
   due_day: "10",
 };
 
