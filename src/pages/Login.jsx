@@ -16,6 +16,12 @@ const Login = () => {
   const [settingsStatus, setSettingsStatus] = useState('loading');
   const [instituteSettings, setInstituteSettings] = useState(null);
 
+  //HWID
+const [hwid, setHwid] = useState('');
+const [hwidLoading, setHwidLoading] = useState(false);
+const [hwidError, setHwidError] = useState('');
+const [hwidCopied, setHwidCopied] = useState(false);
+
   const navigate = useNavigate();
   const login = useAuthStore((state) => state.login);
 
@@ -142,6 +148,58 @@ const Login = () => {
         'Unable to connect to the server. Please make sure the application is running.',
     };
   };
+
+const handleGetHwid = async () => {
+  setHwidLoading(true);
+  setHwidError('');
+  setHwidCopied(false);
+
+  try {
+    const res = await api.get('/license/hwid/');
+
+    // Supports:
+    // { hwid: "..." }
+    // { detail: "..." }
+    // or a plain string response
+    const returnedHwid =
+      res.data?.hwid ||
+      res.data?.HWID ||
+      res.data?.detail ||
+      (typeof res.data === 'string' ? res.data : '');
+
+    if (!returnedHwid) {
+      throw new Error('HWID was not returned by the server.');
+    }
+
+    setHwid(returnedHwid);
+  } catch (error) {
+    console.error('Failed to get machine HWID:', error);
+
+    setHwidError(
+      error?.response?.data?.detail ||
+      error?.response?.data?.error ||
+      error?.message ||
+      'Unable to retrieve the machine HWID.'
+    );
+  } finally {
+    setHwidLoading(false);
+  }
+};
+
+const handleCopyHwid = async () => {
+  if (!hwid) return;
+
+  try {
+    await navigator.clipboard.writeText(hwid);
+    setHwidCopied(true);
+
+    setTimeout(() => {
+      setHwidCopied(false);
+    }, 2000);
+  } catch (error) {
+    console.error('Failed to copy HWID:', error);
+  }
+};
 
   // =========================================================
   // Login
@@ -398,6 +456,91 @@ const Login = () => {
                 <span>Sign In to Portal</span>
               )}
             </button>
+
+              {/* =====================================================
+    Machine HWID
+====================================================== */}
+<div className="mt-5">
+
+  <button
+    type="button"
+    onClick={handleGetHwid}
+    disabled={hwidLoading}
+    className="w-full border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-50 text-gray-700 font-semibold py-3 px-4 rounded-xl transition-all duration-200 shadow-sm hover:shadow flex items-center justify-center gap-2 cursor-pointer text-sm"
+  >
+    {hwidLoading ? (
+      <>
+        <svg
+          className="animate-spin h-4 w-4"
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+        >
+          <circle
+            className="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            strokeWidth="4"
+          />
+
+          <path
+            className="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+          />
+        </svg>
+
+        <span>Getting Machine HWID...</span>
+      </>
+    ) : (
+      <>
+        <span>🔐</span>
+        <span>Get Machine HWID</span>
+      </>
+    )}
+  </button>
+
+  {hwidError && (
+    <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+      <p className="font-semibold">Unable to get HWID</p>
+      <p className="mt-1">{hwidError}</p>
+    </div>
+  )}
+
+  {hwid && (
+    <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50 p-4">
+
+      <div className="flex items-center justify-between gap-3 mb-2">
+        <span className="text-xs font-bold uppercase tracking-wider text-gray-500">
+          Machine HWID
+        </span>
+
+        <button
+          type="button"
+          onClick={handleCopyHwid}
+          className="text-xs font-bold text-[var(--primary)] hover:opacity-80 transition-opacity cursor-pointer"
+        >
+          {hwidCopied ? '✓ Copied' : 'Copy'}
+        </button>
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-lg px-3 py-2">
+        <code className="block text-xs sm:text-sm text-gray-700 break-all select-all">
+          {hwid}
+        </code>
+      </div>
+
+      <p className="mt-2 text-[10px] text-gray-400">
+        This is the HWID of the machine running the Student Portal server.
+      </p>
+
+    </div>
+  )}
+
+</div>
+
           </form>
         </div>
 
