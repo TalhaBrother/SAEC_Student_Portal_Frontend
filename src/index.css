@@ -1,9 +1,29 @@
 @import "tailwindcss";
 
 :root {
-  --primary: #0056D2;    
-  --secondary:#F4F7FC;  
-  --tertiary:#F9BC15; 
-  --quaternary:#FE4A65;
-  --quinary:#1A253C;
+  /* Brand */
+  --primary: #0056D2;
+  --secondary: #F4F7FC;
+  --tertiary: #F9BC15;
+  --quaternary: #FE4A65;
+  --quinary: #1A253C;
+
+  /* Neutral scale (labels, borders, placeholders, subtle backgrounds) */
+  --neutral-50: #F9FAFB;
+  --neutral-100: #F3F4F6;
+  --neutral-200: #E5E7EB;
+  --neutral-300: #D1D5DB;
+  --neutral-400: #9CA3AF;
+  --neutral-500: #6B7280;
+  --neutral-600: #4B5563;
+  --neutral-700: #374151;
+
+  /* Status colors */
+  --danger: #DC2626;   /* login/auth errors */
+  --warning: #D97706;  /* license errors */
+  --info: #EA580C;     /* server/connection errors */
+  --success: #059669;  /* WhatsApp / positive actions */
+
+  /* Surface (white panels/cards, overlay glass effects) */
+  --surface: #FFFFFF;
 }

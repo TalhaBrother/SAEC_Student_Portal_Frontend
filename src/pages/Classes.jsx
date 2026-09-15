@@ -176,8 +176,8 @@ const handleDelete = async (cls) => {
         text: `Delete "${className}"? This cannot be undone.`,
         icon: 'warning',
         showCancelButton: true,
-        confirmButtonColor: '#ef4444', // Tailwind red-500
-        cancelButtonColor: '#6b7280',  // Tailwind gray-500
+        confirmButtonColor: 'var(--danger)',
+        cancelButtonColor: 'var(--neutral-500)',
         confirmButtonText: 'Yes, delete it!',
         cancelButtonText: 'Cancel',
         reverseButtons: true,
@@ -213,7 +213,7 @@ const handleDelete = async (cls) => {
             title: 'Error!',
             text: errorMessage,
             icon: 'error',
-            confirmButtonColor: 'var(--primary, #3b82f6)',
+            confirmButtonColor: 'var(--primary, #0056D2)',
         });
 
         setMessage({
@@ -233,7 +233,7 @@ const handleDelete = async (cls) => {
                     <div className="text-3xl font-bold tracking-tight text-[var(--quinary)]">
                         Classes
                     </div>
-                    <p className="text-gray-500 text-sm mt-1">
+                    <p className="text-[var(--neutral-500)] text-sm mt-1">
                         Create, view, update, and delete classes, their sections, and groups.
                     </p>
                 </div>
@@ -246,20 +246,20 @@ const handleDelete = async (cls) => {
                             placeholder="Search class name..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl px-3.5 py-2 outline-none focus:border-[var(--primary)] text-sm transition-colors placeholder-gray-400 w-48 sm:w-64"
+                            className="bg-[var(--surface)] text-[var(--quinary)] border border-[var(--neutral-300)] rounded-xl px-3.5 py-2 outline-none focus:border-[var(--primary)] text-sm transition-colors placeholder-[var(--neutral-400)] w-48 sm:w-64"
                         />
                         <button
                             type="button"
                             onClick={fetchClasses}
                             disabled={fetching}
-                            className="bg-white hover:bg-gray-50 disabled:opacity-50 text-[var(--quinary)] font-medium py-2.5 px-4 rounded-xl border border-gray-300 transition-colors text-sm cursor-pointer"
+                            className="bg-[var(--surface)] hover:bg-[var(--neutral-50)] disabled:opacity-50 text-[var(--quinary)] font-medium py-2.5 px-4 rounded-xl border border-[var(--neutral-300)] transition-colors text-sm cursor-pointer"
                         >
                             {fetching ? "Refreshing..." : "Refresh"}
                         </button>
                         <button
                             type="button"
                             onClick={openCreateForm}
-                            className="bg-[var(--primary)] hover:bg-[var(--quinary)] text-white font-medium py-2.5 px-5 rounded-xl transition-all duration-300 shadow-md transform active:scale-[0.98] cursor-pointer"
+                            className="bg-[var(--primary)] hover:bg-[var(--quinary)] text-[var(--surface)] font-medium py-2.5 px-5 rounded-xl transition-all duration-300 shadow-md transform active:scale-[0.98] cursor-pointer"
                         >
                             + New Class
                         </button>
@@ -272,8 +272,8 @@ const handleDelete = async (cls) => {
                 <div
                     className={`p-3 rounded-xl text-sm mb-6 text-center border max-w-xl ${
                         message.type === "success"
-                            ? "bg-green-50 text-green-700 border-green-200"
-                            : "bg-red-50 text-red-700 border-red-200"
+                            ? "bg-[var(--success)]/5 text-[var(--success)] border-[var(--success)]/20"
+                            : "bg-[var(--danger)]/5 text-[var(--danger)] border-[var(--danger)]/20"
                     }`}
                 >
                     {message.text}
@@ -282,7 +282,7 @@ const handleDelete = async (cls) => {
 
             {mode === "form" ? (
                 /* ---------------- CREATE / EDIT FORM ---------------- */
-                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 max-w-xl">
+                <div className="bg-[var(--surface)] rounded-2xl border border-[var(--neutral-200)] shadow-sm p-6 max-w-xl">
                     <div className="text-lg font-semibold mb-4 text-[var(--quinary)]">
                         {formData.id ? "Update Class" : "Create New Class"}
                     </div>
@@ -290,7 +290,7 @@ const handleDelete = async (cls) => {
                     <form className="space-y-6" onSubmit={handleSubmit}>
                         {/* Class Name Input */}
                         <div className="flex flex-col w-full">
-                            <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">
+                            <label className="text-xs uppercase tracking-wider text-[var(--neutral-500)] font-semibold mb-1">
                                 Class Name
                             </label>
                             <input
@@ -301,13 +301,13 @@ const handleDelete = async (cls) => {
                                 }
                                 placeholder="e.g., 9"
                                 required
-                                className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm placeholder-gray-400"
+                                className="bg-[var(--surface)] text-[var(--quinary)] border border-[var(--neutral-300)] rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm placeholder-[var(--neutral-400)]"
                             />
                         </div>
 
                         {/* Board Selector Dropdown */}
                         <div className="flex flex-col w-full">
-                            <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">
+                            <label className="text-xs uppercase tracking-wider text-[var(--neutral-500)] font-semibold mb-1">
                                 Board
                             </label>
                             <select
@@ -316,7 +316,7 @@ const handleDelete = async (cls) => {
                                     setFormData((prev) => ({ ...prev, board: e.target.value }))
                                 }
                                 required
-                                className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm cursor-pointer"
+                                className="bg-[var(--surface)] text-[var(--quinary)] border border-[var(--neutral-300)] rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm cursor-pointer"
                             >
                                 <option value="">Select Board</option>
                                 {BOARD_OPTIONS.map((opt) => (
@@ -330,7 +330,7 @@ const handleDelete = async (cls) => {
                         {/* Sections */}
                         <div className="flex flex-col w-full">
                             <div className="flex items-center justify-between mb-1">
-                                <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold">
+                                <label className="text-xs uppercase tracking-wider text-[var(--neutral-500)] font-semibold">
                                     Sections (Optional)
                                 </label>
                                 <button
@@ -341,7 +341,7 @@ const handleDelete = async (cls) => {
                                     + Add Section
                                 </button>
                             </div>
-                            <p className="text-gray-400 text-xs mb-3">
+                            <p className="text-[var(--neutral-400)] text-xs mb-3">
                                 e.g., A, B, C. Leave blank for classes that don't use sections.
                             </p>
 
@@ -355,13 +355,13 @@ const handleDelete = async (cls) => {
                                                 updateField("sections", index, e.target.value)
                                             }
                                             placeholder="e.g., A"
-                                            className="flex-1 bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm placeholder-gray-400"
+                                            className="flex-1 bg-[var(--surface)] text-[var(--quinary)] border border-[var(--neutral-300)] rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm placeholder-[var(--neutral-400)]"
                                         />
                                         {formData.sections.length > 1 && (
                                             <button
                                                 type="button"
                                                 onClick={() => removeField("sections", index)}
-                                                className="text-gray-400 hover:text-red-500 transition-colors px-2 py-2 cursor-pointer"
+                                                className="text-[var(--neutral-400)] hover:text-[var(--danger)] transition-colors px-2 py-2 cursor-pointer"
                                                 aria-label="Remove section"
                                             >
                                                 ✕
@@ -375,7 +375,7 @@ const handleDelete = async (cls) => {
                         {/* Groups / Specializations */}
                         <div className="flex flex-col w-full">
                             <div className="flex items-center justify-between mb-1">
-                                <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold">
+                                <label className="text-xs uppercase tracking-wider text-[var(--neutral-500)] font-semibold">
                                     Groups (Optional)
                                 </label>
                                 <button
@@ -386,7 +386,7 @@ const handleDelete = async (cls) => {
                                     + Add Group
                                 </button>
                             </div>
-                            <p className="text-gray-400 text-xs mb-3">
+                            <p className="text-[var(--neutral-400)] text-xs mb-3">
                                 e.g., Pre-Medical, Computer Science, Pre-Engineering. Leave blank if this
                                 class has no groups.
                             </p>
@@ -399,13 +399,13 @@ const handleDelete = async (cls) => {
                                             value={group}
                                             onChange={(e) => updateField("groups", index, e.target.value)}
                                             placeholder="e.g., Biology"
-                                            className="flex-1 bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm placeholder-gray-400"
+                                            className="flex-1 bg-[var(--surface)] text-[var(--quinary)] border border-[var(--neutral-300)] rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm placeholder-[var(--neutral-400)]"
                                         />
                                         {formData.groups.length > 1 && (
                                             <button
                                                 type="button"
                                                 onClick={() => removeField("groups", index)}
-                                                className="text-gray-400 hover:text-red-500 transition-colors px-2 py-2 cursor-pointer"
+                                                className="text-[var(--neutral-400)] hover:text-[var(--danger)] transition-colors px-2 py-2 cursor-pointer"
                                                 aria-label="Remove group"
                                             >
                                                 ✕
@@ -422,14 +422,14 @@ const handleDelete = async (cls) => {
                                 type="button"
                                 onClick={cancelForm}
                                 disabled={saving}
-                                className="bg-white hover:bg-gray-50 disabled:opacity-50 text-[var(--quinary)] font-medium py-3 px-6 rounded-xl border border-gray-300 transition-colors cursor-pointer"
+                                className="bg-[var(--surface)] hover:bg-[var(--neutral-50)] disabled:opacity-50 text-[var(--quinary)] font-medium py-3 px-6 rounded-xl border border-[var(--neutral-300)] transition-colors cursor-pointer"
                             >
                                 Cancel
                             </button>
                             <button
                                 type="submit"
                                 disabled={saving}
-                                className="bg-[var(--primary)] hover:bg-[var(--quinary)] disabled:opacity-50 text-white font-medium py-3 px-6 rounded-xl transition-all duration-300 shadow-md transform active:scale-[0.98] cursor-pointer"
+                                className="bg-[var(--primary)] hover:bg-[var(--quinary)] disabled:opacity-50 text-[var(--surface)] font-medium py-3 px-6 rounded-xl transition-all duration-300 shadow-md transform active:scale-[0.98] cursor-pointer"
                             >
                                 {saving
                                     ? formData.id
@@ -446,15 +446,15 @@ const handleDelete = async (cls) => {
                 /* ---------------- LIST / READ VIEW ---------------- */
                 <div className="max-w-4xl">
                     {fetching ? (
-                        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center text-gray-400 text-sm">
+                        <div className="bg-[var(--surface)] rounded-2xl border border-[var(--neutral-200)] shadow-sm p-8 text-center text-[var(--neutral-400)] text-sm">
                             Loading classes...
                         </div>
                     ) : classes.length === 0 ? (
-                        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center text-gray-400 text-sm">
+                        <div className="bg-[var(--surface)] rounded-2xl border border-[var(--neutral-200)] shadow-sm p-8 text-center text-[var(--neutral-400)] text-sm">
                             No classes yet. Click "+ New Class" to create your first one.
                         </div>
                     ) : filteredClasses.length === 0 ? (
-                        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center text-gray-400 text-sm">
+                        <div className="bg-[var(--surface)] rounded-2xl border border-[var(--neutral-200)] shadow-sm p-8 text-center text-[var(--neutral-400)] text-sm">
                             No classes matching "{searchQuery}".
                         </div>
                     ) : (
@@ -462,7 +462,7 @@ const handleDelete = async (cls) => {
                             {filteredClasses.map((cls) => (
                                 <div
                                     key={cls.id}
-                                    className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5"
+                                    className="bg-[var(--surface)] rounded-2xl border border-[var(--neutral-200)] shadow-sm p-5"
                                 >
                                     <div className="flex items-start justify-between gap-4 flex-wrap">
                                         <div>
@@ -470,14 +470,14 @@ const handleDelete = async (cls) => {
                                                 <span className="text-lg font-semibold text-[var(--quinary)]">
                                                     {cls.name}
                                                 </span>
-                                                <span className="text-xs font-medium bg-[var(--secondary)] text-[var(--quinary)] px-2.5 py-1 rounded-full border border-gray-200">
+                                                <span className="text-xs font-medium bg-[var(--secondary)] text-[var(--quinary)] px-2.5 py-1 rounded-full border border-[var(--neutral-200)]">
                                                     {boardLabel(cls.board)}
                                                 </span>
                                             </div>
 
                                             {/* Sections */}
                                             <div className="mt-3">
-                                                <span className="text-xs uppercase tracking-wider text-gray-400 font-semibold mr-2">
+                                                <span className="text-xs uppercase tracking-wider text-[var(--neutral-400)] font-semibold mr-2">
                                                     Sections:
                                                 </span>
                                                 {cls.sections?.length ? (
@@ -485,20 +485,20 @@ const handleDelete = async (cls) => {
                                                         {cls.sections.map((s) => (
                                                             <span
                                                                 key={s.id}
-                                                                className="text-xs bg-gray-50 text-[var(--quinary)] px-2 py-0.5 rounded-md border border-gray-200"
+                                                                className="text-xs bg-[var(--neutral-50)] text-[var(--quinary)] px-2 py-0.5 rounded-md border border-[var(--neutral-200)]"
                                                             >
                                                                 {s.name}
                                                             </span>
                                                         ))}
                                                     </span>
                                                 ) : (
-                                                    <span className="text-xs text-gray-400">None</span>
+                                                    <span className="text-xs text-[var(--neutral-400)]">None</span>
                                                 )}
                                             </div>
 
                                             {/* Groups */}
                                             <div className="mt-1.5">
-                                                <span className="text-xs uppercase tracking-wider text-gray-400 font-semibold mr-2">
+                                                <span className="text-xs uppercase tracking-wider text-[var(--neutral-400)] font-semibold mr-2">
                                                     Groups:
                                                 </span>
                                                 {cls.groups?.length ? (
@@ -506,14 +506,14 @@ const handleDelete = async (cls) => {
                                                         {cls.groups.map((g) => (
                                                             <span
                                                                 key={g.id}
-                                                                className="text-xs bg-gray-50 text-[var(--quinary)] px-2 py-0.5 rounded-md border border-gray-200"
+                                                                className="text-xs bg-[var(--neutral-50)] text-[var(--quinary)] px-2 py-0.5 rounded-md border border-[var(--neutral-200)]"
                                                             >
                                                                 {g.name}
                                                             </span>
                                                         ))}
                                                     </span>
                                                 ) : (
-                                                    <span className="text-xs text-gray-400">None</span>
+                                                    <span className="text-xs text-[var(--neutral-400)]">None</span>
                                                 )}
                                             </div>
                                         </div>
@@ -531,7 +531,7 @@ const handleDelete = async (cls) => {
                                                 type="button"
                                                 onClick={() => handleDelete(cls)}
                                                 disabled={deletingId === cls.id}
-                                                className="text-sm font-medium text-red-500 hover:text-red-600 disabled:opacity-50 cursor-pointer px-2 py-1"
+                                                className="text-sm font-medium text-[var(--danger)] hover:text-[var(--danger)] disabled:opacity-50 cursor-pointer px-2 py-1"
                                             >
                                                 {deletingId === cls.id ? "Deleting..." : "Delete"}
                                             </button>
