@@ -348,12 +348,12 @@ const handleCopyHwid = async () => {
                   Password
                 </label>
 
-                <a
+                {/* <a
                   href="#forgot"
                   className="text-xs font-semibold text-[var(--primary)] hover:opacity-80 transition-opacity"
                 >
                   Forgot Password?
-                </a>
+                </a> */}
               </div>
 
               <div className="relative flex items-center">

@@ -26,4 +26,53 @@
 
   /* Surface (white panels/cards, overlay glass effects) */
   --surface: #FFFFFF;
+
+  /* Extra accents (decorative badges/actions that don't fit the core
+     brand/status palette — e.g. group badges, secondary export actions,
+     the teal report-card preview that mirrors the backend PDF generator) */
+  --accent-purple: #9333EA;
+  --accent-sky: #0284C7;
+  --accent-indigo: #4F46E5;
+  --accent-teal-dark: #0f5c5c;
+  --accent-teal: #17a2a2;
+  --accent-teal-light: #eaf6f6;
+}
+
+/*
+  Tailwind v4 theme registration.
+  Every entry below is generated FROM the variables in :root (never a
+  literal value), so utilities like `bg-primary`, `text-neutral-500`,
+  `border-danger/20`, `bg-accent-purple` etc. all stay dynamic — change
+  a value in :root above and every component using these classes
+  repaints automatically, with zero JSX edits needed.
+*/
+@theme inline {
+  --color-primary: var(--primary);
+  --color-secondary: var(--secondary);
+  --color-tertiary: var(--tertiary);
+  --color-quaternary: var(--quaternary);
+  --color-quinary: var(--quinary);
+
+  --color-neutral-50: var(--neutral-50);
+  --color-neutral-100: var(--neutral-100);
+  --color-neutral-200: var(--neutral-200);
+  --color-neutral-300: var(--neutral-300);
+  --color-neutral-400: var(--neutral-400);
+  --color-neutral-500: var(--neutral-500);
+  --color-neutral-600: var(--neutral-600);
+  --color-neutral-700: var(--neutral-700);
+
+  --color-danger: var(--danger);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+  --color-success: var(--success);
+
+  --color-surface: var(--surface);
+
+  --color-accent-purple: var(--accent-purple);
+  --color-accent-sky: var(--accent-sky);
+  --color-accent-indigo: var(--accent-indigo);
+  --color-accent-teal-dark: var(--accent-teal-dark);
+  --color-accent-teal: var(--accent-teal);
+  --color-accent-teal-light: var(--accent-teal-light);
 }

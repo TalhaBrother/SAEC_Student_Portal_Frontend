@@ -300,9 +300,9 @@ const Marks = () => {
         title: "Success!",
         text: `Marks synchronized! (${res.data.created || 0} created, ${res.data.updated || 0} updated)`,
         icon: "success",
-        confirmButtonColor: "#0056D2",
-        background: "#F4F7FC",
-        color: "#1A253C",
+        confirmButtonColor: "var(--primary)",
+        background: "var(--secondary)",
+        color: "var(--quinary)",
       });
 
       loadMarksheet();
@@ -427,14 +427,14 @@ const Marks = () => {
   const effectiveCol = hoveredCol ?? activeCell.subjectId;
 
   return (
-    <div className="p-6 bg-[var(--secondary)] text-[var(--quinary)] min-h-screen font-sans">
+    <div className="p-6 bg-secondary text-quinary min-h-screen font-sans">
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-[var(--quinary)]">
+          <h1 className="text-3xl font-bold tracking-tight text-quinary">
             Marksheet & Grade Management
           </h1>
-          <p className="text-gray-500 text-sm mt-1">
+          <p className="text-neutral-500 text-sm mt-1">
             Bulk enter assessment marks, manage attendance statuses, and update student performance sheets.
           </p>
         </div>
@@ -443,7 +443,7 @@ const Marks = () => {
           <button
             onClick={handleSaveBulkMarks}
             disabled={loading || fetchingSheet}
-            className="bg-[var(--primary)] hover:bg-[var(--quinary)] text-white font-semibold px-6 py-3 rounded-xl transition-all duration-300 shadow-md transform active:scale-[0.98] disabled:opacity-50 text-sm"
+            className="bg-primary hover:bg-quinary text-white font-semibold px-6 py-3 rounded-xl transition-all duration-300 shadow-md transform active:scale-[0.98] disabled:opacity-50 text-sm"
           >
             {loading ? "Saving Changes..." : "Save Sheet Records"}
           </button>
@@ -451,12 +451,12 @@ const Marks = () => {
       </div>
 
       {/* Filter & Selector Bar */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 mb-6 space-y-4">
+      <div className="bg-surface rounded-2xl border border-neutral-200 shadow-sm p-5 mb-6 space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Class Select */}
           <div className="flex flex-col">
-            <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">
-              Class <span className="text-red-500">*</span>
+            <label className="text-xs uppercase tracking-wider text-neutral-500 font-semibold mb-1">
+              Class <span className="text-danger">*</span>
             </label>
             <select
               value={selectedClass}
@@ -464,7 +464,7 @@ const Marks = () => {
                 setSelectedClass(e.target.value);
                 setSelectedTest("");
               }}
-              className="bg-[var(--secondary)] text-[var(--quinary)] border border-gray-300 rounded-xl p-2.5 outline-none focus:border-[var(--primary)] text-sm cursor-pointer font-medium"
+              className="bg-secondary text-quinary border border-neutral-300 rounded-xl p-2.5 outline-none focus:border-primary text-sm cursor-pointer font-medium"
             >
               <option value="">Choose Target Class</option>
               {classes.map((cls) => (
@@ -477,14 +477,14 @@ const Marks = () => {
 
           {/* Test Select */}
           <div className="flex flex-col">
-            <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">
-              Test / Assessment <span className="text-red-500">*</span>
+            <label className="text-xs uppercase tracking-wider text-neutral-500 font-semibold mb-1">
+              Test / Assessment <span className="text-danger">*</span>
             </label>
             <select
               value={selectedTest}
               onChange={(e) => setSelectedTest(e.target.value)}
               disabled={!selectedClass}
-              className="bg-[var(--secondary)] text-[var(--quinary)] border border-gray-300 rounded-xl p-2.5 outline-none focus:border-[var(--primary)] text-sm cursor-pointer disabled:opacity-50 font-medium"
+              className="bg-secondary text-quinary border border-neutral-300 rounded-xl p-2.5 outline-none focus:border-primary text-sm cursor-pointer disabled:opacity-50 font-medium"
             >
               <option value="">Choose Assessment</option>
               {filteredTestOptions.map((t) => (
@@ -497,7 +497,7 @@ const Marks = () => {
 
           {/* Global Default Total Marks */}
           <div className="flex flex-col">
-            <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">
+            <label className="text-xs uppercase tracking-wider text-neutral-500 font-semibold mb-1">
               Set All Total Marks
             </label>
             <input
@@ -505,14 +505,14 @@ const Marks = () => {
               min="1"
               value={globalTotalMarks}
               onChange={(e) => handleGlobalTotalChange(e.target.value)}
-              className="bg-[var(--secondary)] text-[var(--quinary)] border border-gray-300 rounded-xl p-2.5 outline-none focus:border-[var(--primary)] text-sm font-semibold text-center"
+              className="bg-secondary text-quinary border border-neutral-300 rounded-xl p-2.5 outline-none focus:border-primary text-sm font-semibold text-center"
               placeholder="e.g. 100"
             />
           </div>
 
           {/* Search Input */}
           <div className="flex flex-col">
-            <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">
+            <label className="text-xs uppercase tracking-wider text-neutral-500 font-semibold mb-1">
               Search Student / GR
             </label>
             <input
@@ -520,19 +520,19 @@ const Marks = () => {
               placeholder="Search Name or GR..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-[var(--secondary)] text-[var(--quinary)] px-3 py-2.5 border border-gray-300 rounded-xl outline-none focus:border-[var(--primary)] text-sm"
+              className="w-full bg-secondary text-quinary px-3 py-2.5 border border-neutral-300 rounded-xl outline-none focus:border-primary text-sm"
             />
           </div>
         </div>
 
         {/* Extended Criteria Filters */}
-        <div className="pt-3 border-t border-gray-100 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div className="pt-3 border-t border-neutral-100 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           <div>
             <select
               value={selectedGroup}
               onChange={(e) => setSelectedGroup(e.target.value)}
               disabled={!selectedClass || groupsLoading}
-              className="w-full bg-white border border-gray-200 rounded-lg p-2 text-xs text-gray-700 outline-none focus:border-[var(--primary)]"
+              className="w-full bg-surface border border-neutral-200 rounded-lg p-2 text-xs text-neutral-700 outline-none focus:border-primary"
             >
               <option value="">All Groups</option>
               {groups.map((g) => (
@@ -548,7 +548,7 @@ const Marks = () => {
               value={selectedSection}
               onChange={(e) => setSelectedSection(e.target.value)}
               disabled={!selectedClass}
-              className="w-full bg-white border border-gray-200 rounded-lg p-2 text-xs text-gray-700 outline-none focus:border-[var(--primary)]"
+              className="w-full bg-surface border border-neutral-200 rounded-lg p-2 text-xs text-neutral-700 outline-none focus:border-primary"
             >
               <option value="">All Sections</option>
               {sections.map((s) => (
@@ -564,7 +564,7 @@ const Marks = () => {
               value={selectedSubject}
               onChange={(e) => setSelectedSubject(e.target.value)}
               disabled={!selectedClass}
-              className="w-full bg-white border border-gray-200 rounded-lg p-2 text-xs text-gray-700 outline-none focus:border-[var(--primary)]"
+              className="w-full bg-surface border border-neutral-200 rounded-lg p-2 text-xs text-neutral-700 outline-none focus:border-primary"
             >
               <option value="">All Subjects</option>
               {subjects
@@ -585,7 +585,7 @@ const Marks = () => {
             <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
-              className="w-full bg-white border border-gray-200 rounded-lg p-2 text-xs text-gray-700 outline-none focus:border-[var(--primary)]"
+              className="w-full bg-surface border border-neutral-200 rounded-lg p-2 text-xs text-neutral-700 outline-none focus:border-primary"
             >
               <option value="">All Statuses</option>
               <option value="present">Present Only</option>
@@ -602,7 +602,7 @@ const Marks = () => {
                 setSelectedStatus("");
                 setSearchQuery("");
               }}
-              className="w-full text-xs font-semibold text-gray-600 hover:text-[var(--primary)] bg-gray-50 hover:bg-gray-100 p-2 rounded-lg transition-colors border border-gray-200"
+              className="w-full text-xs font-semibold text-neutral-600 hover:text-primary bg-neutral-50 hover:bg-neutral-100 p-2 rounded-lg transition-colors border border-neutral-200"
             >
               Clear Filters
             </button>
@@ -612,17 +612,17 @@ const Marks = () => {
 
       {/* Main Bulk Sheet Viewport */}
       {fetchingSheet ? (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-12 text-center">
-          <p className="text-gray-500 text-sm font-medium animate-pulse">Loading class marksheet matrix...</p>
+        <div className="bg-surface rounded-2xl border border-neutral-200 shadow-sm p-12 text-center">
+          <p className="text-neutral-500 text-sm font-medium animate-pulse">Loading class marksheet matrix...</p>
         </div>
       ) : selectedClass && selectedTest && marksheetData ? (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="bg-surface rounded-2xl border border-neutral-200 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-[var(--secondary)] border-b border-gray-200 text-xs font-bold uppercase tracking-wider text-gray-600">
-                  <th className="p-4 sticky left-0 bg-[var(--secondary)] z-10 w-16">GR #</th>
-                  <th className="p-4 sticky left-16 bg-[var(--secondary)] z-10 min-w-[200px]">Student Name</th>
+                <tr className="bg-secondary border-b border-neutral-200 text-xs font-bold uppercase tracking-wider text-neutral-600">
+                  <th className="p-4 sticky left-0 bg-secondary z-10 w-16">GR #</th>
+                  <th className="p-4 sticky left-16 bg-secondary z-10 min-w-[200px]">Student Name</th>
                   <th className="p-4">Sec / Group</th>
                   
                   {/* Column Header per Subject with dynamic Total Marks control */}
@@ -633,24 +633,24 @@ const Marks = () => {
                         key={subj.subject_id}
                         onMouseEnter={() => setHoveredCol(subj.subject_id)}
                         onMouseLeave={() => setHoveredCol(null)}
-                        className={`p-4 text-center min-w-[170px] border-l border-gray-200 transition-colors duration-150 ${
+                        className={`p-4 text-center min-w-[170px] border-l border-neutral-200 transition-colors duration-150 ${
                           colActive
-                            ? "bg-blue-100 shadow-[inset_0_-2px_0_0_var(--primary)]"
-                            : "bg-blue-50"
+                            ? "bg-primary/10 shadow-[inset_0_-2px_0_0_var(--primary)]"
+                            : "bg-primary/5"
                         }`}
                       >
-                        <div className={`font-bold mb-1.5 ${colActive ? "text-[var(--primary)]" : "text-[var(--quinary)]"}`}>
+                        <div className={`font-bold mb-1.5 ${colActive ? "text-primary" : "text-quinary"}`}>
                           {subj.subject_name}
                         </div>
 
                         <div className="flex items-center justify-center gap-1.5 font-normal normal-case">
-                          <span className="text-[11px] text-gray-500">Total:</span>
+                          <span className="text-[11px] text-neutral-500">Total:</span>
                           <input
                             type="number"
                             min="1"
                             value={subjectTotals[subj.subject_id] ?? globalTotalMarks}
                             onChange={(e) => handleSubjectTotalChange(subj.subject_id, e.target.value)}
-                            className="w-16 bg-white border border-gray-300 rounded-md py-0.5 px-1.5 text-center text-xs font-bold text-[var(--primary)] shadow-sm outline-none focus:border-[var(--primary)]"
+                            className="w-16 bg-surface border border-neutral-300 rounded-md py-0.5 px-1.5 text-center text-xs font-bold text-primary shadow-sm outline-none focus:border-primary"
                           />
                         </div>
                       </th>
@@ -659,16 +659,16 @@ const Marks = () => {
                 </tr>
               </thead>
               
-              <tbody className="divide-y divide-gray-100 text-sm">
+              <tbody className="divide-y divide-neutral-100 text-sm">
                 {filteredStudentsGrid.length > 0 ? (
                   filteredStudentsGrid.map((student, rowIdx) => {
                     const rowActive = effectiveRow === student.student_id;
                     // Zebra banding for rows that aren't currently active
                     const rowBgClass = rowActive
-                      ? "bg-blue-50"
+                      ? "bg-primary/5"
                       : rowIdx % 2 === 1
-                      ? "bg-gray-50"
-                      : "bg-white";
+                      ? "bg-neutral-50"
+                      : "bg-surface";
 
                     return (
                       <tr
@@ -682,7 +682,7 @@ const Marks = () => {
                         {/* GR Number */}
                         <td
                           onMouseEnter={() => setHoveredRow(student.student_id)}
-                          className={`p-4 font-semibold text-gray-500 sticky left-0 z-10 border-r border-gray-100 transition-colors duration-150 ${rowBgClass}`}
+                          className={`p-4 font-semibold text-neutral-500 sticky left-0 z-10 border-r border-neutral-100 transition-colors duration-150 ${rowBgClass}`}
                         >
                           {student.student_gr}
                         </td>
@@ -690,7 +690,7 @@ const Marks = () => {
                         {/* Student Name */}
                         <td
                           onMouseEnter={() => setHoveredRow(student.student_id)}
-                          className={`p-4 font-bold text-[var(--quinary)] sticky left-16 z-10 border-r border-gray-100 transition-colors duration-150 ${rowBgClass}`}
+                          className={`p-4 font-bold text-quinary sticky left-16 z-10 border-r border-neutral-100 transition-colors duration-150 ${rowBgClass}`}
                         >
                           {student.student_name}
                         </td>
@@ -698,12 +698,12 @@ const Marks = () => {
                         {/* Section & Group Tags */}
                         <td
                           onMouseEnter={() => setHoveredRow(student.student_id)}
-                          className={`p-4 text-xs text-gray-500 whitespace-nowrap transition-colors duration-150 ${rowBgClass}`}
+                          className={`p-4 text-xs text-neutral-500 whitespace-nowrap transition-colors duration-150 ${rowBgClass}`}
                         >
-                          <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded font-medium mr-1">
+                          <span className="bg-neutral-100 text-neutral-700 px-2 py-0.5 rounded font-medium mr-1">
                             {student.section || "N/A"}
                           </span>
-                          <span className="bg-blue-50 text-[var(--primary)] px-2 py-0.5 rounded font-medium">
+                          <span className="bg-primary/5 text-primary px-2 py-0.5 rounded font-medium">
                             {student.group || "Gen"}
                           </span>
                         </td>
@@ -724,7 +724,7 @@ const Marks = () => {
                           // Intersection (row + col both active) gets the strongest tint.
                           let cellBgClass = rowBgClass;
                           if (colActive) {
-                            cellBgClass = cellActive ? "bg-indigo-100" : "bg-indigo-50";
+                            cellBgClass = cellActive ? "bg-accent-indigo/10" : "bg-accent-indigo/10";
                           }
 
                           // Ineligible cell: greyed-out, disabled "N/A" placeholder.
@@ -737,9 +737,9 @@ const Marks = () => {
                                   setHoveredCol(subj.subject_id);
                                 }}
                                 onMouseLeave={() => setHoveredCol(null)}
-                                className={`p-3 text-center border-l border-gray-100 transition-colors duration-150 ${cellBgClass}`}
+                                className={`p-3 text-center border-l border-neutral-100 transition-colors duration-150 ${cellBgClass}`}
                               >
-                                <span className="inline-block px-3 py-1.5 rounded-lg bg-gray-100 text-gray-400 text-xs font-semibold border border-gray-200 cursor-not-allowed select-none">
+                                <span className="inline-block px-3 py-1.5 rounded-lg bg-neutral-100 text-neutral-400 text-xs font-semibold border border-neutral-200 cursor-not-allowed select-none">
                                   N/A
                                 </span>
                               </td>
@@ -762,8 +762,8 @@ const Marks = () => {
                                 setHoveredCol(subj.subject_id);
                               }}
                               onMouseLeave={() => setHoveredCol(null)}
-                              className={`p-3 text-center border-l border-gray-100 transition-colors duration-150 ${cellBgClass} ${
-                                cellActive ? "ring-2 ring-inset ring-[var(--primary)]/40" : ""
+                              className={`p-3 text-center border-l border-neutral-100 transition-colors duration-150 ${cellBgClass} ${
+                                cellActive ? "ring-2 ring-inset ring-primary/40" : ""
                               }`}
                             >
                               <div className="flex items-center justify-center gap-2">
@@ -777,8 +777,8 @@ const Marks = () => {
                                   title={isAbsent ? "Mark Present" : "Mark Absent"}
                                   className={`px-2 py-1 rounded-lg border text-xs font-bold transition-colors ${
                                     isAbsent
-                                      ? "bg-red-50 border-red-200 text-red-600"
-                                      : "bg-emerald-50 border-emerald-200 text-emerald-600"
+                                      ? "bg-danger/10 border-danger/20 text-danger"
+                                      : "bg-success/10 border-success/20 text-success"
                                   }`}
                                 >
                                   {isAbsent ? "ABS" : "P"}
@@ -802,15 +802,15 @@ const Marks = () => {
                                   }
                                   className={`w-20 border rounded-lg p-1.5 text-center font-semibold text-sm outline-none transition-all ${
                                     isAbsent
-                                      ? "bg-gray-100 text-gray-400 border-gray-200"
-                                      : "bg-white text-[var(--quinary)] border-gray-300 focus:border-[var(--primary)]"
+                                      ? "bg-neutral-100 text-neutral-400 border-neutral-200"
+                                      : "bg-surface text-quinary border-neutral-300 focus:border-primary"
                                   }`}
                                 />
 
-                                <span className="text-gray-400 text-xs font-medium">/</span>
+                                <span className="text-neutral-400 text-xs font-medium">/</span>
 
                                 {/* Static Display of Subject's Uniform Total Marks */}
-                                <span className="text-xs font-bold text-gray-500 w-8 text-left">
+                                <span className="text-xs font-bold text-neutral-500 w-8 text-left">
                                   {maxTotal}
                                 </span>
                               </div>
@@ -822,7 +822,7 @@ const Marks = () => {
                   })
                 ) : (
                   <tr>
-                    <td colSpan={3 + visibleSubjects.length} className="p-10 text-center text-gray-400">
+                    <td colSpan={3 + visibleSubjects.length} className="p-10 text-center text-neutral-400">
                       No matching student entries found for current query filter.
                     </td>
                   </tr>
@@ -832,24 +832,24 @@ const Marks = () => {
           </div>
 
           {/* Table Footer Actions */}
-          <div className="p-4 bg-[var(--secondary)] border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-gray-500">
+          <div className="p-4 bg-secondary border-t border-neutral-200 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-neutral-500">
             <div>
-              Showing <span className="font-bold text-[var(--quinary)]">{filteredStudentsGrid.length}</span> students across{" "}
-              <span className="font-bold text-[var(--quinary)]">{visibleSubjects.length}</span> subjects.
+              Showing <span className="font-bold text-quinary">{filteredStudentsGrid.length}</span> students across{" "}
+              <span className="font-bold text-quinary">{visibleSubjects.length}</span> subjects.
             </div>
             <button
               onClick={handleSaveBulkMarks}
               disabled={loading}
-              className="bg-[var(--primary)] hover:bg-[var(--quinary)] text-white px-5 py-2.5 rounded-xl font-medium transition-all shadow-sm disabled:opacity-50"
+              className="bg-primary hover:bg-quinary text-white px-5 py-2.5 rounded-xl font-medium transition-all shadow-sm disabled:opacity-50"
             >
               Save Sheet Records
             </button>
           </div>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-16 text-center">
-          <h3 className="text-lg font-bold text-[var(--quinary)]">No Class & Assessment Selected</h3>
-          <p className="text-gray-400 text-sm mt-1 max-w-md mx-auto">
+        <div className="bg-surface rounded-2xl border border-neutral-200 shadow-sm p-16 text-center">
+          <h3 className="text-lg font-bold text-quinary">No Class & Assessment Selected</h3>
+          <p className="text-neutral-400 text-sm mt-1 max-w-md mx-auto">
             Please select a Class and an Assessment Test from the top control panel to initialize the student marksheet matrix.
           </p>
         </div>

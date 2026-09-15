@@ -448,7 +448,7 @@ const Examination = () => {
                 icon: "warning",
                 title: "Select a test",
                 text: "Please select an existing test first.",
-                confirmButtonColor: "#dc2626",
+                confirmButtonColor: "var(--danger)",
             });
         }
 
@@ -459,7 +459,7 @@ const Examination = () => {
                     icon: "warning",
                     title: "Select a class",
                     text: "Please select one of the classes assigned to this test.",
-                    confirmButtonColor: "#dc2626",
+                    confirmButtonColor: "var(--danger)",
                 });
             }
 
@@ -468,7 +468,7 @@ const Examination = () => {
                     icon: "warning",
                     title: "Class not assigned",
                     text: "The selected class is not assigned to this test.",
-                    confirmButtonColor: "#dc2626",
+                    confirmButtonColor: "var(--danger)",
                 });
             }
 
@@ -477,7 +477,7 @@ const Examination = () => {
                     icon: "warning",
                     title: "No subjects",
                     text: "No subjects were found for the selected class.",
-                    confirmButtonColor: "#dc2626",
+                    confirmButtonColor: "var(--danger)",
                 });
             }
 
@@ -486,7 +486,7 @@ const Examination = () => {
                     icon: "warning",
                     title: "Incomplete timetable",
                     text: "Please complete the date, start time, and end time for every subject shown.",
-                    confirmButtonColor: "#dc2626",
+                    confirmButtonColor: "var(--danger)",
                 });
             }
 
@@ -528,7 +528,7 @@ const Examination = () => {
                         error,
                         "Failed to save test timetable. Please check the details and try again."
                     ),
-                    confirmButtonColor: "#dc2626",
+                    confirmButtonColor: "var(--danger)",
                 });
             } finally {
                 setSavingTest(false);
@@ -543,7 +543,7 @@ const Examination = () => {
                 icon: "warning",
                 title: "Select at least one class",
                 text: "Please select one or more classes assigned to this test.",
-                confirmButtonColor: "#dc2626",
+                confirmButtonColor: "var(--danger)",
             });
         }
 
@@ -555,7 +555,7 @@ const Examination = () => {
                 icon: "warning",
                 title: "Class not assigned",
                 text: "One or more selected classes are not assigned to this test.",
-                confirmButtonColor: "#dc2626",
+                confirmButtonColor: "var(--danger)",
             });
         }
 
@@ -564,7 +564,7 @@ const Examination = () => {
                 icon: "warning",
                 title: "Incomplete timetable",
                 text: "Please complete the date, start time, and end time for every subject in every selected class.",
-                confirmButtonColor: "#dc2626",
+                confirmButtonColor: "var(--danger)",
             });
         }
 
@@ -609,7 +609,7 @@ const Examination = () => {
                     error,
                     "Failed to create test timetables. Please check the details and try again."
                 ),
-                confirmButtonColor: "#dc2626",
+                confirmButtonColor: "var(--danger)",
             });
         } finally {
             setSavingTest(false);
@@ -630,7 +630,7 @@ const Examination = () => {
                 icon: "error",
                 title: "Could not delete test timetable",
                 text: extractErrorMessage(error, "Failed to delete test timetable. Please try again."),
-                confirmButtonColor: "#dc2626",
+                confirmButtonColor: "var(--danger)",
             });
         } finally {
             setDeletingTest(false);
@@ -918,7 +918,7 @@ const Examination = () => {
                 icon: "warning",
                 title: "Select a class",
                 text: "Please select a class first.",
-                confirmButtonColor: "#dc2626",
+                confirmButtonColor: "var(--danger)",
             });
             return;
         }
@@ -930,7 +930,7 @@ const Examination = () => {
                 icon: "warning",
                 title: "Nothing to save",
                 text: "Select at least one day and add a time slot for a subject.",
-                confirmButtonColor: "#dc2626",
+                confirmButtonColor: "var(--danger)",
             });
             return;
         }
@@ -985,7 +985,7 @@ const Examination = () => {
                 icon: "error",
                 title: "Could not save timetable",
                 text: errorText,
-                confirmButtonColor: "#dc2626",
+                confirmButtonColor: "var(--danger)",
             });
 
             // Intentionally NOT resetting selectedClassId / timetableData /
@@ -1020,7 +1020,7 @@ const Examination = () => {
                     error,
                     "Failed to delete timetable. Please try again."
                 ),
-                confirmButtonColor: "#dc2626",
+                confirmButtonColor: "var(--danger)",
             });
         } finally {
             setDeleting(false);
@@ -1065,7 +1065,7 @@ const Examination = () => {
                     error,
                     "Failed to download PDF. Please try again."
                 ),
-                confirmButtonColor: "#dc2626",
+                confirmButtonColor: "var(--danger)",
             });
         } finally {
             setDownloadingId(null);
@@ -1104,7 +1104,7 @@ const Examination = () => {
             icon: "error",
             title: "Download failed",
             text: message,
-            confirmButtonColor: "#dc2626",
+            confirmButtonColor: "var(--danger)",
         });
     } finally {
         setDownloadingAll(false);
@@ -1168,7 +1168,7 @@ const Examination = () => {
       icon: "error",
       title: "Download Failed",
       text: errorMessage,
-      confirmButtonColor: "#dc2626",
+      confirmButtonColor: "var(--danger)",
     });
   } finally {
     setDownloadingAllTestPdf(false);
@@ -1185,7 +1185,7 @@ const Examination = () => {
       icon: "warning",
       title: "Select a test",
       text: "Please select a test first.",
-      confirmButtonColor: "#dc2626",
+      confirmButtonColor: "var(--danger)",
     });
   }
 
@@ -1224,7 +1224,7 @@ const Examination = () => {
       icon: "error",
       title: "Download Failed",
       text: errorMessage,
-      confirmButtonColor: "#dc2626",
+      confirmButtonColor: "var(--danger)",
     });
   } finally {
     setDownloadingSelectedTestPdf(false);
@@ -1275,7 +1275,7 @@ const Examination = () => {
       icon: "error",
       title: "Download Failed",
       text: errorMessage,
-      confirmButtonColor: "#dc2626",
+      confirmButtonColor: "var(--danger)",
     });
   } finally {
     setDownloadingTestId(null);
@@ -1283,14 +1283,14 @@ const Examination = () => {
 };
 
     return (
-        <div className="p-6 bg-[var(--secondary)] text-[var(--quinary)] min-h-screen font-sans">
+        <div className="p-6 bg-secondary text-quinary min-h-screen font-sans">
             {/* Header */}
             <div className="flex items-start justify-between mb-6 flex-wrap gap-3">
                 <div>
-                    <div className="text-3xl font-bold tracking-tight text-[var(--quinary)]">
+                    <div className="text-3xl font-bold tracking-tight text-quinary">
                         {section === "class" ? "Class Timetable" : "Test Timetable"}
                     </div>
-                    <p className="text-gray-500 text-sm mt-1">
+                    <p className="text-neutral-500 text-sm mt-1">
                         {section === "class"
                             ? "Manage class timetables — search, filter, create, edit, delete, and export as PDF."
                             : "Manage test timetables — search, filter, create, edit, and delete."}
@@ -1299,13 +1299,13 @@ const Examination = () => {
             </div>
 
             {/* ================= SECTION SWITCHER ================= */}
-            <div className="flex items-center gap-2 mb-4 bg-white border border-gray-200 rounded-xl p-1 w-fit">
+            <div className="flex items-center gap-2 mb-4 bg-surface border border-neutral-200 rounded-xl p-1 w-fit">
                 <button
                     type="button"
                     onClick={() => setSection("class")}
                     className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors cursor-pointer ${section === "class"
-                        ? "bg-[var(--primary)] text-white"
-                        : "text-gray-500 hover:text-[var(--quinary)]"
+                        ? "bg-primary text-white"
+                        : "text-neutral-500 hover:text-quinary"
                         }`}
                 >
                     Class Timetable
@@ -1314,8 +1314,8 @@ const Examination = () => {
                     type="button"
                     onClick={() => setSection("test")}
                     className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors cursor-pointer ${section === "test"
-                        ? "bg-[var(--primary)] text-white"
-                        : "text-gray-500 hover:text-[var(--quinary)]"
+                        ? "bg-primary text-white"
+                        : "text-neutral-500 hover:text-quinary"
                         }`}
                 >
                     Test Timetable
@@ -1325,13 +1325,13 @@ const Examination = () => {
             {section === "class" && (
                 <>
                     {/* Tabs */}
-                    <div className="flex items-center gap-2 mb-6 border-b border-gray-200">
+                    <div className="flex items-center gap-2 mb-6 border-b border-neutral-200">
                         <button
                             type="button"
                             onClick={() => setActiveTab("list")}
                             className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors cursor-pointer ${activeTab === "list"
-                                ? "border-[var(--primary)] text-[var(--primary)]"
-                                : "border-transparent text-gray-500 hover:text-[var(--quinary)]"
+                                ? "border-primary text-primary"
+                                : "border-transparent text-neutral-500 hover:text-quinary"
                                 }`}
                         >
                             All Timetables
@@ -1340,8 +1340,8 @@ const Examination = () => {
                             type="button"
                             onClick={() => (activeTab === "form" ? null : startAddNew())}
                             className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors cursor-pointer ${activeTab === "form"
-                                ? "border-[var(--primary)] text-[var(--primary)]"
-                                : "border-transparent text-gray-500 hover:text-[var(--quinary)]"
+                                ? "border-primary text-primary"
+                                : "border-transparent text-neutral-500 hover:text-quinary"
                                 }`}
                         >
                             {editingId ? "Edit Timetable" : "Add New"}
@@ -1352,7 +1352,7 @@ const Examination = () => {
                     {activeTab === "list" && (
                         <div>
                             {listError && (
-                                <div className="p-3 rounded-xl text-sm mb-6 text-center border max-w-xl bg-red-50 text-red-700 border-red-200">
+                                <div className="p-3 rounded-xl text-sm mb-6 text-center border max-w-xl bg-danger/10 text-danger border-danger/20">
                                     {listError}
                                 </div>
                             )}
@@ -1365,13 +1365,13 @@ const Examination = () => {
                                         value={searchTerm}
                                         onChange={(e) => setSearchTerm(e.target.value)}
                                         placeholder="Search by class name..."
-                                        className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl px-4 py-2.5 outline-none focus:border-[var(--primary)] transition-colors text-sm w-64 placeholder-gray-400"
+                                        className="bg-surface text-quinary border border-neutral-300 rounded-xl px-4 py-2.5 outline-none focus:border-primary transition-colors text-sm w-64 placeholder-neutral-400"
                                     />
 
                                     <select
                                         value={filterClassId}
                                         onChange={(e) => setFilterClassId(e.target.value)}
-                                        className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl px-4 py-2.5 outline-none focus:border-[var(--primary)] transition-colors text-sm cursor-pointer"
+                                        className="bg-surface text-quinary border border-neutral-300 rounded-xl px-4 py-2.5 outline-none focus:border-primary transition-colors text-sm cursor-pointer"
                                     >
                                         <option value="">All Classes</option>
                                         {classes.map((cls) => (
@@ -1388,7 +1388,7 @@ const Examination = () => {
                                                 setSearchTerm("");
                                                 setFilterClassId("");
                                             }}
-                                            className="text-xs text-gray-500 hover:text-[var(--quinary)] underline cursor-pointer"
+                                            className="text-xs text-neutral-500 hover:text-quinary underline cursor-pointer"
                                         >
                                             Clear
                                         </button>
@@ -1400,7 +1400,7 @@ const Examination = () => {
                                         type="button"
                                         onClick={handleDownloadAllPDF}
                                         disabled={downloadingAll || timetables.length === 0}
-                                        className="bg-white hover:bg-gray-50 disabled:opacity-50 text-[var(--quinary)] font-medium py-2.5 px-4 rounded-xl border border-gray-300 transition-colors text-sm cursor-pointer"
+                                        className="bg-surface hover:bg-neutral-50 disabled:opacity-50 text-quinary font-medium py-2.5 px-4 rounded-xl border border-neutral-300 transition-colors text-sm cursor-pointer"
                                     >
                                         {downloadingAll ? "Preparing..." : "Download All (PDF)"}
                                     </button>
@@ -1409,7 +1409,7 @@ const Examination = () => {
                                         type="button"
                                         onClick={fetchTimetables}
                                         disabled={loadingList}
-                                        className="bg-white hover:bg-gray-50 disabled:opacity-50 text-[var(--quinary)] font-medium py-2.5 px-4 rounded-xl border border-gray-300 transition-colors text-sm cursor-pointer"
+                                        className="bg-surface hover:bg-neutral-50 disabled:opacity-50 text-quinary font-medium py-2.5 px-4 rounded-xl border border-neutral-300 transition-colors text-sm cursor-pointer"
                                     >
                                         {loadingList ? "Refreshing..." : "Refresh"}
                                     </button>
@@ -1417,7 +1417,7 @@ const Examination = () => {
                                     <button
                                         type="button"
                                         onClick={startAddNew}
-                                        className="bg-[var(--primary)] hover:bg-[var(--quinary)] text-white font-medium py-2.5 px-4 rounded-xl transition-colors text-sm cursor-pointer"
+                                        className="bg-primary hover:bg-quinary text-white font-medium py-2.5 px-4 rounded-xl transition-colors text-sm cursor-pointer"
                                     >
                                         + Add New Timetable
                                     </button>
@@ -1426,11 +1426,11 @@ const Examination = () => {
 
                             {/* List */}
                             {loadingList ? (
-                                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center text-gray-400 text-sm">
+                                <div className="bg-surface rounded-2xl border border-neutral-200 shadow-sm p-8 text-center text-neutral-400 text-sm">
                                     Loading timetables...
                                 </div>
                             ) : timetables.length === 0 ? (
-                                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center text-gray-400 text-sm">
+                                <div className="bg-surface rounded-2xl border border-neutral-200 shadow-sm p-8 text-center text-neutral-400 text-sm">
                                     {searchTerm || filterClassId
                                         ? "No timetables match your search/filter."
                                         : "No class timetables yet. Click \"Add New Timetable\" to create one."}
@@ -1452,14 +1452,14 @@ const Examination = () => {
                                         return (
                                             <div
                                                 key={timetable.id}
-                                                className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6"
+                                                className="bg-surface rounded-2xl border border-neutral-200 shadow-sm p-6"
                                             >
                                                 <div className="flex items-start justify-between flex-wrap gap-3">
                                                     <div>
-                                                        <div className="text-lg font-semibold text-[var(--quinary)]">
+                                                        <div className="text-lg font-semibold text-quinary">
                                                             {label}
                                                         </div>
-                                                        <div className="text-xs text-gray-400 mt-1">
+                                                        <div className="text-xs text-neutral-400 mt-1">
                                                             {entryCount} period{entryCount === 1 ? "" : "s"}
                                                             {timetable.updated_at
                                                                 ? ` • Updated ${new Date(
@@ -1473,7 +1473,7 @@ const Examination = () => {
                                                         <button
                                                             type="button"
                                                             onClick={() => toggleExpanded(timetable.id)}
-                                                            className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-300 text-[var(--quinary)] hover:bg-gray-50 transition-colors cursor-pointer"
+                                                            className="text-xs font-medium px-3 py-1.5 rounded-lg border border-neutral-300 text-quinary hover:bg-neutral-50 transition-colors cursor-pointer"
                                                         >
                                                             {isExpanded ? "Hide Entries" : "View Entries"}
                                                         </button>
@@ -1482,7 +1482,7 @@ const Examination = () => {
                                                             type="button"
                                                             onClick={() => handleDownloadPDF(timetable)}
                                                             disabled={downloadingId === timetable.id}
-                                                            className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-300 text-[var(--quinary)] hover:bg-gray-50 disabled:opacity-50 transition-colors cursor-pointer"
+                                                            className="text-xs font-medium px-3 py-1.5 rounded-lg border border-neutral-300 text-quinary hover:bg-neutral-50 disabled:opacity-50 transition-colors cursor-pointer"
                                                         >
                                                             {downloadingId === timetable.id
                                                                 ? "Downloading..."
@@ -1492,7 +1492,7 @@ const Examination = () => {
                                                         <button
                                                             type="button"
                                                             onClick={() => startEdit(timetable)}
-                                                            className="text-xs font-medium px-3 py-1.5 rounded-lg border border-[var(--primary)] text-[var(--primary)] hover:bg-[var(--primary)] hover:text-white transition-colors cursor-pointer"
+                                                            className="text-xs font-medium px-3 py-1.5 rounded-lg border border-primary text-primary hover:bg-primary hover:text-white transition-colors cursor-pointer"
                                                         >
                                                             Edit
                                                         </button>
@@ -1500,7 +1500,7 @@ const Examination = () => {
                                                         <button
                                                             type="button"
                                                             onClick={() => setDeleteTarget(timetable)}
-                                                            className="text-xs font-medium px-3 py-1.5 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                                                            className="text-xs font-medium px-3 py-1.5 rounded-lg border border-danger/40 text-danger hover:bg-danger/10 transition-colors cursor-pointer"
                                                         >
                                                             Delete
                                                         </button>
@@ -1508,12 +1508,12 @@ const Examination = () => {
                                                 </div>
 
                                                 {isExpanded && (
-                                                    <div className="mt-4 border-t border-gray-100 pt-4 space-y-3">
+                                                    <div className="mt-4 border-t border-neutral-100 pt-4 space-y-3">
                                                         {DAY_OPTIONS.filter(
                                                             (day) => entriesByDay[day.value]
                                                         ).map((day) => (
                                                             <div key={day.value}>
-                                                                <div className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-2">
+                                                                <div className="text-xs uppercase tracking-wider text-neutral-500 font-semibold mb-2">
                                                                     {day.label}
                                                                 </div>
                                                                 <div className="space-y-1.5">
@@ -1526,20 +1526,20 @@ const Examination = () => {
                                                                         .map((entry) => (
                                                                             <div
                                                                                 key={entry.id}
-                                                                                className="flex items-center gap-3 flex-wrap text-sm bg-gray-50 rounded-lg px-3 py-2"
+                                                                                className="flex items-center gap-3 flex-wrap text-sm bg-neutral-50 rounded-lg px-3 py-2"
                                                                             >
-                                                                                <span className="text-gray-400 text-xs w-16 shrink-0">
+                                                                                <span className="text-neutral-400 text-xs w-16 shrink-0">
                                                                                     Period {entry.period_number}
                                                                                 </span>
-                                                                                <span className="font-medium text-[var(--quinary)]">
+                                                                                <span className="font-medium text-quinary">
                                                                                     {getSubjectName(entry.subject)}
                                                                                 </span>
-                                                                                <span className="text-gray-500 text-xs">
+                                                                                <span className="text-neutral-500 text-xs">
                                                                                     {formatTimeForInput(entry.start_time)} –{" "}
                                                                                     {formatTimeForInput(entry.end_time)}
                                                                                 </span>
                                                                                 {entry.room_number && (
-                                                                                    <span className="text-gray-400 text-xs">
+                                                                                    <span className="text-neutral-400 text-xs">
                                                                                         Room {entry.room_number}
                                                                                     </span>
                                                                                 )}
@@ -1565,8 +1565,8 @@ const Examination = () => {
                             {message.text && (
                                 <div
                                     className={`p-3 rounded-xl text-sm mb-6 text-center border max-w-xl ${message.type === "success"
-                                        ? "bg-green-50 text-green-700 border-green-200"
-                                        : "bg-red-50 text-red-700 border-red-200"
+                                        ? "bg-success/10 text-success border-success/20"
+                                        : "bg-danger/10 text-danger border-danger/20"
                                         }`}
                                 >
                                     {message.text}
@@ -1574,19 +1574,19 @@ const Examination = () => {
                             )}
 
                             {loadingMeta ? (
-                                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center text-gray-400 text-sm max-w-xl">
+                                <div className="bg-surface rounded-2xl border border-neutral-200 shadow-sm p-8 text-center text-neutral-400 text-sm max-w-xl">
                                     Loading classes and subjects...
                                 </div>
                             ) : (
                                 <form onSubmit={handleSubmit} className="space-y-6">
                                     {/* ---------------- CLASS SELECTOR ---------------- */}
-                                    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 max-w-xl">
+                                    <div className="bg-surface rounded-2xl border border-neutral-200 shadow-sm p-6 max-w-xl">
                                         <div className="flex items-center justify-between mb-1">
-                                            <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold block">
+                                            <label className="text-xs uppercase tracking-wider text-neutral-500 font-semibold block">
                                                 Class
                                             </label>
                                             {editingId && (
-                                                <span className="text-xs text-[var(--primary)] font-medium">
+                                                <span className="text-xs text-primary font-medium">
                                                     Editing timetable
                                                 </span>
                                             )}
@@ -1595,7 +1595,7 @@ const Examination = () => {
                                             value={selectedClassId}
                                             onChange={(e) => setSelectedClassId(e.target.value)}
                                             required
-                                            className="w-full bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm cursor-pointer"
+                                            className="w-full bg-surface text-quinary border border-neutral-300 rounded-xl p-3 outline-none focus:border-primary transition-colors text-sm cursor-pointer"
                                         >
                                             <option value="">Select Class</option>
                                             {classes.map((cls) => (
@@ -1610,7 +1610,7 @@ const Examination = () => {
                                         </select>
 
                                         {classAlreadyHasTimetable && (
-                                            <p className="text-amber-600 text-xs mt-3">
+                                            <p className="text-warning text-xs mt-3">
                                                 Class {selectedClass?.name} already has a timetable. Edit
                                                 that timetable from "All Timetables", or pick another
                                                 class.
@@ -1622,7 +1622,7 @@ const Examination = () => {
                                     {selectedClassId && !classAlreadyHasTimetable && (
                                         <>
                                             {subjectsForClass.length === 0 ? (
-                                                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center text-gray-400 text-sm max-w-xl">
+                                                <div className="bg-surface rounded-2xl border border-neutral-200 shadow-sm p-8 text-center text-neutral-400 text-sm max-w-xl">
                                                     No subjects found for this class. Add subjects to this
                                                     class first.
                                                 </div>
@@ -1631,9 +1631,9 @@ const Examination = () => {
                                                     {subjectsForClass.map((subject) => (
                                                         <div
                                                             key={subject.id}
-                                                            className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6"
+                                                            className="bg-surface rounded-2xl border border-neutral-200 shadow-sm p-6"
                                                         >
-                                                            <div className="text-lg font-semibold text-[var(--quinary)] mb-4">
+                                                            <div className="text-lg font-semibold text-quinary mb-4">
                                                                 {subject.name}
                                                             </div>
 
@@ -1651,8 +1651,8 @@ const Examination = () => {
                                                                                 toggleDay(subject.id, day.value)
                                                                             }
                                                                             className={`text-sm font-medium px-4 py-2 rounded-xl border transition-colors cursor-pointer ${isSelected
-                                                                                ? "bg-[var(--primary)] text-white border-[var(--primary)]"
-                                                                                : "bg-white text-[var(--quinary)] border-gray-300 hover:bg-gray-50"
+                                                                                ? "bg-primary text-white border-primary"
+                                                                                : "bg-surface text-quinary border-neutral-300 hover:bg-neutral-50"
                                                                                 }`}
                                                                         >
                                                                             {day.label}
@@ -1674,15 +1674,15 @@ const Examination = () => {
                                                                     return (
                                                                         <div
                                                                             key={day.value}
-                                                                            className="bg-gray-50 rounded-xl border border-gray-200 p-4"
+                                                                            className="bg-neutral-50 rounded-xl border border-neutral-200 p-4"
                                                                         >
                                                                             <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
-                                                                                <span className="text-sm font-semibold text-[var(--quinary)]">
+                                                                                <span className="text-sm font-semibold text-quinary">
                                                                                     {day.label}
                                                                                 </span>
 
                                                                                 <div className="flex items-center gap-2">
-                                                                                    <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold">
+                                                                                    <label className="text-xs uppercase tracking-wider text-neutral-500 font-semibold">
                                                                                         Periods
                                                                                     </label>
                                                                                     <select
@@ -1696,7 +1696,7 @@ const Examination = () => {
                                                                                                 )
                                                                                             )
                                                                                         }
-                                                                                        className="bg-white text-[var(--quinary)] border border-gray-300 rounded-lg px-3 py-1.5 outline-none focus:border-[var(--primary)] transition-colors text-sm cursor-pointer"
+                                                                                        className="bg-surface text-quinary border border-neutral-300 rounded-lg px-3 py-1.5 outline-none focus:border-primary transition-colors text-sm cursor-pointer"
                                                                                     >
                                                                                         {PERIOD_CHOICES.map((n) => (
                                                                                             <option
@@ -1717,7 +1717,7 @@ const Examination = () => {
                                                                                             key={index}
                                                                                             className="flex items-center gap-2 flex-wrap"
                                                                                         >
-                                                                                            <span className="text-xs text-gray-400 font-medium w-16 shrink-0">
+                                                                                            <span className="text-xs text-neutral-400 font-medium w-16 shrink-0">
                                                                                                 Period {index + 1}
                                                                                             </span>
 
@@ -1737,10 +1737,10 @@ const Examination = () => {
                                                                                                     )
                                                                                                 }
                                                                                                 required
-                                                                                                className="bg-white text-[var(--quinary)] border border-gray-300 rounded-lg p-2 outline-none focus:border-[var(--primary)] transition-colors text-sm"
+                                                                                                className="bg-surface text-quinary border border-neutral-300 rounded-lg p-2 outline-none focus:border-primary transition-colors text-sm"
                                                                                             />
 
-                                                                                            <span className="text-gray-400 text-sm">
+                                                                                            <span className="text-neutral-400 text-sm">
                                                                                                 to
                                                                                             </span>
 
@@ -1760,7 +1760,7 @@ const Examination = () => {
                                                                                                     )
                                                                                                 }
                                                                                                 required
-                                                                                                className="bg-white text-[var(--quinary)] border border-gray-300 rounded-lg p-2 outline-none focus:border-[var(--primary)] transition-colors text-sm"
+                                                                                                className="bg-surface text-quinary border border-neutral-300 rounded-lg p-2 outline-none focus:border-primary transition-colors text-sm"
                                                                                             />
 
                                                                                             <input
@@ -1779,7 +1779,7 @@ const Examination = () => {
                                                                                                     )
                                                                                                 }
                                                                                                 placeholder="Room no. (optional)"
-                                                                                                className="flex-1 min-w-[140px] bg-white text-[var(--quinary)] border border-gray-300 rounded-lg p-2 outline-none focus:border-[var(--primary)] transition-colors text-sm placeholder-gray-400"
+                                                                                                className="flex-1 min-w-[140px] bg-surface text-quinary border border-neutral-300 rounded-lg p-2 outline-none focus:border-primary transition-colors text-sm placeholder-neutral-400"
                                                                                             />
                                                                                         </div>
                                                                                     )
@@ -1799,7 +1799,7 @@ const Examination = () => {
                                     {/* ---------------- ACTIONS ---------------- */}
                                     {subjectsForClass.length > 0 && !classAlreadyHasTimetable && (
                                         <div className="flex items-center justify-between max-w-4xl">
-                                            <span className="text-xs text-gray-400">
+                                            <span className="text-xs text-neutral-400">
                                                 {selectedEntryCount} period
                                                 {selectedEntryCount === 1 ? "" : "s"} will be saved.
                                             </span>
@@ -1808,7 +1808,7 @@ const Examination = () => {
                                                 <button
                                                     type="button"
                                                     onClick={cancelForm}
-                                                    className="text-[var(--quinary)] font-medium py-3 px-6 rounded-xl border border-gray-300 hover:bg-gray-50 transition-colors text-sm cursor-pointer"
+                                                    className="text-quinary font-medium py-3 px-6 rounded-xl border border-neutral-300 hover:bg-neutral-50 transition-colors text-sm cursor-pointer"
                                                 >
                                                     Cancel
                                                 </button>
@@ -1816,7 +1816,7 @@ const Examination = () => {
                                                 <button
                                                     type="submit"
                                                     disabled={saving || selectedEntryCount === 0}
-                                                    className="bg-[var(--primary)] hover:bg-[var(--quinary)] disabled:opacity-50 text-white font-medium py-3 px-6 rounded-xl transition-all duration-300 shadow-md transform active:scale-[0.98] cursor-pointer"
+                                                    className="bg-primary hover:bg-quinary disabled:opacity-50 text-white font-medium py-3 px-6 rounded-xl transition-all duration-300 shadow-md transform active:scale-[0.98] cursor-pointer"
                                                 >
                                                     {saving
                                                         ? "Saving..."
@@ -1835,13 +1835,13 @@ const Examination = () => {
                     {/* ================= DELETE CONFIRMATION MODAL ================= */}
                     {deleteTarget && (
                         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-                            <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6">
-                                <div className="text-lg font-semibold text-[var(--quinary)] mb-2">
+                            <div className="bg-surface rounded-2xl shadow-xl max-w-sm w-full p-6">
+                                <div className="text-lg font-semibold text-quinary mb-2">
                                     Delete Timetable?
                                 </div>
-                                <p className="text-sm text-gray-500 mb-6">
+                                <p className="text-sm text-neutral-500 mb-6">
                                     This will permanently delete the timetable for{" "}
-                                    <span className="font-medium text-[var(--quinary)]">
+                                    <span className="font-medium text-quinary">
                                         {getClassLabel(deleteTarget.student_class)}
                                     </span>{" "}
                                     and all of its entries. This action cannot be undone.
@@ -1851,7 +1851,7 @@ const Examination = () => {
                                         type="button"
                                         onClick={() => setDeleteTarget(null)}
                                         disabled={deleting}
-                                        className="text-[var(--quinary)] font-medium py-2.5 px-4 rounded-xl border border-gray-300 hover:bg-gray-50 disabled:opacity-50 transition-colors text-sm cursor-pointer"
+                                        className="text-quinary font-medium py-2.5 px-4 rounded-xl border border-neutral-300 hover:bg-neutral-50 disabled:opacity-50 transition-colors text-sm cursor-pointer"
                                     >
                                         Cancel
                                     </button>
@@ -1859,7 +1859,7 @@ const Examination = () => {
                                         type="button"
                                         onClick={handleDelete}
                                         disabled={deleting}
-                                        className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-medium py-2.5 px-4 rounded-xl transition-colors text-sm cursor-pointer"
+                                        className="bg-danger hover:opacity-90 disabled:opacity-50 text-white font-medium py-2.5 px-4 rounded-xl transition-colors text-sm cursor-pointer"
                                     >
                                         {deleting ? "Deleting..." : "Delete"}
                                     </button>
@@ -1875,13 +1875,13 @@ const Examination = () => {
             {/* ============================================================ */}
             {section === "test" && (
                 <>
-                    <div className="flex items-center gap-2 mb-6 border-b border-gray-200">
+                    <div className="flex items-center gap-2 mb-6 border-b border-neutral-200">
                         <button
                             type="button"
                             onClick={() => setTestActiveTab("list")}
                             className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors cursor-pointer ${testActiveTab === "list"
-                                ? "border-[var(--primary)] text-[var(--primary)]"
-                                : "border-transparent text-gray-500 hover:text-[var(--quinary)]"
+                                ? "border-primary text-primary"
+                                : "border-transparent text-neutral-500 hover:text-quinary"
                                 }`}
                         >
                             All Test Timetables
@@ -1890,8 +1890,8 @@ const Examination = () => {
                             type="button"
                             onClick={() => (testActiveTab === "form" ? null : startAddNewTest())}
                             className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors cursor-pointer ${testActiveTab === "form"
-                                ? "border-[var(--primary)] text-[var(--primary)]"
-                                : "border-transparent text-gray-500 hover:text-[var(--quinary)]"
+                                ? "border-primary text-primary"
+                                : "border-transparent text-neutral-500 hover:text-quinary"
                                 }`}
                         >
                             {editingTestId ? "Edit Test Timetable" : "Add New"}
@@ -1901,7 +1901,7 @@ const Examination = () => {
                     {testActiveTab === "list" && (
                         <div>
                             {testListError && (
-                                <div className="p-3 rounded-xl text-sm mb-6 text-center border max-w-xl bg-red-50 text-red-700 border-red-200">
+                                <div className="p-3 rounded-xl text-sm mb-6 text-center border max-w-xl bg-danger/10 text-danger border-danger/20">
                                     {testListError}
                                 </div>
                             )}
@@ -1913,13 +1913,13 @@ const Examination = () => {
                                         value={testSearchTerm}
                                         onChange={(e) => setTestSearchTerm(e.target.value)}
                                         placeholder="Search by test or class..."
-                                        className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl px-4 py-2.5 outline-none focus:border-[var(--primary)] transition-colors text-sm w-64 placeholder-gray-400"
+                                        className="bg-surface text-quinary border border-neutral-300 rounded-xl px-4 py-2.5 outline-none focus:border-primary transition-colors text-sm w-64 placeholder-neutral-400"
                                     />
 
                                     <select
                                         value={testFilterTestId}
                                         onChange={(e) => setTestFilterTestId(e.target.value)}
-                                        className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl px-4 py-2.5 outline-none focus:border-[var(--primary)] transition-colors text-sm cursor-pointer"
+                                        className="bg-surface text-quinary border border-neutral-300 rounded-xl px-4 py-2.5 outline-none focus:border-primary transition-colors text-sm cursor-pointer"
                                     >
                                         <option value="">All Tests</option>
                                         {tests.map((test) => (
@@ -1932,7 +1932,7 @@ const Examination = () => {
                                     <select
                                         value={testFilterClassId}
                                         onChange={(e) => setTestFilterClassId(e.target.value)}
-                                        className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl px-4 py-2.5 outline-none focus:border-[var(--primary)] transition-colors text-sm cursor-pointer"
+                                        className="bg-surface text-quinary border border-neutral-300 rounded-xl px-4 py-2.5 outline-none focus:border-primary transition-colors text-sm cursor-pointer"
                                     >
                                         <option value="">All Classes</option>
                                         {classes.map((cls) => (
@@ -1950,7 +1950,7 @@ const Examination = () => {
                                                 setTestFilterClassId("");
                                                 setTestFilterTestId("");
                                             }}
-                                            className="text-xs text-gray-500 hover:text-[var(--quinary)] underline cursor-pointer"
+                                            className="text-xs text-neutral-500 hover:text-quinary underline cursor-pointer"
                                         >
                                             Clear
                                         </button>
@@ -1962,14 +1962,14 @@ const Examination = () => {
                                         type="button"
                                         onClick={fetchTestTimetables}
                                         disabled={loadingTestList}
-                                        className="bg-white hover:bg-gray-50 disabled:opacity-50 text-[var(--quinary)] font-medium py-2.5 px-4 rounded-xl border border-gray-300 transition-colors text-sm cursor-pointer"
+                                        className="bg-surface hover:bg-neutral-50 disabled:opacity-50 text-quinary font-medium py-2.5 px-4 rounded-xl border border-neutral-300 transition-colors text-sm cursor-pointer"
                                     >
                                         {loadingTestList ? "Refreshing..." : "Refresh"}
                                     </button>
                                     <button
                                         type="button"
                                         onClick={startAddNewTest}
-                                        className="bg-[var(--primary)] hover:bg-[var(--quinary)] text-white font-medium py-2.5 px-4 rounded-xl transition-colors text-sm cursor-pointer"
+                                        className="bg-primary hover:bg-quinary text-white font-medium py-2.5 px-4 rounded-xl transition-colors text-sm cursor-pointer"
                                     >
                                         + Add New Test Timetable
                                     </button>
@@ -1979,16 +1979,16 @@ const Examination = () => {
                                     <button
                                         onClick={handleDownloadAllTestPDF}
                                         disabled={downloadingAllTestPdf}
-                                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-neutral-700 bg-surface border border-neutral-300 rounded-lg shadow-sm hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-accent-indigo focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                     >
                                         {downloadingAllTestPdf ? (
                                             <>
-                                                <HiOutlineArrowPath className="w-4 h-4 animate-spin text-indigo-600" />
+                                                <HiOutlineArrowPath className="w-4 h-4 animate-spin text-accent-indigo" />
                                                 <span>Downloading...</span>
                                             </>
                                         ) : (
                                             <>
-                                                <HiOutlineArrowDownTray className="w-4 h-4 text-gray-500" />
+                                                <HiOutlineArrowDownTray className="w-4 h-4 text-neutral-500" />
                                                 <span>Download All (PDF)</span>
                                             </>
                                         )}
@@ -1997,7 +1997,7 @@ const Examination = () => {
                                     <select
                                         value={selectedPdfTestId}
                                         onChange={(e) => setSelectedPdfTestId(e.target.value)}
-                                        className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl px-4 py-2.5 outline-none focus:border-[var(--primary)] transition-colors text-sm cursor-pointer"
+                                        className="bg-surface text-quinary border border-neutral-300 rounded-xl px-4 py-2.5 outline-none focus:border-primary transition-colors text-sm cursor-pointer"
                                     >
                                         <option value="">Select Test for PDF</option>
                                         {tests.map((test) => (
@@ -2011,7 +2011,7 @@ const Examination = () => {
                                         type="button"
                                         onClick={handleDownloadSelectedTestPDF}
                                         disabled={downloadingSelectedTestPdf || !selectedPdfTestId}
-                                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-neutral-700 bg-surface border border-neutral-300 rounded-lg shadow-sm hover:bg-neutral-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                     >
                                         {downloadingSelectedTestPdf ? "Downloading..." : "Download Selected Test (PDF)"}
                                     </button>
@@ -2019,7 +2019,7 @@ const Examination = () => {
                                     <button
                                         onClick={fetchTestTimetables}
                                         title="Refresh"
-                                        className="p-2 text-gray-500 bg-white border border-gray-300 rounded-lg shadow-sm hover:text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors"
+                                        className="p-2 text-neutral-500 bg-surface border border-neutral-300 rounded-lg shadow-sm hover:text-neutral-700 hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-accent-indigo focus:ring-offset-2 transition-colors"
                                     >
                                         <HiOutlineArrowPath className="w-4 h-4" />
                                     </button>
@@ -2028,11 +2028,11 @@ const Examination = () => {
                             </div>
 
                             {loadingTestList ? (
-                                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center text-gray-400 text-sm">
+                                <div className="bg-surface rounded-2xl border border-neutral-200 shadow-sm p-8 text-center text-neutral-400 text-sm">
                                     Loading test timetables...
                                 </div>
                             ) : testTimetables.length === 0 ? (
-                                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center text-gray-400 text-sm">
+                                <div className="bg-surface rounded-2xl border border-neutral-200 shadow-sm p-8 text-center text-neutral-400 text-sm">
                                     {testSearchTerm || testFilterClassId || testFilterTestId
                                         ? "No test timetables match your search/filter."
                                         : 'No test timetables yet. Click "Add New Test Timetable" to create one.'}
@@ -2062,17 +2062,17 @@ const Examination = () => {
                                         return (
                                             <div
                                                 key={timetable.id}
-                                                className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6"
+                                                className="bg-surface rounded-2xl border border-neutral-200 shadow-sm p-6"
                                             >
                                                 <div className="flex items-start justify-between flex-wrap gap-3">
                                                     <div>
-                                                        <div className="text-lg font-semibold text-[var(--quinary)]">
+                                                        <div className="text-lg font-semibold text-quinary">
                                                             {testLabel}
                                                         </div>
-                                                        <div className="text-sm text-gray-500 mt-1">
+                                                        <div className="text-sm text-neutral-500 mt-1">
                                                             {classLabel}
                                                         </div>
-                                                        <div className="text-xs text-gray-400 mt-1">
+                                                        <div className="text-xs text-neutral-400 mt-1">
                                                             {entryCount} {entryCount === 1 ? "subject" : "subjects"}
                                                             {timetable.updated_at
                                                                 ? ` • Updated ${new Date(timetable.updated_at).toLocaleDateString()}`
@@ -2084,7 +2084,7 @@ const Examination = () => {
                                                         <button
                                                             type="button"
                                                             onClick={() => toggleTestExpanded(timetable.id)}
-                                                            className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-300 text-[var(--quinary)] hover:bg-gray-50 transition-colors cursor-pointer"
+                                                            className="text-xs font-medium px-3 py-1.5 rounded-lg border border-neutral-300 text-quinary hover:bg-neutral-50 transition-colors cursor-pointer"
                                                         >
                                                             {isExpanded ? "Hide Entries" : "View Entries"}
                                                         </button>
@@ -2093,7 +2093,7 @@ const Examination = () => {
                                                             type="button"
                                                             onClick={() => handleDownloadTestPdf(timetable)}
                                                             disabled={downloadingTestId === timetable.id}
-                                                            className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-300 text-[var(--quinary)] hover:bg-gray-50 disabled:opacity-50 transition-colors cursor-pointer"
+                                                            className="text-xs font-medium px-3 py-1.5 rounded-lg border border-neutral-300 text-quinary hover:bg-neutral-50 disabled:opacity-50 transition-colors cursor-pointer"
                                                         >
                                                             {downloadingTestId === timetable.id
                                                                 ? "Downloading..."
@@ -2103,14 +2103,14 @@ const Examination = () => {
                                                         <button
                                                             type="button"
                                                             onClick={() => startEditTest(timetable)}
-                                                            className="text-xs font-medium px-3 py-1.5 rounded-lg border border-[var(--primary)] text-[var(--primary)] hover:bg-[var(--primary)] hover:text-white transition-colors cursor-pointer"
+                                                            className="text-xs font-medium px-3 py-1.5 rounded-lg border border-primary text-primary hover:bg-primary hover:text-white transition-colors cursor-pointer"
                                                         >
                                                             Edit
                                                         </button>
                                                         <button
                                                             type="button"
                                                             onClick={() => setDeleteTestTarget(timetable)}
-                                                            className="text-xs font-medium px-3 py-1.5 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                                                            className="text-xs font-medium px-3 py-1.5 rounded-lg border border-danger/40 text-danger hover:bg-danger/10 transition-colors cursor-pointer"
                                                         >
                                                             Delete
                                                         </button>
@@ -2118,26 +2118,26 @@ const Examination = () => {
                                                 </div>
 
                                                 {isExpanded && (
-                                                    <div className="mt-4 border-t border-gray-100 pt-4 space-y-3">
+                                                    <div className="mt-4 border-t border-neutral-100 pt-4 space-y-3">
                                                         {sortedDates.map((date) => (
                                                             <div key={date}>
-                                                                <div className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-2">
+                                                                <div className="text-xs uppercase tracking-wider text-neutral-500 font-semibold mb-2">
                                                                     {date}
                                                                 </div>
                                                                 <div className="space-y-1.5">
                                                                     {entriesByDate[date].map((entry, i) => (
                                                                         <div
                                                                             key={entry.id ?? i}
-                                                                            className="flex items-center gap-3 flex-wrap text-sm bg-gray-50 rounded-lg px-3 py-2"
+                                                                            className="flex items-center gap-3 flex-wrap text-sm bg-neutral-50 rounded-lg px-3 py-2"
                                                                         >
-                                                                            <span className="font-medium text-[var(--quinary)]">
+                                                                            <span className="font-medium text-quinary">
                                                                                 {getSubjectName(entry.subject)}
                                                                             </span>
-                                                                            <span className="text-gray-500 text-xs">
+                                                                            <span className="text-neutral-500 text-xs">
                                                                                 {formatTimeForInput(entry.start_time)} – {formatTimeForInput(entry.end_time)}
                                                                             </span>
                                                                             {entry.room_number && (
-                                                                                <span className="text-gray-400 text-xs">
+                                                                                <span className="text-neutral-400 text-xs">
                                                                                     Room {entry.room_number}
                                                                                 </span>
                                                                             )}
@@ -2158,25 +2158,25 @@ const Examination = () => {
 
                     {testActiveTab === "form" && (
                         <form onSubmit={handleTestSubmit} className="space-y-6">
-                            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 max-w-3xl space-y-5">
+                            <div className="bg-surface rounded-2xl border border-neutral-200 shadow-sm p-6 max-w-3xl space-y-5">
                                 <div className="flex items-center justify-between mb-1">
                                     <div>
-                                        <div className="text-xs uppercase tracking-wider text-gray-500 font-semibold">
+                                        <div className="text-xs uppercase tracking-wider text-neutral-500 font-semibold">
                                             Test Timetable Details
                                         </div>
-                                        <div className="text-sm text-gray-400 mt-1">
+                                        <div className="text-sm text-neutral-400 mt-1">
                                             Select an existing test, then choose one of its assigned classes.
                                         </div>
                                     </div>
                                     {editingTestId && (
-                                        <span className="text-xs text-[var(--primary)] font-medium">
+                                        <span className="text-xs text-primary font-medium">
                                             Editing test timetable
                                         </span>
                                     )}
                                 </div>
 
                                 <div>
-                                    <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold block mb-1">
+                                    <label className="text-xs uppercase tracking-wider text-neutral-500 font-semibold block mb-1">
                                         Test *
                                     </label>
                                     <select
@@ -2184,7 +2184,7 @@ const Examination = () => {
                                         onChange={(e) => handleSelectedTestChange(e.target.value)}
                                         disabled={Boolean(editingTestId) || loadingTests}
                                         required
-                                        className="w-full bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm cursor-pointer disabled:opacity-60"
+                                        className="w-full bg-surface text-quinary border border-neutral-300 rounded-xl p-3 outline-none focus:border-primary transition-colors text-sm cursor-pointer disabled:opacity-60"
                                     >
                                         <option value="">
                                             {loadingTests ? "Loading tests..." : "Select Test"}
@@ -2196,7 +2196,7 @@ const Examination = () => {
                                         ))}
                                     </select>
                                     {selectedTest && (
-                                        <div className="mt-2 text-xs text-gray-500">
+                                        <div className="mt-2 text-xs text-neutral-500">
                                             {selectedTest.date ? `Scheduled date: ${selectedTest.date}` : ""}
                                             {selectedTest.description ? ` • ${selectedTest.description}` : ""}
                                         </div>
@@ -2206,12 +2206,12 @@ const Examination = () => {
                                 {/* ===== EDIT MODE: single class picker (unchanged) ===== */}
                                 {selectedTestId && editingTestId && (
                                     <div>
-                                        <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold block mb-2">
+                                        <label className="text-xs uppercase tracking-wider text-neutral-500 font-semibold block mb-2">
                                             Classes assigned to this test *
                                         </label>
 
                                         {assignedClasses.length === 0 ? (
-                                            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
+                                            <div className="rounded-xl border border-warning/20 bg-warning/10 p-4 text-sm text-warning">
                                                 This test has no assigned classes, so a timetable cannot be created for it.
                                             </div>
                                         ) : (
@@ -2224,8 +2224,8 @@ const Examination = () => {
                                                             type="button"
                                                             onClick={() => handleSelectedTestClassChange(String(cls.id))}
                                                             className={`px-4 py-2.5 rounded-xl border text-sm font-medium transition-colors cursor-pointer ${active
-                                                                ? "bg-[var(--primary)] text-white border-[var(--primary)]"
-                                                                : "bg-white text-[var(--quinary)] border-gray-300 hover:bg-gray-50"
+                                                                ? "bg-primary text-white border-primary"
+                                                                : "bg-surface text-quinary border-neutral-300 hover:bg-neutral-50"
                                                                 }`}
                                                         >
                                                             {cls.display_name || cls.name}
@@ -2240,12 +2240,12 @@ const Examination = () => {
                                 {/* ===== CREATE MODE: multi-select class picker, disables classes that already have a timetable for this test ===== */}
                                 {selectedTestId && !editingTestId && (
                                     <div>
-                                        <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold block mb-2">
-                                            Classes assigned to this test * <span className="normal-case text-gray-400 font-normal">(select one or more)</span>
+                                        <label className="text-xs uppercase tracking-wider text-neutral-500 font-semibold block mb-2">
+                                            Classes assigned to this test * <span className="normal-case text-neutral-400 font-normal">(select one or more)</span>
                                         </label>
 
                                         {assignedClasses.length === 0 ? (
-                                            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
+                                            <div className="rounded-xl border border-warning/20 bg-warning/10 p-4 text-sm text-warning">
                                                 This test has no assigned classes, so a timetable cannot be created for it.
                                             </div>
                                         ) : (
@@ -2261,10 +2261,10 @@ const Examination = () => {
                                                             onClick={() => toggleTestClassSelection(cls.id)}
                                                             title={alreadyCreated ? "A timetable already exists for this class and test" : undefined}
                                                             className={`px-4 py-2.5 rounded-xl border text-sm font-medium transition-colors ${alreadyCreated
-                                                                ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+                                                                ? "bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed"
                                                                 : active
-                                                                    ? "bg-[var(--primary)] text-white border-[var(--primary)] cursor-pointer"
-                                                                    : "bg-white text-[var(--quinary)] border-gray-300 hover:bg-gray-50 cursor-pointer"
+                                                                    ? "bg-primary text-white border-primary cursor-pointer"
+                                                                    : "bg-surface text-quinary border-neutral-300 hover:bg-neutral-50 cursor-pointer"
                                                                 }`}
                                                         >
                                                             {cls.display_name || cls.name}
@@ -2282,28 +2282,28 @@ const Examination = () => {
                                 )}
 
                                 {editingTestId && selectedTestClassId && (
-                                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                                        <div className="text-xs uppercase tracking-wider text-gray-500 font-semibold">
+                                    <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+                                        <div className="text-xs uppercase tracking-wider text-neutral-500 font-semibold">
                                             Selected class
                                         </div>
-                                        <div className="text-base font-semibold text-[var(--quinary)] mt-1">
+                                        <div className="text-base font-semibold text-quinary mt-1">
                                             {selectedTestClass?.display_name || selectedTestClass?.name || `Class #${selectedTestClassId}`}
                                         </div>
-                                        <div className="text-xs text-gray-500 mt-1">
+                                        <div className="text-xs text-neutral-500 mt-1">
                                             {subjectsForTestClass.length} {subjectsForTestClass.length === 1 ? "subject" : "subjects"} found for this class.
                                         </div>
                                     </div>
                                 )}
 
                                 {!editingTestId && selectedTestClassIds.length > 0 && (
-                                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                                        <div className="text-xs uppercase tracking-wider text-gray-500 font-semibold">
+                                    <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+                                        <div className="text-xs uppercase tracking-wider text-neutral-500 font-semibold">
                                             Selected classes
                                         </div>
-                                        <div className="text-base font-semibold text-[var(--quinary)] mt-1">
+                                        <div className="text-base font-semibold text-quinary mt-1">
                                             {selectedTestClassIds.length} {selectedTestClassIds.length === 1 ? "class" : "classes"} selected
                                         </div>
-                                        <div className="text-xs text-gray-500 mt-1">
+                                        <div className="text-xs text-neutral-500 mt-1">
                                             A timetable will be created for each selected class below.
                                         </div>
                                     </div>
@@ -2313,7 +2313,7 @@ const Examination = () => {
                             {/* ===== EDIT MODE: single-class entry form (unchanged) ===== */}
                             {editingTestId && selectedTestClassId && (
                                 subjectsForTestClass.length === 0 ? (
-                                    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center text-gray-400 text-sm max-w-4xl">
+                                    <div className="bg-surface rounded-2xl border border-neutral-200 shadow-sm p-8 text-center text-neutral-400 text-sm max-w-4xl">
                                         No subjects found for this class. Add subjects to this class first.
                                     </div>
                                 ) : (
@@ -2323,14 +2323,14 @@ const Examination = () => {
                                             return (
                                                 <div
                                                     key={subject?.id ?? `extra-${index}`}
-                                                    className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6"
+                                                    className="bg-surface rounded-2xl border border-neutral-200 shadow-sm p-6"
                                                 >
                                                     <div className="flex items-center justify-between gap-3 mb-4">
                                                         <div>
-                                                            <div className="text-lg font-semibold text-[var(--quinary)]">
+                                                            <div className="text-lg font-semibold text-quinary">
                                                                 {subject?.name || `Subject #${entry.subject}`}
                                                             </div>
-                                                            <div className="text-xs text-gray-400 mt-1">
+                                                            <div className="text-xs text-neutral-400 mt-1">
                                                                 Configure the examination date and time for this subject.
                                                             </div>
                                                         </div>
@@ -2338,7 +2338,7 @@ const Examination = () => {
                                                             <button
                                                                 type="button"
                                                                 onClick={() => removeTestEntry(index)}
-                                                                className="text-xs font-medium px-3 py-2 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                                                                className="text-xs font-medium px-3 py-2 rounded-lg border border-danger/40 text-danger hover:bg-danger/10 transition-colors cursor-pointer"
                                                             >
                                                                 Remove
                                                             </button>
@@ -2347,7 +2347,7 @@ const Examination = () => {
 
                                                     <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                                                         <div>
-                                                            <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold block mb-1">
+                                                            <label className="text-xs uppercase tracking-wider text-neutral-500 font-semibold block mb-1">
                                                                 Date *
                                                             </label>
                                                             <input
@@ -2355,11 +2355,11 @@ const Examination = () => {
                                                                 value={entry.date}
                                                                 onChange={(e) => updateTestEntry(index, "date", e.target.value)}
                                                                 required
-                                                                className="w-full bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm"
+                                                                className="w-full bg-surface text-quinary border border-neutral-300 rounded-xl p-3 outline-none focus:border-primary transition-colors text-sm"
                                                             />
                                                         </div>
                                                         <div>
-                                                            <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold block mb-1">
+                                                            <label className="text-xs uppercase tracking-wider text-neutral-500 font-semibold block mb-1">
                                                                 Start Time *
                                                             </label>
                                                             <input
@@ -2367,11 +2367,11 @@ const Examination = () => {
                                                                 value={entry.start_time}
                                                                 onChange={(e) => updateTestEntry(index, "start_time", e.target.value)}
                                                                 required
-                                                                className="w-full bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm"
+                                                                className="w-full bg-surface text-quinary border border-neutral-300 rounded-xl p-3 outline-none focus:border-primary transition-colors text-sm"
                                                             />
                                                         </div>
                                                         <div>
-                                                            <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold block mb-1">
+                                                            <label className="text-xs uppercase tracking-wider text-neutral-500 font-semibold block mb-1">
                                                                 End Time *
                                                             </label>
                                                             <input
@@ -2379,11 +2379,11 @@ const Examination = () => {
                                                                 value={entry.end_time}
                                                                 onChange={(e) => updateTestEntry(index, "end_time", e.target.value)}
                                                                 required
-                                                                className="w-full bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm"
+                                                                className="w-full bg-surface text-quinary border border-neutral-300 rounded-xl p-3 outline-none focus:border-primary transition-colors text-sm"
                                                             />
                                                         </div>
                                                         <div>
-                                                            <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold block mb-1">
+                                                            <label className="text-xs uppercase tracking-wider text-neutral-500 font-semibold block mb-1">
                                                                 Room
                                                             </label>
                                                             <input
@@ -2391,7 +2391,7 @@ const Examination = () => {
                                                                 value={entry.room_number}
                                                                 onChange={(e) => updateTestEntry(index, "room_number", e.target.value)}
                                                                 placeholder="Optional"
-                                                                className="w-full bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm placeholder-gray-400"
+                                                                className="w-full bg-surface text-quinary border border-neutral-300 rounded-xl p-3 outline-none focus:border-primary transition-colors text-sm placeholder-neutral-400"
                                                             />
                                                         </div>
                                                     </div>
@@ -2415,17 +2415,17 @@ const Examination = () => {
 
                                         return (
                                             <div key={classId} className="space-y-4">
-                                                <div className="flex items-center gap-2 border-b border-gray-200 pb-2">
-                                                    <span className="text-sm font-semibold uppercase tracking-wider text-[var(--primary)]">
+                                                <div className="flex items-center gap-2 border-b border-neutral-200 pb-2">
+                                                    <span className="text-sm font-semibold uppercase tracking-wider text-primary">
                                                         {classLabel}
                                                     </span>
-                                                    <span className="text-xs text-gray-400">
+                                                    <span className="text-xs text-neutral-400">
                                                         {entries.filter((e) => e.subject && e.date && e.start_time && e.end_time).length} of {entries.length} subjects configured
                                                     </span>
                                                 </div>
 
                                                 {classSubjects.length === 0 ? (
-                                                    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 text-center text-gray-400 text-sm">
+                                                    <div className="bg-surface rounded-2xl border border-neutral-200 shadow-sm p-6 text-center text-neutral-400 text-sm">
                                                         No subjects found for this class. Add subjects to this class first.
                                                     </div>
                                                 ) : (
@@ -2436,14 +2436,14 @@ const Examination = () => {
                                                         return (
                                                             <div
                                                                 key={subject?.id ?? `${classId}-extra-${index}`}
-                                                                className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6"
+                                                                className="bg-surface rounded-2xl border border-neutral-200 shadow-sm p-6"
                                                             >
                                                                 <div className="flex items-center justify-between gap-3 mb-4">
                                                                     <div>
-                                                                        <div className="text-lg font-semibold text-[var(--quinary)]">
+                                                                        <div className="text-lg font-semibold text-quinary">
                                                                             {subject?.name || `Subject #${entry.subject}`}
                                                                         </div>
-                                                                        <div className="text-xs text-gray-400 mt-1">
+                                                                        <div className="text-xs text-neutral-400 mt-1">
                                                                             Configure the examination date and time for this subject.
                                                                         </div>
                                                                     </div>
@@ -2451,7 +2451,7 @@ const Examination = () => {
                                                                         <button
                                                                             type="button"
                                                                             onClick={() => removeBatchTestEntry(classId, index)}
-                                                                            className="text-xs font-medium px-3 py-2 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                                                                            className="text-xs font-medium px-3 py-2 rounded-lg border border-danger/40 text-danger hover:bg-danger/10 transition-colors cursor-pointer"
                                                                         >
                                                                             Remove
                                                                         </button>
@@ -2460,7 +2460,7 @@ const Examination = () => {
 
                                                                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                                                                     <div>
-                                                                        <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold block mb-1">
+                                                                        <label className="text-xs uppercase tracking-wider text-neutral-500 font-semibold block mb-1">
                                                                             Date *
                                                                         </label>
                                                                         <input
@@ -2468,11 +2468,11 @@ const Examination = () => {
                                                                             value={entry.date}
                                                                             onChange={(e) => updateBatchTestEntry(classId, index, "date", e.target.value)}
                                                                             required
-                                                                            className="w-full bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm"
+                                                                            className="w-full bg-surface text-quinary border border-neutral-300 rounded-xl p-3 outline-none focus:border-primary transition-colors text-sm"
                                                                         />
                                                                     </div>
                                                                     <div>
-                                                                        <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold block mb-1">
+                                                                        <label className="text-xs uppercase tracking-wider text-neutral-500 font-semibold block mb-1">
                                                                             Start Time *
                                                                         </label>
                                                                         <input
@@ -2480,11 +2480,11 @@ const Examination = () => {
                                                                             value={entry.start_time}
                                                                             onChange={(e) => updateBatchTestEntry(classId, index, "start_time", e.target.value)}
                                                                             required
-                                                                            className="w-full bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm"
+                                                                            className="w-full bg-surface text-quinary border border-neutral-300 rounded-xl p-3 outline-none focus:border-primary transition-colors text-sm"
                                                                         />
                                                                     </div>
                                                                     <div>
-                                                                        <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold block mb-1">
+                                                                        <label className="text-xs uppercase tracking-wider text-neutral-500 font-semibold block mb-1">
                                                                             End Time *
                                                                         </label>
                                                                         <input
@@ -2492,11 +2492,11 @@ const Examination = () => {
                                                                             value={entry.end_time}
                                                                             onChange={(e) => updateBatchTestEntry(classId, index, "end_time", e.target.value)}
                                                                             required
-                                                                            className="w-full bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm"
+                                                                            className="w-full bg-surface text-quinary border border-neutral-300 rounded-xl p-3 outline-none focus:border-primary transition-colors text-sm"
                                                                         />
                                                                     </div>
                                                                     <div>
-                                                                        <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold block mb-1">
+                                                                        <label className="text-xs uppercase tracking-wider text-neutral-500 font-semibold block mb-1">
                                                                             Room
                                                                         </label>
                                                                         <input
@@ -2504,7 +2504,7 @@ const Examination = () => {
                                                                             value={entry.room_number}
                                                                             onChange={(e) => updateBatchTestEntry(classId, index, "room_number", e.target.value)}
                                                                             placeholder="Optional"
-                                                                            className="w-full bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm placeholder-gray-400"
+                                                                            className="w-full bg-surface text-quinary border border-neutral-300 rounded-xl p-3 outline-none focus:border-primary transition-colors text-sm placeholder-neutral-400"
                                                                         />
                                                                     </div>
                                                                 </div>
@@ -2521,21 +2521,21 @@ const Examination = () => {
                             {/* ===== EDIT MODE footer ===== */}
                             {editingTestId && selectedTestClassId && subjectsForTestClass.length > 0 && (
                                 <div className="flex items-center justify-between max-w-4xl">
-                                    <span className="text-xs text-gray-400">
+                                    <span className="text-xs text-neutral-400">
                                         {validTestEntries.length} of {testEntries.length} subjects configured.
                                     </span>
                                     <div className="flex items-center gap-3">
                                         <button
                                             type="button"
                                             onClick={cancelTestForm}
-                                            className="text-[var(--quinary)] font-medium py-3 px-6 rounded-xl border border-gray-300 hover:bg-gray-50 transition-colors text-sm cursor-pointer"
+                                            className="text-quinary font-medium py-3 px-6 rounded-xl border border-neutral-300 hover:bg-neutral-50 transition-colors text-sm cursor-pointer"
                                         >
                                             Cancel
                                         </button>
                                         <button
                                             type="submit"
                                             disabled={savingTest || validTestEntries.length !== testEntries.length || testEntries.length === 0}
-                                            className="bg-[var(--primary)] hover:bg-[var(--quinary)] disabled:opacity-50 text-white font-medium py-3 px-6 rounded-xl transition-all duration-300 shadow-md transform active:scale-[0.98] cursor-pointer"
+                                            className="bg-primary hover:bg-quinary disabled:opacity-50 text-white font-medium py-3 px-6 rounded-xl transition-all duration-300 shadow-md transform active:scale-[0.98] cursor-pointer"
                                         >
                                             {savingTest ? "Saving..." : "Update Test Timetable"}
                                         </button>
@@ -2546,21 +2546,21 @@ const Examination = () => {
                             {/* ===== CREATE MODE footer ===== */}
                             {!editingTestId && selectedTestClassIds.length > 0 && (
                                 <div className="flex items-center justify-between max-w-4xl">
-                                    <span className="text-xs text-gray-400">
+                                    <span className="text-xs text-neutral-400">
                                         {selectedTestClassIds.filter((id) => isClassBatchComplete(id)).length} of {selectedTestClassIds.length} classes fully configured.
                                     </span>
                                     <div className="flex items-center gap-3">
                                         <button
                                             type="button"
                                             onClick={cancelTestForm}
-                                            className="text-[var(--quinary)] font-medium py-3 px-6 rounded-xl border border-gray-300 hover:bg-gray-50 transition-colors text-sm cursor-pointer"
+                                            className="text-quinary font-medium py-3 px-6 rounded-xl border border-neutral-300 hover:bg-neutral-50 transition-colors text-sm cursor-pointer"
                                         >
                                             Cancel
                                         </button>
                                         <button
                                             type="submit"
                                             disabled={savingTest || !allBatchClassesComplete}
-                                            className="bg-[var(--primary)] hover:bg-[var(--quinary)] disabled:opacity-50 text-white font-medium py-3 px-6 rounded-xl transition-all duration-300 shadow-md transform active:scale-[0.98] cursor-pointer"
+                                            className="bg-primary hover:bg-quinary disabled:opacity-50 text-white font-medium py-3 px-6 rounded-xl transition-all duration-300 shadow-md transform active:scale-[0.98] cursor-pointer"
                                         >
                                             {savingTest ? "Saving..." : `Create Test Timetable${selectedTestClassIds.length > 1 ? "s" : ""}`}
                                         </button>
@@ -2572,17 +2572,17 @@ const Examination = () => {
 
                     {deleteTestTarget && (
                         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-                            <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6">
-                                <div className="text-lg font-semibold text-[var(--quinary)] mb-2">
+                            <div className="bg-surface rounded-2xl shadow-xl max-w-sm w-full p-6">
+                                <div className="text-lg font-semibold text-quinary mb-2">
                                     Delete Test Timetable?
                                 </div>
-                                <p className="text-sm text-gray-500 mb-6">
+                                <p className="text-sm text-neutral-500 mb-6">
                                     This will permanently delete the timetable for{" "}
-                                    <span className="font-medium text-[var(--quinary)]">
+                                    <span className="font-medium text-quinary">
                                         {deleteTestTarget.test_name || `Test #${getClassIdOf(deleteTestTarget.test)}`}
                                     </span>{" "}
                                     for{" "}
-                                    <span className="font-medium text-[var(--quinary)]">
+                                    <span className="font-medium text-quinary">
                                         {deleteTestTarget.student_class_name || getClassLabel(deleteTestTarget.student_class)}
                                     </span>{" "}
                                     and all of its entries. This action cannot be undone.
@@ -2592,7 +2592,7 @@ const Examination = () => {
                                         type="button"
                                         onClick={() => setDeleteTestTarget(null)}
                                         disabled={deletingTest}
-                                        className="text-[var(--quinary)] font-medium py-2.5 px-4 rounded-xl border border-gray-300 hover:bg-gray-50 disabled:opacity-50 transition-colors text-sm cursor-pointer"
+                                        className="text-quinary font-medium py-2.5 px-4 rounded-xl border border-neutral-300 hover:bg-neutral-50 disabled:opacity-50 transition-colors text-sm cursor-pointer"
                                     >
                                         Cancel
                                     </button>
@@ -2600,7 +2600,7 @@ const Examination = () => {
                                         type="button"
                                         onClick={handleDeleteTest}
                                         disabled={deletingTest}
-                                        className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-medium py-2.5 px-4 rounded-xl transition-colors text-sm cursor-pointer"
+                                        className="bg-danger hover:opacity-90 disabled:opacity-50 text-white font-medium py-2.5 px-4 rounded-xl transition-colors text-sm cursor-pointer"
                                     >
                                         {deletingTest ? "Deleting..." : "Delete"}
                                     </button>

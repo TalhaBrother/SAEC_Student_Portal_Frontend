@@ -7,10 +7,10 @@ import Swal from "sweetalert2";
 
 // Shared theming for every SweetAlert popup so they match the app's palette
 const SWAL_THEME = {
-  confirmButtonColor: "#0056D2", // --primary
-  cancelButtonColor: "#94A3B8",
-  background: "#F4F7FC",         // --secondary
-  color: "#1A253C",              // --quinary
+  confirmButtonColor: "var(--primary)",
+  cancelButtonColor: "var(--neutral-400)",
+  background: "var(--secondary)",
+  color: "var(--quinary)",
 };
 
 const emptyForm = () => ({
@@ -47,7 +47,7 @@ const emptyFeeOverrideForm = () => ({
 });
 
 const feeInputClass =
-  "bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm";
+  "bg-surface text-quinary border border-neutral-300 rounded-xl p-3 outline-none focus:border-primary transition-colors text-sm";
 
 const Students = () => {
   const token = useAuthStore((state) => state.accessToken);
@@ -466,7 +466,7 @@ const Students = () => {
       confirmButtonText: "Delete",
       cancelButtonText: "Cancel",
       ...SWAL_THEME,
-      confirmButtonColor: "#DC2626",
+      confirmButtonColor: "var(--danger)",
     });
 
     if (!confirmResult.isConfirmed) return;
@@ -599,12 +599,12 @@ const Students = () => {
   };
 
   return (
-    <div className="p-6 bg-[var(--secondary)] text-[var(--quinary)] min-h-screen font-sans">
+    <div className="p-6 bg-secondary text-quinary min-h-screen font-sans">
       {/* Header */}
       <div className="flex items-start justify-between mb-2 flex-wrap gap-3">
         <div>
-          <div className="text-3xl font-bold tracking-tight text-[var(--quinary)]">Students</div>
-          <p className="text-gray-500 text-sm mt-1">
+          <div className="text-3xl font-bold tracking-tight text-quinary">Students</div>
+          <p className="text-neutral-500 text-sm mt-1">
             Register, search, filter, update, and manage student accounts.
           </p>
         </div>
@@ -615,14 +615,14 @@ const Students = () => {
               type="button"
               onClick={fetchStudents}
               disabled={fetching}
-              className="bg-white hover:bg-gray-50 disabled:opacity-50 text-[var(--quinary)] font-medium py-2.5 px-4 rounded-xl border border-gray-300 transition-colors text-sm cursor-pointer"
+              className="bg-surface hover:bg-neutral-50 disabled:opacity-50 text-quinary font-medium py-2.5 px-4 rounded-xl border border-neutral-300 transition-colors text-sm cursor-pointer"
             >
               {fetching ? "Refreshing..." : "Refresh"}
             </button>
             <button
               type="button"
               onClick={openCreateForm}
-              className="bg-[var(--primary)] hover:bg-[var(--quinary)] text-white font-medium py-2.5 px-5 rounded-xl transition-all duration-300 shadow-md transform active:scale-[0.98] cursor-pointer"
+              className="bg-primary hover:bg-quinary text-white font-medium py-2.5 px-5 rounded-xl transition-all duration-300 shadow-md transform active:scale-[0.98] cursor-pointer"
             >
               + New Student
             </button>
@@ -634,8 +634,8 @@ const Students = () => {
       {message.text && (
         <div
           className={`p-3 rounded-xl text-sm mb-6 whitespace-pre-line text-center border max-w-3xl ${message.type === "success"
-            ? "bg-green-50 text-green-700 border-green-200"
-            : "bg-red-50 text-red-700 border-red-200"
+            ? "bg-success/10 text-success border-success/20"
+            : "bg-danger/10 text-danger border-danger/20"
             }`}
         >
           {message.text}
@@ -644,23 +644,23 @@ const Students = () => {
 
       {mode === "form" ? (
         /* ---------------- CREATE / EDIT FORM ---------------- */
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 max-w-3xl">
-          <div className="text-lg font-semibold mb-4 text-[var(--quinary)]">
+        <div className="bg-surface rounded-2xl border border-neutral-200 shadow-sm p-6 max-w-3xl">
+          <div className="text-lg font-semibold mb-4 text-quinary">
             {formData.id ? "Update Student" : "Register New Student"}
           </div>
 
           {formLoading ? (
-            <div className="text-sm text-gray-400 p-6 text-center">Loading student record...</div>
+            <div className="text-sm text-neutral-400 p-6 text-center">Loading student record...</div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Section: Profile Picture */}
               <div>
-                <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
+                <h3 className="text-sm font-semibold text-neutral-400 uppercase tracking-wider mb-4">
                   Profile Picture
                 </h3>
 
                 <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
-                  <div className="w-28 h-28 rounded-full border-4 border-gray-100 bg-gray-50 overflow-hidden flex items-center justify-center shadow-sm shrink-0">
+                  <div className="w-28 h-28 rounded-full border-4 border-neutral-100 bg-neutral-50 overflow-hidden flex items-center justify-center shadow-sm shrink-0">
                     {imagePreview ? (
                       <img
                         src={imagePreview}
@@ -679,7 +679,7 @@ const Students = () => {
                         fill="none"
                         stroke="currentColor"
                         strokeWidth="1.5"
-                        className="w-12 h-12 text-gray-300"
+                        className="w-12 h-12 text-neutral-300"
                         aria-hidden="true"
                       >
                         <path
@@ -694,7 +694,7 @@ const Students = () => {
                   <div className="flex flex-col items-center sm:items-start gap-2">
                     <label
                       htmlFor="student-profile-image"
-                      className="bg-[var(--primary)] hover:bg-[var(--quinary)] text-white font-medium py-2.5 px-5 rounded-xl transition-colors cursor-pointer text-sm shadow-sm"
+                      className="bg-primary hover:bg-quinary text-white font-medium py-2.5 px-5 rounded-xl transition-colors cursor-pointer text-sm shadow-sm"
                     >
                       {imageFile ? "Change Image" : imagePreview ? "Change Image" : "Upload Image"}
                     </label>
@@ -705,11 +705,11 @@ const Students = () => {
                       onChange={handleImageChange}
                       className="hidden"
                     />
-                    <p className="text-xs text-gray-400 text-center sm:text-left">
+                    <p className="text-xs text-neutral-400 text-center sm:text-left">
                       Maximum size: 5 MB. JPG, JPEG, PNG, GIF, WebP and other supported image formats.
                     </p>
                     {imageFile && (
-                      <p className="text-xs text-gray-500 max-w-xs truncate" title={imageFile.name}>
+                      <p className="text-xs text-neutral-500 max-w-xs truncate" title={imageFile.name}>
                         Selected: {imageFile.name}
                       </p>
                     )}
@@ -717,16 +717,16 @@ const Students = () => {
                 </div>
               </div>
 
-              <hr className="border-gray-100" />
+              <hr className="border-neutral-100" />
 
               {/* Section: Personal Information */}
               <div>
-                <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
+                <h3 className="text-sm font-semibold text-neutral-400 uppercase tracking-wider mb-4">
                   Personal Information
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="flex flex-col">
-                    <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
+                    <label className="text-xs font-bold uppercase tracking-wider text-neutral-500 mb-1">
                       Full Name
                     </label>
                     <input
@@ -754,12 +754,12 @@ const Students = () => {
                       }}
                       placeholder="Shayan Khan"
                       required
-                      className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm"
+                      className="bg-surface text-quinary border border-neutral-300 rounded-xl p-3 outline-none focus:border-primary transition-colors text-sm"
                     />
                   </div>
 
                   <div className="flex flex-col">
-                    <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
+                    <label className="text-xs font-bold uppercase tracking-wider text-neutral-500 mb-1">
                       Father Name
                     </label>
                     <input
@@ -767,18 +767,18 @@ const Students = () => {
                       value={formData.fatherName}
                       onChange={(e) => setFormData((prev) => ({ ...prev, fatherName: e.target.value }))}
                       placeholder="Shafat Khan"
-                      className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm"
+                      className="bg-surface text-quinary border border-neutral-300 rounded-xl p-3 outline-none focus:border-primary transition-colors text-sm"
                     />
                   </div>
 
                   <div className="flex flex-col">
-                    <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
+                    <label className="text-xs font-bold uppercase tracking-wider text-neutral-500 mb-1">
                       Gender
                     </label>
                     <select
                       value={formData.gender}
                       onChange={(e) => setFormData((prev) => ({ ...prev, gender: e.target.value }))}
-                      className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm"
+                      className="bg-surface text-quinary border border-neutral-300 rounded-xl p-3 outline-none focus:border-primary transition-colors text-sm"
                     >
                       <option value="">Select Gender</option>
                       <option value="Male">Male</option>
@@ -787,7 +787,7 @@ const Students = () => {
                   </div>
 
                   <div className="flex flex-col">
-                    <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
+                    <label className="text-xs font-bold uppercase tracking-wider text-neutral-500 mb-1">
                       Residence Address
                     </label>
                     <input
@@ -795,12 +795,12 @@ const Students = () => {
                       value={formData.residence}
                       onChange={(e) => setFormData((prev) => ({ ...prev, residence: e.target.value }))}
                       placeholder="Block 13, Gulshan-e-Iqbal, Karachi"
-                      className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm"
+                      className="bg-surface text-quinary border border-neutral-300 rounded-xl p-3 outline-none focus:border-primary transition-colors text-sm"
                     />
                   </div>
 
                   <div className="flex flex-col">
-                    <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
+                    <label className="text-xs font-bold uppercase tracking-wider text-neutral-500 mb-1">
                       Parent WhatsApp No
                     </label>
                     <input
@@ -809,17 +809,17 @@ const Students = () => {
                       value={formData.phone}
                       onChange={(e) => setFormData((prev) => ({ ...prev, phone: e.target.value }))}
                       placeholder="03001234567"
-                      className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm"
+                      className="bg-surface text-quinary border border-neutral-300 rounded-xl p-3 outline-none focus:border-primary transition-colors text-sm"
                     />
                     {formData.phone.length > 0 && formData.phone.length < 11 && (
-                      <span className="text-xs text-red-500 mt-1 font-medium">
+                      <span className="text-xs text-danger mt-1 font-medium">
                         Phone number must be exactly 11 digits ({formData.phone.length}/11)
                       </span>
                     )}
                   </div>
 
                   <div className="flex flex-col">
-                    <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
+                    <label className="text-xs font-bold uppercase tracking-wider text-neutral-500 mb-1">
                       Student WhatsApp No
                     </label>
                     <input
@@ -830,10 +830,10 @@ const Students = () => {
                         setFormData((prev) => ({ ...prev, studentWhatsappNo: e.target.value }))
                       }
                       placeholder="03007654321"
-                      className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm"
+                      className="bg-surface text-quinary border border-neutral-300 rounded-xl p-3 outline-none focus:border-primary transition-colors text-sm"
                     />
                     {formData.studentWhatsappNo.length > 0 && formData.studentWhatsappNo.length < 11 && (
-                      <span className="text-xs text-red-500 mt-1 font-medium">
+                      <span className="text-xs text-danger mt-1 font-medium">
                         Phone number must be exactly 11 digits ({formData.studentWhatsappNo.length}/11)
                       </span>
                     )}
@@ -841,16 +841,16 @@ const Students = () => {
                 </div>
               </div>
 
-              <hr className="border-gray-100" />
+              <hr className="border-neutral-100" />
 
               {/* Section: Academic Placement */}
               <div>
-                <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
+                <h3 className="text-sm font-semibold text-neutral-400 uppercase tracking-wider mb-4">
                   Academic Placement
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="flex flex-col">
-                    <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
+                    <label className="text-xs font-bold uppercase tracking-wider text-neutral-500 mb-1">
                       GR No / Student ID
                     </label>
                     <input
@@ -860,18 +860,18 @@ const Students = () => {
                       placeholder="STU-2026-001"
                       required
                       disabled={Boolean(formData.id)}
-                      className={`border border-gray-300 rounded-xl p-3 outline-none transition-colors text-sm ${formData.id
-                        ? "bg-gray-100 text-gray-500 cursor-not-allowed"
-                        : "bg-white text-[var(--quinary)] focus:border-[var(--primary)]"
+                      className={`border border-neutral-300 rounded-xl p-3 outline-none transition-colors text-sm ${formData.id
+                        ? "bg-neutral-100 text-neutral-500 cursor-not-allowed"
+                        : "bg-surface text-quinary focus:border-primary"
                         }`}
                     />
                     {formData.id && (
-                      <p className="text-gray-400 text-xs mt-1">GR No cannot be changed after registration.</p>
+                      <p className="text-neutral-400 text-xs mt-1">GR No cannot be changed after registration.</p>
                     )}
                   </div>
 
                   <div className="flex flex-col">
-                    <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
+                    <label className="text-xs font-bold uppercase tracking-wider text-neutral-500 mb-1">
                       Class / Grade Assigned
                     </label>
                     <select
@@ -880,7 +880,7 @@ const Students = () => {
                         setFormData((prev) => ({ ...prev, studentClass: e.target.value, section: "", group: "" }))
                       }
                       required
-                      className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm"
+                      className="bg-surface text-quinary border border-neutral-300 rounded-xl p-3 outline-none focus:border-primary transition-colors text-sm"
                     >
                       <option value="">Select Class</option>
                       {classes.map((cls) => (
@@ -894,14 +894,14 @@ const Students = () => {
                   {/* Section is conditional: only shown when the selected class has sections defined */}
                   {formData.studentClass && formSections.length > 0 && (
                     <div className="flex flex-col">
-                      <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
+                      <label className="text-xs font-bold uppercase tracking-wider text-neutral-500 mb-1">
                         Section
                       </label>
                       <select
                         value={formData.section}
                         onChange={(e) => setFormData((prev) => ({ ...prev, section: e.target.value }))}
                         required
-                        className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm"
+                        className="bg-surface text-quinary border border-neutral-300 rounded-xl p-3 outline-none focus:border-primary transition-colors text-sm"
                       >
                         <option value="">Select Section</option>
                         {formSections.map((sec) => (
@@ -916,14 +916,14 @@ const Students = () => {
                   {/* Group is conditional: only shown when the selected class has groups defined */}
                   {formData.studentClass && formGroups.length > 0 && (
                     <div className="flex flex-col">
-                      <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
+                      <label className="text-xs font-bold uppercase tracking-wider text-neutral-500 mb-1">
                         Group
                       </label>
                       <select
                         value={formData.group}
                         onChange={(e) => setFormData((prev) => ({ ...prev, group: e.target.value }))}
                         required
-                        className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm"
+                        className="bg-surface text-quinary border border-neutral-300 rounded-xl p-3 outline-none focus:border-primary transition-colors text-sm"
                       >
                         <option value="">Select Group</option>
                         {formGroups.map((grp) => (
@@ -937,31 +937,31 @@ const Students = () => {
                 </div>
               </div>
 
-              <hr className="border-gray-100" />
+              <hr className="border-neutral-100" />
 
               {/* Section: Individual Fee Structure (optional) */}
               <div>
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
+                  <h3 className="text-sm font-semibold text-neutral-400 uppercase tracking-wider">
                     Individual Fee Structure
                   </h3>
-                  <label className="flex items-center gap-2 text-xs font-semibold text-gray-500 cursor-pointer select-none">
+                  <label className="flex items-center gap-2 text-xs font-semibold text-neutral-500 cursor-pointer select-none">
                     <input
                       type="checkbox"
                       checked={feeOverrideEnabled}
                       onChange={(e) => setFeeOverrideEnabled(e.target.checked)}
                       disabled={checkingFeeOverride}
-                      className="w-4 h-4 accent-[var(--primary)] cursor-pointer"
+                      className="w-4 h-4 accent-primary cursor-pointer"
                     />
                     Set individual fee structure for this student
                   </label>
                 </div>
 
                 {checkingFeeOverride ? (
-                  <p className="text-xs text-gray-400">Checking for an existing individual fee structure...</p>
+                  <p className="text-xs text-neutral-400">Checking for an existing individual fee structure...</p>
                 ) : (
                   <>
-                    <p className="text-xs text-gray-400 mb-4">
+                    <p className="text-xs text-neutral-400 mb-4">
                       {feeOverrideId
                         ? "This student has an individual fee structure. Editing below updates it; unchecking the box above removes it and reverts them to their class's fee structure."
                         : "Optional. When enabled, these amounts override the class's fee structure just for this student — used whenever a voucher is generated for them."}
@@ -970,7 +970,7 @@ const Students = () => {
                     {feeOverrideEnabled && (
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="flex flex-col">
-                          <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
+                          <label className="text-xs font-bold uppercase tracking-wider text-neutral-500 mb-1">
                             Tuition Fee
                           </label>
                           <input
@@ -986,7 +986,7 @@ const Students = () => {
                         </div>
 
                         <div className="flex flex-col">
-                          <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
+                          <label className="text-xs font-bold uppercase tracking-wider text-neutral-500 mb-1">
                             Exam Fee
                           </label>
                           <input
@@ -1002,7 +1002,7 @@ const Students = () => {
                         </div>
 
                         <div className="flex flex-col">
-                          <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
+                          <label className="text-xs font-bold uppercase tracking-wider text-neutral-500 mb-1">
                             Arrears Amount
                           </label>
                           <input
@@ -1018,7 +1018,7 @@ const Students = () => {
                         </div>
 
                         <div className="flex flex-col">
-                          <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
+                          <label className="text-xs font-bold uppercase tracking-wider text-neutral-500 mb-1">
                             Amount Within Due Date
                           </label>
                           <input
@@ -1034,7 +1034,7 @@ const Students = () => {
                         </div>
 
                         <div className="flex flex-col">
-                          <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
+                          <label className="text-xs font-bold uppercase tracking-wider text-neutral-500 mb-1">
                             Amount After Due Date
                           </label>
                           <input
@@ -1050,7 +1050,7 @@ const Students = () => {
                         </div>
 
                         <div className="flex flex-col">
-                          <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
+                          <label className="text-xs font-bold uppercase tracking-wider text-neutral-500 mb-1">
                             Due Day (1–28)
                           </label>
                           <input
@@ -1063,7 +1063,7 @@ const Students = () => {
                             required
                             className={feeInputClass}
                           />
-                          <p className="text-gray-400 text-xs mt-1">
+                          <p className="text-neutral-400 text-xs mt-1">
                             Day of the month vouchers become due. Kept ≤28 so it's valid every month.
                           </p>
                         </div>
@@ -1073,13 +1073,13 @@ const Students = () => {
                 )}
               </div>
 
-              <hr className="border-gray-100" />
+              <hr className="border-neutral-100" />
 
 
               {/* Section: Portal Account Credentials */}
               <div>
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
+                  <h3 className="text-sm font-semibold text-neutral-400 uppercase tracking-wider">
                     Portal Account Credentials
                   </h3>
                   {!formData.id && (
@@ -1098,7 +1098,7 @@ const Students = () => {
                           confirmPassword: newPass,
                         }));
                       }}
-                      className="text-xs font-semibold text-[var(--primary)] hover:underline cursor-pointer"
+                      className="text-xs font-semibold text-primary hover:underline cursor-pointer"
                     >
                       ↻ Regenerate Credentials
                     </button>
@@ -1108,7 +1108,7 @@ const Students = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {/* Username */}
                   <div className="flex flex-col">
-                    <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
+                    <label className="text-xs font-bold uppercase tracking-wider text-neutral-500 mb-1">
                       Username
                     </label>
                     <input
@@ -1118,16 +1118,16 @@ const Students = () => {
                       disabled={Boolean(formData.id)}
                       placeholder="Auto-generated"
                       required
-                      className={`border border-gray-300 rounded-xl p-3 outline-none text-sm transition-colors ${formData.id
-                        ? "bg-gray-100 text-gray-500 cursor-not-allowed"
-                        : "bg-white text-[var(--quinary)] focus:border-[var(--primary)]"
+                      className={`border border-neutral-300 rounded-xl p-3 outline-none text-sm transition-colors ${formData.id
+                        ? "bg-neutral-100 text-neutral-500 cursor-not-allowed"
+                        : "bg-surface text-quinary focus:border-primary"
                         }`}
                     />
                   </div>
 
                   {/* Email */}
                   <div className="flex flex-col">
-                    <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
+                    <label className="text-xs font-bold uppercase tracking-wider text-neutral-500 mb-1">
                       Email Address
                     </label>
                     <input
@@ -1135,7 +1135,7 @@ const Students = () => {
                       value={formData.email || ""}
                       onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
                       placeholder="shayan@gmail.com"
-                      className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm"
+                      className="bg-surface text-quinary border border-neutral-300 rounded-xl p-3 outline-none focus:border-primary transition-colors text-sm"
                     />
                   </div>
 
@@ -1143,7 +1143,7 @@ const Students = () => {
                   {!formData.id && (
                     <>
                       <div className="flex flex-col">
-                        <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
+                        <label className="text-xs font-bold uppercase tracking-wider text-neutral-500 mb-1">
                           System Password
                         </label>
                         <input
@@ -1158,7 +1158,7 @@ const Students = () => {
                           }
                           placeholder="Auto-generated"
                           required
-                          className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm font-mono"
+                          className="bg-surface text-quinary border border-neutral-300 rounded-xl p-3 outline-none focus:border-primary transition-colors text-sm font-mono"
                         />
                       </div>
 
@@ -1178,14 +1178,14 @@ const Students = () => {
                   type="button"
                   onClick={cancelForm}
                   disabled={saving}
-                  className="bg-white hover:bg-gray-50 disabled:opacity-50 text-[var(--quinary)] font-medium py-3 px-6 rounded-xl border border-gray-300 transition-colors cursor-pointer text-sm"
+                  className="bg-surface hover:bg-neutral-50 disabled:opacity-50 text-quinary font-medium py-3 px-6 rounded-xl border border-neutral-300 transition-colors cursor-pointer text-sm"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="bg-[var(--primary)] hover:bg-[var(--quinary)] disabled:opacity-50 text-white font-medium py-3 px-8 rounded-xl transition-all duration-300 shadow-md transform active:scale-[0.98] cursor-pointer text-sm font-semibold tracking-wide uppercase"
+                  className="bg-primary hover:bg-quinary disabled:opacity-50 text-white font-medium py-3 px-8 rounded-xl transition-all duration-300 shadow-md transform active:scale-[0.98] cursor-pointer text-sm font-semibold tracking-wide uppercase"
                 >
                   {saving
                     ? formData.id
@@ -1203,11 +1203,11 @@ const Students = () => {
         /* ---------------- LIST / READ VIEW ---------------- */
         <div>
           {/* Filter Bar */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 mb-5">
+          <div className="bg-surface rounded-2xl border border-neutral-200 shadow-sm p-5 mb-5">
             <form onSubmit={handleSearchSubmit} className="flex flex-wrap items-end gap-3">
               {/* Search by GR No / Name */}
               <div className="flex flex-col flex-1 min-w-[220px]">
-                <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">
+                <label className="text-xs uppercase tracking-wider text-neutral-500 font-semibold mb-1">
                   Search by GR No / Name
                 </label>
                 <div className="flex gap-2">
@@ -1216,11 +1216,11 @@ const Students = () => {
                     value={searchInput}
                     onChange={(e) => setSearchInput(e.target.value)}
                     placeholder="e.g., STU-2026-001"
-                    className="flex-1 bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm placeholder-gray-400"
+                    className="flex-1 bg-surface text-quinary border border-neutral-300 rounded-xl p-3 outline-none focus:border-primary transition-colors text-sm placeholder-neutral-400"
                   />
                   <button
                     type="submit"
-                    className="bg-[var(--primary)] hover:bg-[var(--quinary)] text-white font-medium px-4 rounded-xl transition-colors text-sm cursor-pointer"
+                    className="bg-primary hover:bg-quinary text-white font-medium px-4 rounded-xl transition-colors text-sm cursor-pointer"
                   >
                     Search
                   </button>
@@ -1229,13 +1229,13 @@ const Students = () => {
 
               {/* Class filter */}
               <div className="flex flex-col min-w-[160px]">
-                <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">
+                <label className="text-xs uppercase tracking-wider text-neutral-500 font-semibold mb-1">
                   Class
                 </label>
                 <select
                   value={classFilter}
                   onChange={(e) => setClassFilter(e.target.value)}
-                  className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm cursor-pointer"
+                  className="bg-surface text-quinary border border-neutral-300 rounded-xl p-3 outline-none focus:border-primary transition-colors text-sm cursor-pointer"
                 >
                   <option value="">All Classes</option>
                   {classes.map((cls) => (
@@ -1248,14 +1248,14 @@ const Students = () => {
 
               {/* Section filter — scoped to the selected class */}
               <div className="flex flex-col min-w-[150px]">
-                <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">
+                <label className="text-xs uppercase tracking-wider text-neutral-500 font-semibold mb-1">
                   Section
                 </label>
                 <select
                   value={sectionFilter}
                   onChange={(e) => setSectionFilter(e.target.value)}
                   disabled={!classFilter || filterSections.length === 0}
-                  className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bg-surface text-quinary border border-neutral-300 rounded-xl p-3 outline-none focus:border-primary transition-colors text-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <option value="">
                     {classFilter ? "All Sections" : "Select a class first"}
@@ -1270,14 +1270,14 @@ const Students = () => {
 
               {/* Group filter — scoped to the selected class */}
               <div className="flex flex-col min-w-[150px]">
-                <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">
+                <label className="text-xs uppercase tracking-wider text-neutral-500 font-semibold mb-1">
                   Group
                 </label>
                 <select
                   value={groupFilter}
                   onChange={(e) => setGroupFilter(e.target.value)}
                   disabled={!classFilter || filterGroups.length === 0}
-                  className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bg-surface text-quinary border border-neutral-300 rounded-xl p-3 outline-none focus:border-primary transition-colors text-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <option value="">
                     {classFilter ? "All Groups" : "Select a class first"}
@@ -1292,13 +1292,13 @@ const Students = () => {
 
               {/* Status filter */}
               <div className="flex flex-col min-w-[140px]">
-                <label className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">
+                <label className="text-xs uppercase tracking-wider text-neutral-500 font-semibold mb-1">
                   Status
                 </label>
                 <select
                   value={frozenFilter}
                   onChange={(e) => setFrozenFilter(e.target.value)}
-                  className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm cursor-pointer"
+                  className="bg-surface text-quinary border border-neutral-300 rounded-xl p-3 outline-none focus:border-primary transition-colors text-sm cursor-pointer"
                 >
                   <option value="">All Statuses</option>
                   <option value="false">Active</option>
@@ -1309,7 +1309,7 @@ const Students = () => {
               <button
                 type="button"
                 onClick={clearFilters}
-                className="text-sm font-medium text-gray-500 hover:text-[var(--quinary)] hover:underline cursor-pointer py-3"
+                className="text-sm font-medium text-neutral-500 hover:text-quinary hover:underline cursor-pointer py-3"
               >
                 Clear Filters
               </button>
@@ -1320,12 +1320,12 @@ const Students = () => {
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-2 outline-none focus:border-[var(--primary)] text-sm"
+                className="bg-surface text-quinary border border-neutral-300 rounded-xl p-2 outline-none focus:border-primary text-sm"
               />
               <button
                 type="button"
                 onClick={() => handleDownloadAdmissionReport('daily', selectedDate)}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded shadow transition-colors text-sm cursor-pointer"
+                className="flex items-center gap-2 bg-primary hover:bg-quinary text-white font-medium py-2 px-4 rounded shadow transition-colors text-sm cursor-pointer"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 000-4H9a2 2 0 000 4zm8-12V5a2 2 0 00-2-2H7a2 2 0 00-2 2v4h14z" />
@@ -1336,50 +1336,50 @@ const Students = () => {
           </div>
 
           {/* Results Table */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="bg-surface rounded-2xl border border-neutral-200 shadow-sm overflow-hidden">
             {fetching ? (
-              <div className="p-8 text-center text-gray-400 text-sm">Loading students...</div>
+              <div className="p-8 text-center text-neutral-400 text-sm">Loading students...</div>
             ) : students.length === 0 ? (
-              <div className="p-8 text-center text-gray-400 text-sm">
+              <div className="p-8 text-center text-neutral-400 text-sm">
                 No students found. Try adjusting your filters, or click "+ New Student" to register one.
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-[var(--secondary)] text-left">
-                      <th className="p-3 font-semibold text-gray-500 uppercase text-xs tracking-wider">GR No</th>
-                      <th className="p-3 font-semibold text-gray-500 uppercase text-xs tracking-wider">Full Name</th>
-                      <th className="p-3 font-semibold text-gray-500 uppercase text-xs tracking-wider">Father Name</th>
-                      <th className="p-3 font-semibold text-gray-500 uppercase text-xs tracking-wider">Class</th>
-                      <th className="p-3 font-semibold text-gray-500 uppercase text-xs tracking-wider">Section</th>
-                      <th className="p-3 font-semibold text-gray-500 uppercase text-xs tracking-wider">Group</th>
-                      <th className="p-3 font-semibold text-gray-500 uppercase text-xs tracking-wider">Parent WhatsApp</th>
-                      <th className="p-3 font-semibold text-gray-500 uppercase text-xs tracking-wider">Status</th>
-                      <th className="p-3 font-semibold text-gray-500 uppercase text-xs tracking-wider text-right">Actions</th>
+                    <tr className="bg-secondary text-left">
+                      <th className="p-3 font-semibold text-neutral-500 uppercase text-xs tracking-wider">GR No</th>
+                      <th className="p-3 font-semibold text-neutral-500 uppercase text-xs tracking-wider">Full Name</th>
+                      <th className="p-3 font-semibold text-neutral-500 uppercase text-xs tracking-wider">Father Name</th>
+                      <th className="p-3 font-semibold text-neutral-500 uppercase text-xs tracking-wider">Class</th>
+                      <th className="p-3 font-semibold text-neutral-500 uppercase text-xs tracking-wider">Section</th>
+                      <th className="p-3 font-semibold text-neutral-500 uppercase text-xs tracking-wider">Group</th>
+                      <th className="p-3 font-semibold text-neutral-500 uppercase text-xs tracking-wider">Parent WhatsApp</th>
+                      <th className="p-3 font-semibold text-neutral-500 uppercase text-xs tracking-wider">Status</th>
+                      <th className="p-3 font-semibold text-neutral-500 uppercase text-xs tracking-wider text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {students.map((student) => (
-                      <tr key={student.id} className="border-t border-gray-100 hover:bg-gray-50">
-                        <td className="p-3 font-medium text-[var(--quinary)] whitespace-nowrap">
+                      <tr key={student.id} className="border-t border-neutral-100 hover:bg-neutral-50">
+                        <td className="p-3 font-medium text-quinary whitespace-nowrap">
                           {student.gr_no || student.student_id}
                         </td>
-                        <td className="p-3 text-[var(--quinary)] whitespace-nowrap">{student.full_name}</td>
-                        <td className="p-3 text-gray-500 whitespace-nowrap">{student.father_name || "—"}</td>
-                        <td className="p-3 text-gray-500 whitespace-nowrap">
+                        <td className="p-3 text-quinary whitespace-nowrap">{student.full_name}</td>
+                        <td className="p-3 text-neutral-500 whitespace-nowrap">{student.father_name || "—"}</td>
+                        <td className="p-3 text-neutral-500 whitespace-nowrap">
                           {student.student_class?.display_name || "—"}
                         </td>
-                        <td className="p-3 text-gray-500 whitespace-nowrap">{student.section?.name || "—"}</td>
-                        <td className="p-3 text-gray-500 whitespace-nowrap">{student.group?.name || "—"}</td>
-                        <td className="p-3 text-gray-500 whitespace-nowrap">
+                        <td className="p-3 text-neutral-500 whitespace-nowrap">{student.section?.name || "—"}</td>
+                        <td className="p-3 text-neutral-500 whitespace-nowrap">{student.group?.name || "—"}</td>
+                        <td className="p-3 text-neutral-500 whitespace-nowrap">
                           {student.parent_whatsapp_no || student.phone || "—"}
                         </td>
                         <td className="p-3 whitespace-nowrap">
                           <span
                             className={`text-xs font-medium px-2.5 py-1 rounded-full border ${student.is_frozen
-                              ? "bg-red-50 text-red-600 border-red-200"
-                              : "bg-green-50 text-green-700 border-green-200"
+                              ? "bg-danger/10 text-danger border-danger/20"
+                              : "bg-success/10 text-success border-success/20"
                               }`}
                           >
                             {student.is_frozen ? "Frozen" : "Active"}
@@ -1390,7 +1390,7 @@ const Students = () => {
                             <button
                               type="button"
                               onClick={() => openEditForm(student)}
-                              className="text-sm font-medium text-[var(--primary)] hover:underline cursor-pointer"
+                              className="text-sm font-medium text-primary hover:underline cursor-pointer"
                             >
                               Edit
                             </button>
@@ -1398,7 +1398,7 @@ const Students = () => {
                               type="button"
                               onClick={() => handleToggleStatus(student)}
                               disabled={statusChangingId === student.id}
-                              className={`text-sm font-medium hover:underline cursor-pointer disabled:opacity-50 ${student.is_frozen ? "text-green-600" : "text-amber-600"
+                              className={`text-sm font-medium hover:underline cursor-pointer disabled:opacity-50 ${student.is_frozen ? "text-success" : "text-warning"
                                 }`}
                             >
                               {statusChangingId === student.id
@@ -1411,7 +1411,7 @@ const Students = () => {
                               type="button"
                               onClick={() => handleDelete(student)}
                               disabled={deletingId === student.id}
-                              className="text-sm font-medium text-red-500 hover:text-red-600 disabled:opacity-50 cursor-pointer"
+                              className="text-sm font-medium text-danger hover:underline disabled:opacity-50 cursor-pointer"
                             >
                               {deletingId === student.id ? "Deleting..." : "Delete"}
                             </button>

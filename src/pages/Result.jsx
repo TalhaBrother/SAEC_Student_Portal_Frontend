@@ -8,9 +8,9 @@ import useAuthStore from "../store/authStore";
 // used in class_test_result_pdf_generator.py, so the hover previews
 // below actually look like the PDFs they represent.
 // ---------------------------------------------------------------
-const PDF_PRIMARY = "#0f5c5c";
-const PDF_SECONDARY = "#17a2a2";
-const PDF_ACCENT = "#eaf6f6";
+const PDF_PRIMARY = "var(--accent-teal-dark)";
+const PDF_SECONDARY = "var(--accent-teal)";
+const PDF_ACCENT = "var(--accent-teal-light)";
 
 // ---------------------------------------------------------------
 // Small CSS mockups of each report card format, shown in a popover on
@@ -22,7 +22,7 @@ const PDF_ACCENT = "#eaf6f6";
 const FormatPreviewCard = ({ format }) => {
     if (format === 1) {
         return (
-            <div className="w-[230px] bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden text-left">
+            <div className="w-[230px] bg-surface rounded-lg shadow-xl border border-neutral-200 overflow-hidden text-left">
                 <div className="px-2 py-1.5" style={{ backgroundColor: PDF_PRIMARY }}>
                     <div className="text-white text-[9px] font-bold tracking-wide">STUDENT REPORT CARD</div>
                 </div>
@@ -30,25 +30,25 @@ const FormatPreviewCard = ({ format }) => {
                     <table className="w-full border-collapse text-[6px]">
                         <thead>
                             <tr style={{ backgroundColor: PDF_ACCENT }}>
-                                <th className="border border-gray-300 px-1 py-0.5">Sr#</th>
-                                <th className="border border-gray-300 px-1 py-0.5">Test</th>
-                                <th className="border border-gray-300 px-1 py-0.5">Eng</th>
-                                <th className="border border-gray-300 px-1 py-0.5">Math</th>
-                                <th className="border border-gray-300 px-1 py-0.5">Sci</th>
-                                <th className="border border-gray-300 px-1 py-0.5">%</th>
-                                <th className="border border-gray-300 px-1 py-0.5">Remarks</th>
+                                <th className="border border-neutral-300 px-1 py-0.5">Sr#</th>
+                                <th className="border border-neutral-300 px-1 py-0.5">Test</th>
+                                <th className="border border-neutral-300 px-1 py-0.5">Eng</th>
+                                <th className="border border-neutral-300 px-1 py-0.5">Math</th>
+                                <th className="border border-neutral-300 px-1 py-0.5">Sci</th>
+                                <th className="border border-neutral-300 px-1 py-0.5">%</th>
+                                <th className="border border-neutral-300 px-1 py-0.5">Remarks</th>
                             </tr>
                         </thead>
                         <tbody>
                             {["Test 1", "Test 2", "Test 3"].map((t, i) => (
                                 <tr key={t}>
-                                    <td className="border border-gray-200 px-1 py-0.5 text-center">{i + 1}</td>
-                                    <td className="border border-gray-200 px-1 py-0.5">{t}</td>
-                                    <td className="border border-gray-200 px-1 py-0.5 text-center">18</td>
-                                    <td className="border border-gray-200 px-1 py-0.5 text-center">22</td>
-                                    <td className="border border-gray-200 px-1 py-0.5 text-center">20</td>
-                                    <td className="border border-gray-200 px-1 py-0.5 text-center">80%</td>
-                                    <td className="border border-gray-200 px-1 py-0.5 text-center">Good</td>
+                                    <td className="border border-neutral-200 px-1 py-0.5 text-center">{i + 1}</td>
+                                    <td className="border border-neutral-200 px-1 py-0.5">{t}</td>
+                                    <td className="border border-neutral-200 px-1 py-0.5 text-center">18</td>
+                                    <td className="border border-neutral-200 px-1 py-0.5 text-center">22</td>
+                                    <td className="border border-neutral-200 px-1 py-0.5 text-center">20</td>
+                                    <td className="border border-neutral-200 px-1 py-0.5 text-center">80%</td>
+                                    <td className="border border-neutral-200 px-1 py-0.5 text-center">Good</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -62,9 +62,9 @@ const FormatPreviewCard = ({ format }) => {
                             />
                         ))}
                     </div>
-                    <div className="text-[7px] text-gray-400 mt-1">Percentage trend across tests</div>
+                    <div className="text-[7px] text-neutral-400 mt-1">Percentage trend across tests</div>
                 </div>
-                <div className="px-2 py-1 bg-gray-50 border-t border-gray-100 text-[7px] text-gray-500 leading-tight">
+                <div className="px-2 py-1 bg-neutral-50 border-t border-neutral-100 text-[7px] text-neutral-500 leading-tight">
                     One PDF per student — every test they've taken, side-by-side, with a trend chart.
                 </div>
             </div>
@@ -73,7 +73,7 @@ const FormatPreviewCard = ({ format }) => {
 
     if (format === 2) {
         return (
-            <div className="w-[230px] bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden text-left">
+            <div className="w-[230px] bg-surface rounded-lg shadow-xl border border-neutral-200 overflow-hidden text-left">
                 <div className="px-2 py-1.5" style={{ backgroundColor: PDF_PRIMARY }}>
                     <div className="text-white text-[9px] font-bold tracking-wide">STUDENT REPORT CARD</div>
                 </div>
@@ -88,12 +88,12 @@ const FormatPreviewCard = ({ format }) => {
                     <table className="w-full border-collapse text-[6px]">
                         <thead>
                             <tr style={{ backgroundColor: PDF_ACCENT }}>
-                                <th className="border border-gray-300 px-1 py-0.5">S.No</th>
-                                <th className="border border-gray-300 px-1 py-0.5">Subject</th>
-                                <th className="border border-gray-300 px-1 py-0.5">Obt.</th>
-                                <th className="border border-gray-300 px-1 py-0.5">Total</th>
-                                <th className="border border-gray-300 px-1 py-0.5">%</th>
-                                <th className="border border-gray-300 px-1 py-0.5">Grade</th>
+                                <th className="border border-neutral-300 px-1 py-0.5">S.No</th>
+                                <th className="border border-neutral-300 px-1 py-0.5">Subject</th>
+                                <th className="border border-neutral-300 px-1 py-0.5">Obt.</th>
+                                <th className="border border-neutral-300 px-1 py-0.5">Total</th>
+                                <th className="border border-neutral-300 px-1 py-0.5">%</th>
+                                <th className="border border-neutral-300 px-1 py-0.5">Grade</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -103,14 +103,14 @@ const FormatPreviewCard = ({ format }) => {
                                 ["Science", 21, 25, "B"],
                             ].map(([s, o, t, g], i) => (
                                 <tr key={s}>
-                                    <td className="border border-gray-200 px-1 py-0.5 text-center">{i + 1}</td>
-                                    <td className="border border-gray-200 px-1 py-0.5">{s}</td>
-                                    <td className="border border-gray-200 px-1 py-0.5 text-center">{o}</td>
-                                    <td className="border border-gray-200 px-1 py-0.5 text-center">{t}</td>
-                                    <td className="border border-gray-200 px-1 py-0.5 text-center">
+                                    <td className="border border-neutral-200 px-1 py-0.5 text-center">{i + 1}</td>
+                                    <td className="border border-neutral-200 px-1 py-0.5">{s}</td>
+                                    <td className="border border-neutral-200 px-1 py-0.5 text-center">{o}</td>
+                                    <td className="border border-neutral-200 px-1 py-0.5 text-center">{t}</td>
+                                    <td className="border border-neutral-200 px-1 py-0.5 text-center">
                                         {Math.round((o / t) * 100)}%
                                     </td>
-                                    <td className="border border-gray-200 px-1 py-0.5 text-center">{g}</td>
+                                    <td className="border border-neutral-200 px-1 py-0.5 text-center">{g}</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -127,7 +127,7 @@ const FormatPreviewCard = ({ format }) => {
                         </span>
                     </div>
                 </div>
-                <div className="px-2 py-1 bg-gray-50 border-t border-gray-100 text-[7px] text-gray-500 leading-tight">
+                <div className="px-2 py-1 bg-neutral-50 border-t border-neutral-100 text-[7px] text-neutral-500 leading-tight">
                     One PDF per student — one selected test, with per-subject grades and class average.
                 </div>
             </div>
@@ -136,20 +136,20 @@ const FormatPreviewCard = ({ format }) => {
 
     // format === 3
     return (
-        <div className="w-[250px] bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden text-left">
-            <div className="px-2 py-1.5 bg-[#E5E7EB] border-b border-gray-300">
-                <div className="text-[9px] font-bold text-gray-700 text-center">CLASS 9-A · MONTHLY TEST 2 RESULT</div>
+        <div className="w-[250px] bg-surface rounded-lg shadow-xl border border-neutral-200 overflow-hidden text-left">
+            <div className="px-2 py-1.5 bg-neutral-200 border-b border-neutral-300">
+                <div className="text-[9px] font-bold text-neutral-700 text-center">CLASS 9-A · MONTHLY TEST 2 RESULT</div>
             </div>
             <div className="p-2">
                 <table className="w-full border-collapse text-[6px]">
                     <thead>
-                        <tr style={{ backgroundColor: "#E5E7EB" }}>
-                            <th className="border border-gray-400 px-1 py-0.5">S.No</th>
-                            <th className="border border-gray-400 px-1 py-0.5">Student</th>
-                            <th className="border border-gray-400 px-1 py-0.5">Eng</th>
-                            <th className="border border-gray-400 px-1 py-0.5">Math</th>
-                            <th className="border border-gray-400 px-1 py-0.5">Sci</th>
-                            <th className="border border-gray-400 px-1 py-0.5">%</th>
+                        <tr style={{ backgroundColor: "var(--neutral-200)" }}>
+                            <th className="border border-neutral-400 px-1 py-0.5">S.No</th>
+                            <th className="border border-neutral-400 px-1 py-0.5">Student</th>
+                            <th className="border border-neutral-400 px-1 py-0.5">Eng</th>
+                            <th className="border border-neutral-400 px-1 py-0.5">Math</th>
+                            <th className="border border-neutral-400 px-1 py-0.5">Sci</th>
+                            <th className="border border-neutral-400 px-1 py-0.5">%</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -159,18 +159,18 @@ const FormatPreviewCard = ({ format }) => {
                             ["Omar Sheikh", 15, 22, 19, "68%"],
                         ].map((row, i) => (
                             <tr key={row[0]}>
-                                <td className="border border-gray-300 px-1 py-0.5 text-center">{i + 1}</td>
-                                <td className="border border-gray-300 px-1 py-0.5">{row[0]}</td>
-                                <td className="border border-gray-300 px-1 py-0.5 text-center">{row[1]}</td>
-                                <td className="border border-gray-300 px-1 py-0.5 text-center">{row[2]}</td>
-                                <td className="border border-gray-300 px-1 py-0.5 text-center">{row[3]}</td>
-                                <td className="border border-gray-300 px-1 py-0.5 text-center">{row[4]}</td>
+                                <td className="border border-neutral-300 px-1 py-0.5 text-center">{i + 1}</td>
+                                <td className="border border-neutral-300 px-1 py-0.5">{row[0]}</td>
+                                <td className="border border-neutral-300 px-1 py-0.5 text-center">{row[1]}</td>
+                                <td className="border border-neutral-300 px-1 py-0.5 text-center">{row[2]}</td>
+                                <td className="border border-neutral-300 px-1 py-0.5 text-center">{row[3]}</td>
+                                <td className="border border-neutral-300 px-1 py-0.5 text-center">{row[4]}</td>
                             </tr>
                         ))}
                     </tbody>
                 </table>
             </div>
-            <div className="px-2 py-1 bg-gray-50 border-t border-gray-100 text-[7px] text-gray-500 leading-tight">
+            <div className="px-2 py-1 bg-neutral-50 border-t border-neutral-100 text-[7px] text-neutral-500 leading-tight">
                 One PDF for the whole class — every student × every subject, for one test, in a single grid.
             </div>
         </div>
@@ -590,19 +590,19 @@ const Result = () => {
     };
 
     return (
-        <div className="p-6 bg-[var(--secondary)] text-[var(--quinary)] min-h-screen font-sans">
+        <div className="p-6 bg-secondary text-quinary min-h-screen font-sans">
             {/* Header */}
-            <div className="text-3xl font-bold tracking-tight mb-2 text-[var(--quinary)]">Academic Reports</div>
-            <p className="text-gray-500 text-sm mb-6">Inspect, compile, and distribute finalized performance metrics and multi-test summaries.</p>
+            <div className="text-3xl font-bold tracking-tight mb-2 text-quinary">Academic Reports</div>
+            <p className="text-neutral-500 text-sm mb-6">Inspect, compile, and distribute finalized performance metrics and multi-test summaries.</p>
 
             {/* Filter Deck */}
-            <div className="flex flex-col sm:flex-row gap-4 mb-4 items-end bg-white p-5 rounded-2xl border border-gray-200 shadow-sm max-w-5xl flex-wrap">
+            <div className="flex flex-col sm:flex-row gap-4 mb-4 items-end bg-surface p-5 rounded-2xl border border-neutral-200 shadow-sm max-w-5xl flex-wrap">
                 <div className="flex flex-col min-w-[220px] w-full sm:w-auto">
-                    <label className="text-xs uppercase tracking-wider text-gray-500 font-bold mb-1">Class</label>
+                    <label className="text-xs uppercase tracking-wider text-neutral-500 font-bold mb-1">Class</label>
                     <select
                         value={SelectedClass}
                         onChange={(e) => setSelectedClass(e.target.value)}
-                        className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] text-sm cursor-pointer font-medium"
+                        className="bg-surface text-quinary border border-neutral-300 rounded-xl p-3 outline-none focus:border-primary text-sm cursor-pointer font-medium"
                     >
                         <option value="">Select Class</option>
                         {Classes.map((cls) => (
@@ -615,11 +615,11 @@ const Result = () => {
 
                 {Sections.length > 0 && (
                     <div className="flex flex-col min-w-[180px] w-full sm:w-auto">
-                        <label className="text-xs uppercase tracking-wider text-gray-500 font-bold mb-1">Section</label>
+                        <label className="text-xs uppercase tracking-wider text-neutral-500 font-bold mb-1">Section</label>
                         <select
                             value={SelectedSection}
                             onChange={(e) => setSelectedSection(e.target.value)}
-                            className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] text-sm cursor-pointer font-medium"
+                            className="bg-surface text-quinary border border-neutral-300 rounded-xl p-3 outline-none focus:border-primary text-sm cursor-pointer font-medium"
                         >
                             <option value="">All Sections</option>
                             {Sections.map((s) => (
@@ -631,11 +631,11 @@ const Result = () => {
 
                 {Groups.length > 0 && (
                     <div className="flex flex-col min-w-[180px] w-full sm:w-auto">
-                        <label className="text-xs uppercase tracking-wider text-gray-500 font-bold mb-1">Group</label>
+                        <label className="text-xs uppercase tracking-wider text-neutral-500 font-bold mb-1">Group</label>
                         <select
                             value={SelectedGroup}
                             onChange={(e) => setSelectedGroup(e.target.value)}
-                            className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] text-sm cursor-pointer font-medium"
+                            className="bg-surface text-quinary border border-neutral-300 rounded-xl p-3 outline-none focus:border-primary text-sm cursor-pointer font-medium"
                         >
                             <option value="">All Groups</option>
                             {Groups.map((g) => (
@@ -646,31 +646,31 @@ const Result = () => {
                 )}
 
                 <div className="flex flex-col min-w-[220px] w-full sm:w-auto flex-1">
-                    <label className="text-xs uppercase tracking-wider text-gray-500 font-bold mb-1">Search (name or roll no.)</label>
+                    <label className="text-xs uppercase tracking-wider text-neutral-500 font-bold mb-1">Search (name or roll no.)</label>
                     <input
                         type="text"
                         value={SearchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         disabled={!SelectedClass}
                         placeholder="Search by name or student ID..."
-                        className="bg-white text-[var(--quinary)] border border-gray-300 rounded-xl p-3 outline-none focus:border-[var(--primary)] text-sm disabled:opacity-50 disabled:bg-gray-50 font-medium"
+                        className="bg-surface text-quinary border border-neutral-300 rounded-xl p-3 outline-none focus:border-primary text-sm disabled:opacity-50 disabled:bg-neutral-50 font-medium"
                     />
                 </div>
             </div>
 
             {/* Bulk actions */}
             {SelectedClass && (
-                <div className="flex flex-col gap-3 mb-8 max-w-5xl bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">
+                <div className="flex flex-col gap-3 mb-8 max-w-5xl bg-surface p-4 rounded-2xl border border-neutral-200 shadow-sm">
                     <div className="flex flex-wrap items-center gap-3">
-                        <span className="text-xs uppercase tracking-wider text-gray-500 font-bold">Whole Class Format:</span>
+                        <span className="text-xs uppercase tracking-wider text-neutral-500 font-bold">Whole Class Format:</span>
                         <div className="flex gap-2">
                             <FormatPreviewTrigger format={1} align="left">
                                 <button
                                     onClick={() => { setClassZipFormat("current"); setSelectedZipTestId(""); }}
                                     className={`text-xs font-semibold py-1.5 px-3 rounded-lg border transition-all cursor-pointer ${
                                         classZipFormat === "current"
-                                            ? "bg-[var(--primary)] text-white border-[var(--primary)]"
-                                            : "bg-white text-[var(--quinary)] border-gray-300 hover:border-[var(--primary)]"
+                                            ? "bg-primary text-white border-primary"
+                                            : "bg-surface text-quinary border-neutral-300 hover:border-primary"
                                     }`}
                                 >
                                     Format 1
@@ -681,8 +681,8 @@ const Result = () => {
                                     onClick={() => setClassZipFormat("individual")}
                                     className={`text-xs font-semibold py-1.5 px-3 rounded-lg border transition-all cursor-pointer ${
                                         classZipFormat === "individual"
-                                            ? "bg-[var(--primary)] text-white border-[var(--primary)]"
-                                            : "bg-white text-[var(--quinary)] border-gray-300 hover:border-[var(--primary)]"
+                                            ? "bg-primary text-white border-primary"
+                                            : "bg-surface text-quinary border-neutral-300 hover:border-primary"
                                     }`}
                                 >
                                     Format 2
@@ -695,7 +695,7 @@ const Result = () => {
                                 value={selectedZipTestId}
                                 onChange={(e) => setSelectedZipTestId(e.target.value)}
                                 disabled={loadingClassTests}
-                                className="bg-white text-[var(--quinary)] border border-gray-300 rounded-lg py-1.5 px-3 outline-none focus:border-[var(--primary)] text-xs cursor-pointer font-medium disabled:opacity-50 min-w-[160px]"
+                                className="bg-surface text-quinary border border-neutral-300 rounded-lg py-1.5 px-3 outline-none focus:border-primary text-xs cursor-pointer font-medium disabled:opacity-50 min-w-[160px]"
                             >
                                 <option value="">
                                     {loadingClassTests ? "Loading tests..." : "Select a test"}
@@ -708,7 +708,7 @@ const Result = () => {
                     </div>
 
                     {classZipFormat === "individual" && (
-                        <div className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                        <div className="text-xs text-warning bg-warning/10 border border-warning/20 rounded-xl px-3 py-2">
                             Format 2 generates one report per student for a single test — pick the test above before generating.
                         </div>
                     )}
@@ -722,18 +722,18 @@ const Result = () => {
                                 Students.length === 0 ||
                                 (classZipFormat === "individual" && !selectedZipTestId)
                             }
-                            className="text-xs bg-[var(--secondary)] hover:bg-[var(--primary)] hover:text-white text-[var(--primary)] font-semibold py-2 px-4 rounded-xl border border-gray-200 transition-all cursor-pointer disabled:opacity-40"
+                            className="text-xs bg-secondary hover:bg-primary hover:text-white text-primary font-semibold py-2 px-4 rounded-xl border border-neutral-200 transition-all cursor-pointer disabled:opacity-40"
                         >
                             {downloadingZip ? "Generating ZIP..." : "📦 Generate Complete Class Reports"}
                         </button>
                     </div>
 
                     {/* Format 3 — single PDF, whole class, one test, all subjects */}
-                    <div className="border-t border-gray-100 pt-3 flex flex-col gap-2">
+                    <div className="border-t border-neutral-100 pt-3 flex flex-col gap-2">
                         <div className="flex flex-wrap items-center gap-3">
-                            <span className="text-xs uppercase tracking-wider text-gray-500 font-bold">Class Test Result:</span>
+                            <span className="text-xs uppercase tracking-wider text-neutral-500 font-bold">Class Test Result:</span>
                             <FormatPreviewTrigger format={3} align="left">
-                                <span className="text-xs font-semibold py-1.5 px-3 rounded-lg border bg-sky-50 text-sky-700 border-sky-200 select-none">
+                                <span className="text-xs font-semibold py-1.5 px-3 rounded-lg border bg-accent-sky/10 text-accent-sky border-accent-sky/20 select-none">
                                     Format 3
                                 </span>
                             </FormatPreviewTrigger>
@@ -741,7 +741,7 @@ const Result = () => {
                                 value={selectedFormat3TestId}
                                 onChange={(e) => setSelectedFormat3TestId(e.target.value)}
                                 disabled={loadingClassTests}
-                                className="bg-white text-[var(--quinary)] border border-gray-300 rounded-lg py-1.5 px-3 outline-none focus:border-[var(--primary)] text-xs cursor-pointer font-medium disabled:opacity-50 min-w-[160px]"
+                                className="bg-surface text-quinary border border-neutral-300 rounded-lg py-1.5 px-3 outline-none focus:border-primary text-xs cursor-pointer font-medium disabled:opacity-50 min-w-[160px]"
                             >
                                 <option value="">
                                     {loadingClassTests ? "Loading tests..." : "Select a test"}
@@ -753,12 +753,12 @@ const Result = () => {
                             <button
                                 onClick={handleDownloadClassTestResultPdf}
                                 disabled={downloadingFormat3 || !selectedFormat3TestId}
-                                className="text-xs bg-sky-50 hover:bg-sky-600 hover:text-white text-sky-700 font-semibold py-2 px-4 rounded-xl border border-sky-200 transition-all cursor-pointer disabled:opacity-40"
+                                className="text-xs bg-accent-sky/10 hover:bg-accent-sky hover:text-white text-accent-sky font-semibold py-2 px-4 rounded-xl border border-accent-sky/20 transition-all cursor-pointer disabled:opacity-40"
                             >
                                 {downloadingFormat3 ? "Generating..." : "🧾 Generate Class Result PDF"}
                             </button>
                         </div>
-                        <div className="text-xs text-sky-600 bg-sky-50 border border-sky-200 rounded-xl px-3 py-2">
+                        <div className="text-xs text-accent-sky bg-accent-sky/10 border border-accent-sky/20 rounded-xl px-3 py-2">
                             Format 3 produces one PDF listing every student in this class against every subject for the selected test — it's not a ZIP, and section/group/search filters don't apply (it's the whole class).
                         </div>
                     </div>
@@ -766,26 +766,26 @@ const Result = () => {
             )}
 
             {/* Student Roster */}
-            <div className="max-w-5xl bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-                <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">Class Registry List</h3>
+            <div className="max-w-5xl bg-surface rounded-2xl border border-neutral-200 shadow-sm p-5">
+                <h3 className="text-sm font-bold text-neutral-400 uppercase tracking-wider mb-4">Class Registry List</h3>
 
                 {!SelectedClass ? (
-                    <div className="text-gray-400 text-xs italic py-4">Select a class to load its students.</div>
+                    <div className="text-neutral-400 text-xs italic py-4">Select a class to load its students.</div>
                 ) : loadingStudents ? (
-                    <div className="flex items-center gap-2 py-8 justify-center text-gray-400 text-xs font-medium">
-                        <div className="w-5 h-5 border-4 border-t-[var(--primary)] border-gray-200 rounded-full animate-spin"></div>
+                    <div className="flex items-center gap-2 py-8 justify-center text-neutral-400 text-xs font-medium">
+                        <div className="w-5 h-5 border-4 border-t-primary border-neutral-200 rounded-full animate-spin"></div>
                         Loading students...
                     </div>
                 ) : Students.length === 0 ? (
-                    <div className="text-gray-400 text-xs italic py-4">No students found for the current filters.</div>
+                    <div className="text-neutral-400 text-xs italic py-4">No students found for the current filters.</div>
                 ) : (
-                    <div className="divide-y divide-gray-100">
+                    <div className="divide-y divide-neutral-100">
                         {Students.map((student) => (
                             <div key={student.id} className="py-4 space-y-3">
                                 <div className="flex flex-wrap items-center justify-between gap-2">
                                     <div>
-                                        <div className="font-semibold text-[var(--quinary)] text-sm">{student.full_name}</div>
-                                        <div className="text-xs text-gray-400">
+                                        <div className="font-semibold text-quinary text-sm">{student.full_name}</div>
+                                        <div className="text-xs text-neutral-400">
                                             {student.student_id}
                                             {/* {student.section ? ` · ${student.section}` : ""}
                                             {student.group ? ` · ${student.group}` : ""} */}
@@ -796,7 +796,7 @@ const Result = () => {
                                             <button
                                                 onClick={() => handleDownloadReportCard(student.id, student.full_name)}
                                                 disabled={downloadingId === `${student.id}`}
-                                                className="text-xs bg-[var(--secondary)] hover:bg-[var(--primary)] hover:text-white text-[var(--primary)] font-semibold py-2 px-3 rounded-xl transition-all cursor-pointer disabled:opacity-40"
+                                                className="text-xs bg-secondary hover:bg-primary hover:text-white text-primary font-semibold py-2 px-3 rounded-xl transition-all cursor-pointer disabled:opacity-40"
                                             >
                                                 {downloadingId === `${student.id}` ? "Generating..." : "Full Report Card (Format 1)"}
                                             </button>
@@ -811,7 +811,7 @@ const Result = () => {
                                                     }))
                                                 }
                                                 disabled={loadingClassTests || classTests.length === 0}
-                                                className="text-xs bg-white text-[var(--quinary)] border border-gray-300 rounded-xl py-2 px-2 outline-none focus:border-[var(--primary)] cursor-pointer font-medium disabled:opacity-50 max-w-[130px]"
+                                                className="text-xs bg-surface text-quinary border border-neutral-300 rounded-xl py-2 px-2 outline-none focus:border-primary cursor-pointer font-medium disabled:opacity-50 max-w-[130px]"
                                             >
                                                 <option value="">
                                                     {loadingClassTests
@@ -838,7 +838,7 @@ const Result = () => {
                                                         !rowTestSelection[student.id] ||
                                                         downloadingId === `${student.id}-${rowTestSelection[student.id]}-individual`
                                                     }
-                                                    className="text-xs bg-indigo-50 hover:bg-indigo-600 hover:text-white text-indigo-600 font-semibold py-2 px-3 rounded-xl transition-all cursor-pointer disabled:opacity-40 border border-indigo-200"
+                                                    className="text-xs bg-accent-indigo/10 hover:bg-accent-indigo hover:text-white text-accent-indigo font-semibold py-2 px-3 rounded-xl transition-all cursor-pointer disabled:opacity-40 border border-accent-indigo/20"
                                                 >
                                                     {downloadingId === `${student.id}-${rowTestSelection[student.id]}-individual`
                                                         ? "..."
@@ -848,7 +848,7 @@ const Result = () => {
                                         </div>
                                         <button
                                             onClick={() => handleToggleAvailableTests(student.id)}
-                                            className="text-xs bg-gray-100 hover:bg-[var(--quinary)] hover:text-white text-gray-600 font-semibold py-2 px-3 rounded-xl transition-all cursor-pointer"
+                                            className="text-xs bg-neutral-100 hover:bg-quinary hover:text-white text-neutral-600 font-semibold py-2 px-3 rounded-xl transition-all cursor-pointer"
                                         >
                                             {expandedStudentId === student.id ? "Hide Tests" : "View Tests"}
                                         </button>
@@ -856,27 +856,27 @@ const Result = () => {
                                 </div>
 
                                 {expandedStudentId === student.id && (
-                                    <div className="bg-[var(--secondary)] border border-gray-200 rounded-xl p-3 space-y-2">
+                                    <div className="bg-secondary border border-neutral-200 rounded-xl p-3 space-y-2">
                                         {loadingAvailable && !availableReportsByStudent[student.id] ? (
-                                            <div className="text-xs text-gray-400 py-2">Loading test history...</div>
+                                            <div className="text-xs text-neutral-400 py-2">Loading test history...</div>
                                         ) : (availableReportsByStudent[student.id] || []).length === 0 ? (
-                                            <div className="text-xs text-gray-400 py-2">No marks recorded for this student yet.</div>
+                                            <div className="text-xs text-neutral-400 py-2">No marks recorded for this student yet.</div>
                                         ) : (
                                             availableReportsByStudent[student.id].map((test) => (
                                                 <div
                                                     key={test.test_id}
-                                                    className="bg-white rounded-lg border border-gray-100 px-3 py-2 flex flex-wrap items-center justify-between gap-2"
+                                                    className="bg-surface rounded-lg border border-neutral-100 px-3 py-2 flex flex-wrap items-center justify-between gap-2"
                                                 >
                                                     <div>
-                                                        <div className="text-sm font-semibold text-[var(--quinary)]">{test.test_name}</div>
-                                                        <div className="text-xs text-gray-400">{test.date} · {test.percentage}%</div>
+                                                        <div className="text-sm font-semibold text-quinary">{test.test_name}</div>
+                                                        <div className="text-xs text-neutral-400">{test.date} · {test.percentage}%</div>
                                                     </div>
                                                     <div className="flex gap-2 flex-wrap">
                                                         <FormatPreviewTrigger format={1}>
                                                             <button
                                                                 onClick={() => handleDownloadTestReport(student.id, student.full_name, test.test_id, "current")}
                                                                 disabled={downloadingId === `${student.id}-${test.test_id}-current`}
-                                                                className="text-xs bg-[var(--secondary)] hover:bg-[var(--primary)] hover:text-white text-[var(--primary)] font-semibold py-1.5 px-3 rounded-lg transition-all cursor-pointer disabled:opacity-40"
+                                                                className="text-xs bg-secondary hover:bg-primary hover:text-white text-primary font-semibold py-1.5 px-3 rounded-lg transition-all cursor-pointer disabled:opacity-40"
                                                             >
                                                                 {downloadingId === `${student.id}-${test.test_id}-current` ? "..." : "Format 1"}
                                                             </button>
@@ -885,14 +885,14 @@ const Result = () => {
                                                             <button
                                                                 onClick={() => handleDownloadTestReport(student.id, student.full_name, test.test_id, "individual")}
                                                                 disabled={downloadingId === `${student.id}-${test.test_id}-individual`}
-                                                                className="text-xs bg-indigo-50 hover:bg-indigo-600 hover:text-white text-indigo-600 font-semibold py-1.5 px-3 rounded-lg transition-all cursor-pointer disabled:opacity-40 border border-indigo-200"
+                                                                className="text-xs bg-accent-indigo/10 hover:bg-accent-indigo hover:text-white text-accent-indigo font-semibold py-1.5 px-3 rounded-lg transition-all cursor-pointer disabled:opacity-40 border border-accent-indigo/20"
                                                             >
                                                                 {downloadingId === `${student.id}-${test.test_id}-individual` ? "..." : "Format 2"}
                                                             </button>
                                                         </FormatPreviewTrigger>
                                                         <button
                                                             onClick={() => handleSendWhatsAppText(student.id, test.test_id)}
-                                                            className="text-xs bg-emerald-50 hover:bg-emerald-600 hover:text-white text-emerald-600 font-bold py-1.5 px-3 rounded-lg transition-all cursor-pointer border border-emerald-200"
+                                                            className="text-xs bg-success/10 hover:bg-success hover:text-white text-success font-bold py-1.5 px-3 rounded-lg transition-all cursor-pointer border border-success/20"
                                                         >
                                                             💬
                                                         </button>
