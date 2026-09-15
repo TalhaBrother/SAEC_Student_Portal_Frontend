@@ -4,7 +4,6 @@
   "version": "1.0.0",
   "type": "module",
   "main": "public/main.js",
-
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -12,12 +11,9 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest",
-
     "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
-
     "electron:build": "npm run build:electron && electron-builder"
   },
-
   "dependencies": {
     "@tailwindcss/vite": "^4.3.1",
     "axios": "^1.18.0",
@@ -30,7 +26,6 @@
     "sweetalert2": "^11.26.25",
     "zustand": "^5.0.14"
   },
-
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@tailwindcss/postcss": "^4.3.1",
@@ -51,43 +46,41 @@
     "vitest": "^4.1.10",
     "wait-on": "^9.1.0"
   },
-
   "build": {
     "appId": "com.saec.studentportal",
-    "productName": "SAEC Student Portal",
-
+    "productName": "Student Portal",
     "directories": {
       "output": "release"
     },
-
     "files": [
       "public/**/*",
       "package.json"
     ],
-
     "extraResources": [
       {
         "from": "../Server/Backend/dist/serve",
         "to": "backend",
-         "filter": [
-      "**/*"
-    ]
+        "filter": [
+          "**/*"
+        ]
       },
-       {
-    "from": "../Server/Backend/.env",
-    "to": ".env"
-  },
+      {
+        "from": "../Bridge/whatsapp-server.exe",
+        "to": "whatsapp/whatsapp-server.exe"
+      },
+      {
+        "from": "../Server/Backend/.env",
+        "to": "backend/.env"
+      },
       {
         "from": "dist",
         "to": "frontend/dist"
       }
     ],
-
     "win": {
       "target": "nsis",
       "icon": "public/icon.ico"
     },
-
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
