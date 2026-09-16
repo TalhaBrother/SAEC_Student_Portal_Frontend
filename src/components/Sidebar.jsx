@@ -52,6 +52,12 @@ export default function Sidebar({ closeMobileMenu }) {
           roles: ["admin"],
           path: "/admin/students",
         },
+         {
+          label: "Teachers",
+          icon: HiOutlineUsers,
+          roles: ["admin"],
+          path: "/admin/teachers",
+        },
         {
           label: "Subjects",
           icon: HiOutlineBookOpen,
