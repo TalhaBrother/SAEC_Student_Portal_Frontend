@@ -15,6 +15,7 @@ import {
   HiOutlineTableCells,
   HiOutlineServer,
   HiChevronDown,
+  HiOutlineCamera,
 } from "react-icons/hi2";
 
 export default function Sidebar({ closeMobileMenu }) {
@@ -109,6 +110,12 @@ export default function Sidebar({ closeMobileMenu }) {
           icon: HiOutlineBanknotes,
           roles: ["admin"],
           path: "/admin/fees",
+        },
+         {
+          label: "ID Cards",
+          icon: HiOutlineCamera,
+          roles: ["admin"],
+          path: "/admin/idcard",
         },
       ],
     },

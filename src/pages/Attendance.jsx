@@ -65,12 +65,26 @@ const inputClass =
     "bg-[var(--surface)] text-[var(--quinary)] border border-[var(--neutral-300)] rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm";
 const labelClass = "text-xs uppercase tracking-wider text-[var(--neutral-500)] font-semibold mb-1";
 
-const TABS = [
+const ATTENDANCE_MODES = [
+    { key: "student", label: "Student Attendance" },
+    { key: "teacher", label: "Teacher Attendance" },
+];
+
+const STUDENT_TABS = [
     { key: "mark", label: "Mark Attendance" },
     { key: "records", label: "Records" },
     { key: "student", label: "Student Analytics" },
     { key: "class", label: "Class Analytics" },
 ];
+
+const TEACHER_TABS = [
+    { key: "mark", label: "Mark Attendance" },
+    { key: "records", label: "Records" },
+    { key: "analytics", label: "Analytics" },
+];
+
+// Kept for compatibility with anything referencing the old name.
+const TABS = STUDENT_TABS;
 
 /* ------------------------------------------------------------------ */
 /*  Root component                                                     */
@@ -78,10 +92,17 @@ const TABS = [
 
 const Attendance = () => {
     const token = useAuthStore((state) => state.accessToken);
-    const [activeTab, setActiveTab] = useState("mark");
+
+    // Top-level split: which roster this screen is working with. Each side
+    // keeps its own tab selection so switching back and forth doesn't lose
+    // your place.
+    const [mode, setMode] = useState("student");
+    const [activeStudentTab, setActiveStudentTab] = useState("mark");
+    const [activeTeacherTab, setActiveTeacherTab] = useState("mark");
 
     const [Students, setStudents] = useState([]);
     const [Classes, setClasses] = useState([]);
+    const [Teachers, setTeachers] = useState([]);
 
     useEffect(() => {
         if (!token) return;
@@ -93,6 +114,10 @@ const Attendance = () => {
         api.get("/classes/", authHeaders(token))
             .then((res) => setClasses(res.data))
             .catch((err) => console.error("Failed to load classes:", err));
+
+        api.get("/teachers/", authHeaders(token))
+            .then((res) => setTeachers(Array.isArray(res.data) ? res.data : res.data?.results || []))
+            .catch((err) => console.error("Failed to load teachers:", err));
     }, [token]);
 
     // Section / group options for a given class, derived from the
@@ -120,16 +145,39 @@ const Attendance = () => {
         return Array.from(seen, ([id, name]) => ({ id, name }));
     };
 
+    const tabs = mode === "student" ? STUDENT_TABS : TEACHER_TABS;
+    const activeTab = mode === "student" ? activeStudentTab : activeTeacherTab;
+    const setActiveTab = mode === "student" ? setActiveStudentTab : setActiveTeacherTab;
+
     return (
         <div className="p-6 bg-[var(--secondary)] text-[var(--quinary)] min-h-screen font-sans">
             <div className="text-3xl font-bold tracking-tight mb-2 text-[var(--quinary)]">Attendance</div>
             <p className="text-[var(--neutral-500)] text-sm mb-6">
-                Mark daily attendance, browse and edit records, and review attendance analytics.
+                Mark daily attendance, browse and edit records, and review attendance analytics — for students or
+                teaching staff.
             </p>
+
+            {/* Student / Teacher switch */}
+            <div className="inline-flex items-center gap-1 bg-[var(--surface)] border border-[var(--neutral-200)] rounded-xl p-1 mb-5 shadow-sm">
+                {ATTENDANCE_MODES.map((m) => (
+                    <button
+                        key={m.key}
+                        type="button"
+                        onClick={() => setMode(m.key)}
+                        className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+                            mode === m.key
+                                ? "bg-[var(--primary)] text-[var(--surface)] shadow-sm"
+                                : "text-[var(--neutral-500)] hover:text-[var(--quinary)] hover:bg-[var(--neutral-50)]"
+                        }`}
+                    >
+                        {m.label}
+                    </button>
+                ))}
+            </div>
 
             {/* Tabs */}
             <div className="flex flex-wrap gap-2 mb-6 border-b border-[var(--neutral-200)]">
-                {TABS.map((tab) => (
+                {tabs.map((tab) => (
                     <button
                         key={tab.key}
                         type="button"
@@ -145,31 +193,43 @@ const Attendance = () => {
                 ))}
             </div>
 
-            {activeTab === "mark" && (
-                <MarkAttendanceTab
-                    token={token}
-                    Classes={Classes}
-                    sectionOptionsFor={sectionOptionsFor}
-                    groupOptionsFor={groupOptionsFor}
-                />
+            {mode === "student" && (
+                <>
+                    {activeTab === "mark" && (
+                        <MarkAttendanceTab
+                            token={token}
+                            Classes={Classes}
+                            sectionOptionsFor={sectionOptionsFor}
+                            groupOptionsFor={groupOptionsFor}
+                        />
+                    )}
+                    {activeTab === "records" && (
+                        <RecordsTab
+                            token={token}
+                            Classes={Classes}
+                            Students={Students}
+                            sectionOptionsFor={sectionOptionsFor}
+                            groupOptionsFor={groupOptionsFor}
+                        />
+                    )}
+                    {activeTab === "student" && <StudentAnalyticsTab token={token} Students={Students} />}
+                    {activeTab === "class" && (
+                        <ClassAnalyticsTab
+                            token={token}
+                            Classes={Classes}
+                            sectionOptionsFor={sectionOptionsFor}
+                            groupOptionsFor={groupOptionsFor}
+                        />
+                    )}
+                </>
             )}
-            {activeTab === "records" && (
-                <RecordsTab
-                    token={token}
-                    Classes={Classes}
-                    Students={Students}
-                    sectionOptionsFor={sectionOptionsFor}
-                    groupOptionsFor={groupOptionsFor}
-                />
-            )}
-            {activeTab === "student" && <StudentAnalyticsTab token={token} Students={Students} />}
-            {activeTab === "class" && (
-                <ClassAnalyticsTab
-                    token={token}
-                    Classes={Classes}
-                    sectionOptionsFor={sectionOptionsFor}
-                    groupOptionsFor={groupOptionsFor}
-                />
+
+            {mode === "teacher" && (
+                <>
+                    {activeTab === "mark" && <TeacherMarkAttendanceTab token={token} Teachers={Teachers} />}
+                    {activeTab === "records" && <TeacherRecordsTab token={token} Teachers={Teachers} />}
+                    {activeTab === "analytics" && <TeacherAnalyticsTab token={token} />}
+                </>
             )}
         </div>
     );
@@ -1339,6 +1399,767 @@ function ClassSummaryView({ data }) {
                                 <td className="p-3 font-semibold">{s.attendance_percentage}%</td>
                             </tr>
                         ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/*  TEACHER ATTENDANCE — shared helpers                                */
+/* ------------------------------------------------------------------ */
+
+// TeacherAttendanceViewSet only supports these three query params
+// (teacher / date / status) — there is no `search` param on the backend,
+// so free-text search is always done client-side against fields the
+// serializer already gives us (teacher_name / teacher_id).
+const teacherMatchesQuery = (teacher, q) => {
+    if (!q) return true;
+    const query = q.trim().toLowerCase();
+    if (!query) return true;
+    return (
+        teacher.full_name?.toLowerCase().includes(query) ||
+        teacher.teacher_id?.toLowerCase().includes(query) ||
+        teacher.phone?.toLowerCase().includes(query)
+    );
+};
+
+/* ------------------------------------------------------------------ */
+/*  Teacher Tab 1 — Mark Attendance (roster -> bulk)                   */
+/* ------------------------------------------------------------------ */
+
+function TeacherMarkAttendanceTab({ token, Teachers }) {
+    const [date, setDate] = useState(todayISO());
+    const [search, setSearch] = useState("");
+
+    const [existing, setExisting] = useState({}); // teacherId -> status, from already-saved records
+    const [rosterLoading, setRosterLoading] = useState(false);
+    const [attendanceData, setAttendanceData] = useState({});
+    const [saving, setSaving] = useState(false);
+    const [lastSummary, setLastSummary] = useState(null);
+
+    const activeTeachers = useMemo(() => Teachers.filter((t) => t.is_active), [Teachers]);
+
+    // Pull whatever's already been marked for this date so the roster
+    // reflects reality instead of always defaulting to Present.
+    useEffect(() => {
+        if (!token || !date) return;
+
+        setRosterLoading(true);
+        setLastSummary(null);
+
+        api.get(`/teacher-attendance/?date=${date}`, authHeaders(token))
+            .then((res) => {
+                const records = Array.isArray(res.data) ? res.data : res.data?.results || [];
+                const map = {};
+                records.forEach((r) => {
+                    map[r.teacher] = r.status;
+                });
+                setExisting(map);
+                const initial = {};
+                activeTeachers.forEach((t) => {
+                    initial[t.id] = map[t.id] || "PRESENT";
+                });
+                setAttendanceData(initial);
+            })
+            .catch(async (err) => toast("error", await extractErrorMessage(err)))
+            .finally(() => setRosterLoading(false));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [date, token, Teachers.length]);
+
+    const filteredRoster = useMemo(() => {
+        if (!search.trim()) return activeTeachers;
+        return activeTeachers.filter((t) => teacherMatchesQuery(t, search));
+    }, [activeTeachers, search]);
+
+    const markStatus = (teacherId, status) => {
+        setAttendanceData((prev) => ({ ...prev, [teacherId]: status }));
+    };
+
+    const markAllVisible = (status) => {
+        setAttendanceData((prev) => {
+            const next = { ...prev };
+            filteredRoster.forEach((t) => {
+                next[t.id] = status;
+            });
+            return next;
+        });
+    };
+
+    const submitAttendance = async () => {
+        if (!date) return toast("warning", "Please select a date before saving attendance!");
+        if (activeTeachers.length === 0) return toast("warning", "There are no active teachers to mark.");
+
+        const records = activeTeachers.map((t) => ({
+            teacher: t.id,
+            status: attendanceData[t.id] || "PRESENT",
+        }));
+
+        setSaving(true);
+        try {
+            const res = await api.post("/teacher-attendance/bulk/", { date, records }, authHeaders(token));
+            const saved = Array.isArray(res.data) ? res.data : [];
+            const present = saved.filter((r) => r.status === "PRESENT").length;
+            const absent = saved.filter((r) => r.status === "ABSENT").length;
+            setLastSummary({ total: saved.length, present, absent });
+            toast("success", `Saved attendance for ${saved.length} teacher(s) on ${date}.`);
+        } catch (err) {
+            toast("error", await extractErrorMessage(err));
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <div>
+            <div className="flex flex-col sm:flex-row gap-4 mb-4 items-end flex-wrap">
+                <div className="flex flex-col min-w-[180px]">
+                    <label className={labelClass}>Date</label>
+                    <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={`${inputClass} cursor-pointer`} />
+                </div>
+
+                <div className="flex flex-col min-w-[220px] flex-1">
+                    <label className={labelClass}>Search roster</label>
+                    <input
+                        type="text"
+                        placeholder="Name, teacher ID, or phone..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className={inputClass}
+                    />
+                </div>
+            </div>
+
+            {filteredRoster.length > 0 && (
+                <div className="flex justify-between items-center mb-3">
+                    <div className="text-sm text-[var(--neutral-500)]">
+                        {filteredRoster.length} active teacher{filteredRoster.length !== 1 ? "s" : ""}
+                    </div>
+                    <div className="flex gap-2">
+                        <button
+                            type="button"
+                            onClick={() => markAllVisible("PRESENT")}
+                            className="text-xs font-semibold uppercase tracking-wide px-3 py-1.5 rounded-lg border border-[var(--success)] text-[var(--success)] hover:bg-[var(--success)]/5 cursor-pointer"
+                        >
+                            Mark all present
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => markAllVisible("ABSENT")}
+                            className="text-xs font-semibold uppercase tracking-wide px-3 py-1.5 rounded-lg border border-[var(--danger)] text-[var(--danger)] hover:bg-[var(--danger)]/5 cursor-pointer"
+                        >
+                            Mark all absent
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            <div className="bg-[var(--surface)] rounded-2xl border border-[var(--neutral-200)] shadow-sm p-6 space-y-4">
+                {rosterLoading ? (
+                    <div className="text-center py-8 text-[var(--neutral-400)] text-sm">Loading roster...</div>
+                ) : filteredRoster.length > 0 ? (
+                    filteredRoster.map((teacher) => {
+                        const currentStatus = attendanceData[teacher.id] || "PRESENT";
+                        return (
+                            <div
+                                key={teacher.id}
+                                className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[var(--neutral-100)] pb-4 last:border-0 last:pb-0 gap-3"
+                            >
+                                <div className="min-w-[220px]">
+                                    <div className="font-semibold text-base text-[var(--quinary)]">{teacher.full_name}</div>
+                                    <div className="text-xs text-[var(--neutral-400)]">
+                                        {teacher.teacher_id}
+                                        {teacher.phone ? ` · ${teacher.phone}` : ""}
+                                        {existing[teacher.id] && <span className="text-[var(--primary)]"> · already marked</span>}
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => markStatus(teacher.id, "PRESENT")}
+                                        className={`px-4 py-2 text-xs uppercase font-bold tracking-wider rounded-xl border transition-all duration-200 cursor-pointer ${
+                                            currentStatus === "PRESENT" ? STATUS_STYLES.PRESENT : STATUS_IDLE
+                                        }`}
+                                    >
+                                        Present
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => markStatus(teacher.id, "ABSENT")}
+                                        className={`px-4 py-2 text-xs uppercase font-bold tracking-wider rounded-xl border transition-all duration-200 cursor-pointer ${
+                                            currentStatus === "ABSENT" ? STATUS_STYLES.ABSENT : STATUS_IDLE
+                                        }`}
+                                    >
+                                        Absent
+                                    </button>
+                                </div>
+                            </div>
+                        );
+                    })
+                ) : (
+                    <div className="text-center py-8 text-[var(--neutral-400)] text-sm">
+                        {activeTeachers.length === 0 ? "No active teachers found." : "No teachers match this search."}
+                    </div>
+                )}
+            </div>
+
+            {filteredRoster.length > 0 && (
+                <div className="mt-6 flex justify-end">
+                    <button
+                        type="button"
+                        onClick={submitAttendance}
+                        disabled={saving}
+                        className="bg-[var(--primary)] hover:bg-[var(--quinary)] disabled:opacity-50 text-[var(--surface)] font-medium py-3 px-6 rounded-xl transition-all duration-300 shadow-md transform active:scale-[0.98] cursor-pointer"
+                    >
+                        {saving ? "Processing Records..." : "Save Attendance"}
+                    </button>
+                </div>
+            )}
+
+            <p className="text-xs text-[var(--neutral-400)] mt-3">
+                Note: saving always covers every active teacher for the selected date (not just the ones visible after
+                a search) — the search box here only helps you find someone to check or flip their status.
+            </p>
+
+            {lastSummary && (
+                <div className="mt-4 text-xs text-[var(--neutral-500)] bg-[var(--surface)] border border-[var(--neutral-200)] rounded-xl p-3">
+                    Last save: {lastSummary.total} record(s) — {lastSummary.present} present, {lastSummary.absent} absent.
+                </div>
+            )}
+        </div>
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Teacher Tab 2 — Records (filter, inline edit, delete, quick add)   */
+/* ------------------------------------------------------------------ */
+
+function TeacherRecordsTab({ token, Teachers }) {
+    const [filters, setFilters] = useState({
+        teacher: "",
+        date: "",
+        status: "",
+    });
+    const [search, setSearch] = useState("");
+    const [records, setRecords] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [busyId, setBusyId] = useState(null);
+    const [showAddForm, setShowAddForm] = useState(false);
+
+    const setFilter = (key, val) => setFilters((prev) => ({ ...prev, [key]: val }));
+
+    const fetchRecords = async () => {
+        if (!token) return;
+        setLoading(true);
+        try {
+            const params = new URLSearchParams();
+            if (filters.teacher) params.set("teacher", filters.teacher);
+            if (filters.date) params.set("date", filters.date);
+            if (filters.status) params.set("status", filters.status);
+            const res = await api.get(`/teacher-attendance/?${params.toString()}`, authHeaders(token));
+            setRecords(Array.isArray(res.data) ? res.data : res.data?.results || []);
+        } catch (err) {
+            toast("error", await extractErrorMessage(err));
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchRecords();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [token, filters.teacher, filters.date, filters.status]);
+
+    // The backend has no search param for this endpoint, so this runs
+    // client-side over whatever `records` currently holds.
+    const filteredRecords = useMemo(() => {
+        if (!search.trim()) return records;
+        const q = search.trim().toLowerCase();
+        return records.filter(
+            (r) => r.teacher_name?.toLowerCase().includes(q) || r.teacher_id?.toLowerCase().includes(q)
+        );
+    }, [records, search]);
+
+    const updateStatus = async (record, status) => {
+        if (record.status === status) return;
+        setBusyId(record.id);
+        try {
+            await api.patch(`/teacher-attendance/${record.id}/`, { status }, authHeaders(token));
+            setRecords((prev) => prev.map((r) => (r.id === record.id ? { ...r, status } : r)));
+        } catch (err) {
+            toast("error", await extractErrorMessage(err));
+        } finally {
+            setBusyId(null);
+        }
+    };
+
+    const deleteRecord = async (record) => {
+        const confirm = await Swal.fire({
+            title: "Delete this record?",
+            text: `${record.teacher_name} · ${record.date}`,
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonText: "Delete",
+            confirmButtonColor: "var(--danger)",
+            background: "var(--secondary)",
+            color: "var(--quinary)",
+        });
+        if (!confirm.isConfirmed) return;
+
+        setBusyId(record.id);
+        try {
+            await api.delete(`/teacher-attendance/${record.id}/`, authHeaders(token));
+            setRecords((prev) => prev.filter((r) => r.id !== record.id));
+        } catch (err) {
+            toast("error", await extractErrorMessage(err));
+        } finally {
+            setBusyId(null);
+        }
+    };
+
+    return (
+        <div>
+            {/* Filters */}
+            <div className="bg-[var(--surface)] rounded-2xl border border-[var(--neutral-200)] shadow-sm p-4 mb-4 flex flex-wrap gap-3 items-end">
+                <div className="flex flex-col min-w-[200px] flex-1">
+                    <label className={labelClass}>Search (on this page)</label>
+                    <input
+                        type="text"
+                        placeholder="Teacher name or ID..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className={inputClass}
+                    />
+                </div>
+                <div className="flex flex-col min-w-[200px]">
+                    <label className={labelClass}>Teacher</label>
+                    <select
+                        value={filters.teacher}
+                        onChange={(e) => setFilter("teacher", e.target.value)}
+                        className={`${inputClass} cursor-pointer`}
+                    >
+                        <option value="">All teachers</option>
+                        {Teachers.map((t) => (
+                            <option key={t.id} value={t.id}>
+                                {t.full_name} ({t.teacher_id})
+                            </option>
+                        ))}
+                    </select>
+                </div>
+                <div className="flex flex-col min-w-[150px]">
+                    <label className={labelClass}>Date</label>
+                    <input type="date" value={filters.date} onChange={(e) => setFilter("date", e.target.value)} className={inputClass} />
+                </div>
+                <div className="flex flex-col min-w-[150px]">
+                    <label className={labelClass}>Status</label>
+                    <select
+                        value={filters.status}
+                        onChange={(e) => setFilter("status", e.target.value)}
+                        className={`${inputClass} cursor-pointer`}
+                    >
+                        <option value="">All</option>
+                        <option value="PRESENT">Present</option>
+                        <option value="ABSENT">Absent</option>
+                    </select>
+                </div>
+                <button
+                    type="button"
+                    onClick={() => setShowAddForm((v) => !v)}
+                    className="border border-[var(--primary)] text-[var(--primary)] font-medium py-3 px-5 rounded-xl hover:bg-[var(--primary)]/10 transition-colors cursor-pointer"
+                >
+                    {showAddForm ? "Cancel" : "+ Add record"}
+                </button>
+            </div>
+
+            {showAddForm && (
+                <TeacherQuickAddRecord
+                    token={token}
+                    Teachers={Teachers}
+                    onCreated={(created) => {
+                        setRecords((prev) => [created, ...prev]);
+                        setShowAddForm(false);
+                    }}
+                />
+            )}
+
+            {/* Results table */}
+            <div className="bg-[var(--surface)] rounded-2xl border border-[var(--neutral-200)] shadow-sm overflow-x-auto">
+                <table className="w-full text-sm">
+                    <thead>
+                        <tr className="text-left text-xs uppercase tracking-wider text-[var(--neutral-500)] border-b border-[var(--neutral-100)]">
+                            <th className="p-3">Teacher</th>
+                            <th className="p-3">Date</th>
+                            <th className="p-3">Status</th>
+                            <th className="p-3 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {loading ? (
+                            <tr>
+                                <td colSpan={4} className="text-center py-8 text-[var(--neutral-400)]">
+                                    Loading records...
+                                </td>
+                            </tr>
+                        ) : filteredRecords.length === 0 ? (
+                            <tr>
+                                <td colSpan={4} className="text-center py-8 text-[var(--neutral-400)]">
+                                    No attendance records match these filters.
+                                </td>
+                            </tr>
+                        ) : (
+                            filteredRecords.map((record) => (
+                                <tr key={record.id} className="border-b border-[var(--neutral-50)] last:border-0">
+                                    <td className="p-3">
+                                        <div className="font-semibold">{record.teacher_name}</div>
+                                        <div className="text-xs text-[var(--neutral-400)]">{record.teacher_id}</div>
+                                    </td>
+                                    <td className="p-3">{record.date}</td>
+                                    <td className="p-3">
+                                        <div className="flex gap-2">
+                                            <button
+                                                type="button"
+                                                disabled={busyId === record.id}
+                                                onClick={() => updateStatus(record, "PRESENT")}
+                                                className={`px-3 py-1 text-xs font-bold uppercase rounded-lg border cursor-pointer disabled:opacity-50 ${
+                                                    record.status === "PRESENT" ? STATUS_STYLES.PRESENT : STATUS_IDLE
+                                                }`}
+                                            >
+                                                Present
+                                            </button>
+                                            <button
+                                                type="button"
+                                                disabled={busyId === record.id}
+                                                onClick={() => updateStatus(record, "ABSENT")}
+                                                className={`px-3 py-1 text-xs font-bold uppercase rounded-lg border cursor-pointer disabled:opacity-50 ${
+                                                    record.status === "ABSENT" ? STATUS_STYLES.ABSENT : STATUS_IDLE
+                                                }`}
+                                            >
+                                                Absent
+                                            </button>
+                                        </div>
+                                    </td>
+                                    <td className="p-3 text-right">
+                                        <button
+                                            type="button"
+                                            disabled={busyId === record.id}
+                                            onClick={() => deleteRecord(record)}
+                                            className="text-xs font-semibold text-[var(--danger)] hover:text-[var(--danger)] cursor-pointer disabled:opacity-50"
+                                        >
+                                            Delete
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))
+                        )}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+}
+
+function TeacherQuickAddRecord({ token, Teachers, onCreated }) {
+    const [teacherId, setTeacherId] = useState("");
+    const [date, setDate] = useState(todayISO());
+    const [status, setStatus] = useState("PRESENT");
+    const [saving, setSaving] = useState(false);
+
+    // Only active teachers can be marked going forward, matching the rule
+    // the bulk endpoint already enforces on the backend.
+    const activeTeachers = useMemo(() => Teachers.filter((t) => t.is_active), [Teachers]);
+
+    const submit = async () => {
+        if (!teacherId || !date) return toast("warning", "Teacher and date are both required.");
+        setSaving(true);
+        try {
+            const res = await api.post(
+                "/teacher-attendance/",
+                { teacher: Number(teacherId), date, status },
+                authHeaders(token)
+            );
+            onCreated(res.data);
+            toast("success", "Attendance record added.");
+        } catch (err) {
+            toast("error", await extractErrorMessage(err));
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <div className="bg-[var(--surface)] rounded-2xl border border-[var(--neutral-200)] shadow-sm p-4 mb-4 flex flex-wrap gap-3 items-end">
+            <div className="flex flex-col min-w-[240px] flex-1">
+                <label className={labelClass}>Teacher</label>
+                <select value={teacherId} onChange={(e) => setTeacherId(e.target.value)} className={`${inputClass} cursor-pointer`}>
+                    <option value="">Select teacher</option>
+                    {activeTeachers.map((t) => (
+                        <option key={t.id} value={t.id}>
+                            {t.full_name} ({t.teacher_id})
+                        </option>
+                    ))}
+                </select>
+            </div>
+            <div className="flex flex-col min-w-[150px]">
+                <label className={labelClass}>Date</label>
+                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputClass} />
+            </div>
+            <div className="flex flex-col min-w-[140px]">
+                <label className={labelClass}>Status</label>
+                <select value={status} onChange={(e) => setStatus(e.target.value)} className={`${inputClass} cursor-pointer`}>
+                    <option value="PRESENT">Present</option>
+                    <option value="ABSENT">Absent</option>
+                </select>
+            </div>
+            <button
+                type="button"
+                onClick={submit}
+                disabled={saving}
+                className="bg-[var(--primary)] hover:bg-[var(--quinary)] disabled:opacity-50 text-[var(--surface)] font-medium py-3 px-5 rounded-xl transition-colors cursor-pointer"
+            >
+                {saving ? "Saving..." : "Add record"}
+            </button>
+            <p className="text-xs text-[var(--neutral-400)] w-full">
+                Note: a duplicate (teacher, date) pair will be rejected by the backend — edit the existing record in
+                the table instead.
+            </p>
+        </div>
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Teacher Tab 3 — Analytics (daily / monthly, matching the backend)  */
+/* ------------------------------------------------------------------ */
+
+function TeacherAnalyticsTab({ token }) {
+    // The backend only exposes daily and monthly analytics for teacher
+    // attendance (no "week", no all-time) — so the toggle mirrors that
+    // exactly instead of reusing the student PeriodToggle.
+    const [period, setPeriod] = useState("day");
+    const [date, setDate] = useState(todayISO());
+    const now = new Date();
+    const [month, setMonth] = useState(String(now.getMonth() + 1));
+    const [year, setYear] = useState(String(now.getFullYear()));
+
+    const [data, setData] = useState(null);
+    const [loading, setLoading] = useState(false);
+
+    const fetchDaily = async () => {
+        setLoading(true);
+        try {
+            const res = await api.get(`/teacher-attendance/analytics/daily/?date=${date}`, authHeaders(token));
+            setData(res.data);
+        } catch (err) {
+            toast("error", await extractErrorMessage(err));
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const fetchMonthly = async () => {
+        if (!month || !year) return;
+        setLoading(true);
+        try {
+            const res = await api.get(
+                `/teacher-attendance/analytics/monthly/?month=${month}&year=${year}`,
+                authHeaders(token)
+            );
+            setData(res.data);
+        } catch (err) {
+            toast("error", await extractErrorMessage(err));
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        setData(null);
+        if (period === "day") fetchDaily();
+        else fetchMonthly();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [period, date, month, year, token]);
+
+    return (
+        <div>
+            <div className="bg-[var(--surface)] rounded-2xl border border-[var(--neutral-200)] shadow-sm p-4 mb-4 flex flex-wrap gap-4 items-end">
+                <div className="flex flex-col">
+                    <label className={labelClass}>Period</label>
+                    <div className="flex gap-1 bg-[var(--neutral-100)] rounded-xl p-1">
+                        {["day", "month"].map((opt) => (
+                            <button
+                                key={opt}
+                                type="button"
+                                onClick={() => setPeriod(opt)}
+                                className={`px-3 py-2 text-xs font-bold uppercase rounded-lg cursor-pointer ${
+                                    period === opt ? "bg-[var(--surface)] shadow-sm text-[var(--primary)]" : "text-[var(--neutral-500)]"
+                                }`}
+                            >
+                                {opt === "day" ? "Daily" : "Monthly"}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {period === "day" ? (
+                    <div className="flex flex-col">
+                        <label className={labelClass}>Date</label>
+                        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={`${inputClass} cursor-pointer`} />
+                    </div>
+                ) : (
+                    <>
+                        <div className="flex flex-col min-w-[140px]">
+                            <label className={labelClass}>Month</label>
+                            <select value={month} onChange={(e) => setMonth(e.target.value)} className={`${inputClass} cursor-pointer`}>
+                                {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                                    <option key={m} value={m}>
+                                        {new Date(2000, m - 1, 1).toLocaleString("default", { month: "long" })}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="flex flex-col min-w-[120px]">
+                            <label className={labelClass}>Year</label>
+                            <input
+                                type="number"
+                                value={year}
+                                onChange={(e) => setYear(e.target.value)}
+                                className={inputClass}
+                            />
+                        </div>
+                    </>
+                )}
+            </div>
+
+            {loading || !data ? (
+                <div className="text-center py-8 text-[var(--neutral-400)] text-sm">{loading ? "Loading analytics..." : "No data yet."}</div>
+            ) : period === "day" ? (
+                <TeacherDailySummaryView data={data} />
+            ) : (
+                <TeacherMonthlySummaryView data={data} />
+            )}
+        </div>
+    );
+}
+
+function TeacherDailySummaryView({ data }) {
+    const { date, total_records, present, absent, attendance_rate, teachers } = data;
+    return (
+        <div>
+            <div className="bg-[var(--surface)] rounded-2xl border border-[var(--neutral-200)] shadow-sm p-5 mb-4">
+                <div className="text-lg font-bold">{date}</div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-2">
+                    <StatCard label="Total" value={total_records} />
+                    <StatCard label="Present" value={present} accent="text-[var(--success)]" />
+                    <StatCard label="Absent" value={absent} accent="text-[var(--danger)]" />
+                    <StatCard
+                        label="Attendance %"
+                        value={attendance_rate === null ? "—" : `${attendance_rate}%`}
+                        accent="text-[var(--primary)]"
+                    />
+                </div>
+            </div>
+
+            <div className="bg-[var(--surface)] rounded-2xl border border-[var(--neutral-200)] shadow-sm overflow-x-auto">
+                <table className="w-full text-sm">
+                    <thead>
+                        <tr className="text-left text-xs uppercase tracking-wider text-[var(--neutral-500)] border-b border-[var(--neutral-100)]">
+                            <th className="p-3">Teacher</th>
+                            <th className="p-3">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {(teachers || []).length === 0 ? (
+                            <tr>
+                                <td colSpan={2} className="text-center py-8 text-[var(--neutral-400)]">
+                                    No attendance marked for this date.
+                                </td>
+                            </tr>
+                        ) : (
+                            teachers.map((t) => (
+                                <tr key={`${t.teacher_id}-${t.status}`} className="border-b border-[var(--neutral-50)] last:border-0">
+                                    <td className="p-3">
+                                        <div className="font-semibold">{t.teacher_name}</div>
+                                        <div className="text-xs text-[var(--neutral-400)]">{t.teacher_id}</div>
+                                    </td>
+                                    <td className="p-3">
+                                        <span
+                                            className={`px-2 py-1 text-xs font-bold uppercase rounded-lg ${
+                                                t.status === "PRESENT"
+                                                    ? "bg-[var(--success)]/15 text-[var(--success)]"
+                                                    : "bg-[var(--danger)]/15 text-[var(--danger)]"
+                                            }`}
+                                        >
+                                            {t.status}
+                                        </span>
+                                    </td>
+                                </tr>
+                            ))
+                        )}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+}
+
+function TeacherMonthlySummaryView({ data }) {
+    const { month, year, total_records, present, absent, attendance_rate, teachers } = data;
+    const monthLabel = new Date(Number(year), Number(month) - 1, 1).toLocaleString("default", {
+        month: "long",
+        year: "numeric",
+    });
+
+    return (
+        <div>
+            <div className="bg-[var(--surface)] rounded-2xl border border-[var(--neutral-200)] shadow-sm p-5 mb-4">
+                <div className="text-lg font-bold">{monthLabel}</div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-2">
+                    <StatCard label="Total" value={total_records} />
+                    <StatCard label="Present" value={present} accent="text-[var(--success)]" />
+                    <StatCard label="Absent" value={absent} accent="text-[var(--danger)]" />
+                    <StatCard
+                        label="Attendance %"
+                        value={attendance_rate === null ? "—" : `${attendance_rate}%`}
+                        accent="text-[var(--primary)]"
+                    />
+                </div>
+            </div>
+
+            <div className="bg-[var(--surface)] rounded-2xl border border-[var(--neutral-200)] shadow-sm overflow-x-auto">
+                <table className="w-full text-sm">
+                    <thead>
+                        <tr className="text-left text-xs uppercase tracking-wider text-[var(--neutral-500)] border-b border-[var(--neutral-100)]">
+                            <th className="p-3">Teacher</th>
+                            <th className="p-3">Present</th>
+                            <th className="p-3">Absent</th>
+                            <th className="p-3">Total</th>
+                            <th className="p-3">%</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {(teachers || []).length === 0 ? (
+                            <tr>
+                                <td colSpan={5} className="text-center py-8 text-[var(--neutral-400)]">
+                                    No attendance marked for this month.
+                                </td>
+                            </tr>
+                        ) : (
+                            teachers.map((t) => (
+                                <tr key={t.teacher_id} className="border-b border-[var(--neutral-50)] last:border-0">
+                                    <td className="p-3">
+                                        <div className="font-semibold">{t.teacher_name}</div>
+                                        <div className="text-xs text-[var(--neutral-400)]">{t.teacher_id}</div>
+                                    </td>
+                                    <td className="p-3 text-[var(--success)]">{t.present}</td>
+                                    <td className="p-3 text-[var(--danger)]">{t.absent}</td>
+                                    <td className="p-3">{t.total_records}</td>
+                                    <td className="p-3 font-semibold">
+                                        {t.attendance_rate === null ? "—" : `${t.attendance_rate}%`}
+                                    </td>
+                                </tr>
+                            ))
+                        )}
                     </tbody>
                 </table>
             </div>
