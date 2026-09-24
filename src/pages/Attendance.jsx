@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import jsQR from "jsqr";
 import api from "../api/axios";
 import useAuthStore from "../store/authStore";
 import Swal from "sweetalert2";
@@ -68,6 +69,7 @@ const labelClass = "text-xs uppercase tracking-wider text-[var(--neutral-500)] f
 const ATTENDANCE_MODES = [
     { key: "student", label: "Student Attendance" },
     { key: "teacher", label: "Teacher Attendance" },
+    { key: "qr", label: "QR Attendance" },
 ];
 
 const STUDENT_TABS = [
@@ -145,7 +147,7 @@ const Attendance = () => {
         return Array.from(seen, ([id, name]) => ({ id, name }));
     };
 
-    const tabs = mode === "student" ? STUDENT_TABS : TEACHER_TABS;
+    const tabs = mode === "student" ? STUDENT_TABS : mode === "teacher" ? TEACHER_TABS : [];
     const activeTab = mode === "student" ? activeStudentTab : activeTeacherTab;
     const setActiveTab = mode === "student" ? setActiveStudentTab : setActiveTeacherTab;
 
@@ -175,23 +177,27 @@ const Attendance = () => {
                 ))}
             </div>
 
-            {/* Tabs */}
-            <div className="flex flex-wrap gap-2 mb-6 border-b border-[var(--neutral-200)]">
-                {tabs.map((tab) => (
-                    <button
-                        key={tab.key}
-                        type="button"
-                        onClick={() => setActiveTab(tab.key)}
-                        className={`px-4 py-2 text-sm font-semibold rounded-t-xl transition-colors cursor-pointer ${
-                            activeTab === tab.key
-                                ? "bg-[var(--surface)] text-[var(--primary)] border border-b-0 border-[var(--neutral-200)]"
-                                : "text-[var(--neutral-500)] hover:text-[var(--quinary)]"
-                        }`}
-                    >
-                        {tab.label}
-                    </button>
-                ))}
-            </div>
+            {/* Student / Teacher sub-tabs */}
+            {mode !== "qr" && (
+                <div className="flex flex-wrap gap-2 mb-6 border-b border-[var(--neutral-200)]">
+                    {tabs.map((tab) => (
+                        <button
+                            key={tab.key}
+                            type="button"
+                            onClick={() => setActiveTab(tab.key)}
+                            className={`px-4 py-2 text-sm font-semibold rounded-t-xl transition-colors cursor-pointer ${
+                                activeTab === tab.key
+                                    ? "bg-[var(--surface)] text-[var(--primary)] border border-b-0 border-[var(--neutral-200)]"
+                                    : "text-[var(--neutral-500)] hover:text-[var(--quinary)]"
+                            }`}
+                        >
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
+            )}
+
+            {mode === "qr" && <QRAttendanceTab token={token} active={mode === "qr"} />}
 
             {mode === "student" && (
                 <>
@@ -238,6 +244,947 @@ const Attendance = () => {
 /* ------------------------------------------------------------------ */
 /*  Tab 1 — Mark Attendance (class-students -> bulk)                   */
 /* ------------------------------------------------------------------ */
+
+/* ------------------------------------------------------------------ */
+/*  QR ATTENDANCE — scan student / teacher ID cards                    */
+/* ------------------------------------------------------------------ */
+
+// ID cards encode "STUDENT:<uuid>" or "TEACHER:<uuid>" (see the ID-card
+// PDF generators). The backend (/api/qr-attendance/) does the real
+// validation — this prefix check only avoids spending a request (and part
+// of the hourly throttle budget) on QR codes that clearly aren't ours.
+const qrKindOf = (raw) => {
+    const value = (raw || "").trim();
+    if (value.startsWith("STUDENT:")) return "student";
+    if (value.startsWith("TEACHER:")) return "teacher";
+    return null;
+};
+
+const QR_CAMERA_COOLDOWN_MS = 4000; // camera keeps seeing the same card — ignore repeats
+const QR_SCANNER_DEBOUNCE_MS = 1500; // hardware scanner double-trigger guard
+const QR_DECODE_INTERVAL_MS = 120;
+const QR_MAX_FRAME_WIDTH = 960;
+const QR_LOG_LIMIT = 300;
+
+const QR_OUTCOMES = {
+    marked: { label: "Marked", dot: "bg-[var(--success)]", text: "text-[var(--success)]" },
+    existing: { label: "Already recorded", dot: "bg-amber-500", text: "text-amber-600" },
+    error: { label: "Failed", dot: "bg-[var(--danger)]", text: "text-[var(--danger)]" },
+    undone: { label: "Undone", dot: "bg-[var(--neutral-400)]", text: "text-[var(--neutral-400)]" },
+};
+
+const QR_TONES = {
+    success: { box: "border-[var(--success)] bg-[var(--success)]/10", title: "text-[var(--success)]" },
+    warning: { box: "border-amber-500 bg-amber-500/10", title: "text-amber-600" },
+    error: { box: "border-[var(--danger)] bg-[var(--danger)]/10", title: "text-[var(--danger)]" },
+};
+
+const formatClock = (d) =>
+    d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+
+// The QR endpoints report problems as { detail }, and a frozen student /
+// inactive teacher response also carries the person's name + id, so the
+// error card can say *who* was rejected.
+function describeQRError(err) {
+    const res = err?.response;
+    const data = res?.data;
+
+    let message;
+    if (!res) {
+        message = "Cannot reach the server. Check the connection and try again.";
+    } else if (data && typeof data === "object") {
+        message = data.detail || data.error || data.message;
+    } else if (typeof data === "string" && data.length < 200) {
+        message = data;
+    }
+    message = message || err?.message || "Request failed.";
+
+    let title = "Scan failed";
+    if (res?.status === 404) title = "QR code not recognised";
+    else if (res?.status === 429) title = "Too many requests";
+    else if (res?.status === 401 || res?.status === 403) title = "Not allowed";
+    else if (res?.status === 400 && data?.name) title = "Attendance not marked";
+    else if (res?.status === 400) title = "Invalid QR code";
+
+    return {
+        title,
+        message,
+        type: data?.type || null,
+        name: data?.name || null,
+        externalId: data?.student_id || data?.teacher_id || null,
+    };
+}
+
+// Short beep + vibration so staff can scan without watching the screen.
+function useScanFeedback(enabled) {
+    const ctxRef = useRef(null);
+
+    useEffect(
+        () => () => {
+            try {
+                ctxRef.current?.close?.();
+            } catch {
+                /* ignore */
+            }
+        },
+        []
+    );
+
+    return useCallback(
+        (kind) => {
+            if (!enabled) return;
+            try {
+                navigator.vibrate?.(kind === "success" ? 60 : [80, 60, 80]);
+            } catch {
+                /* ignore */
+            }
+            try {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (!AudioCtx) return;
+                if (!ctxRef.current) ctxRef.current = new AudioCtx();
+                const ctx = ctxRef.current;
+                if (ctx.state === "suspended") ctx.resume();
+
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                const length = kind === "success" ? 0.14 : 0.3;
+                osc.type = "sine";
+                osc.frequency.value = kind === "success" ? 880 : kind === "warning" ? 620 : 240;
+                gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + 0.01);
+                gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + length);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + length + 0.02);
+            } catch {
+                /* audio is best-effort */
+            }
+        },
+        [enabled]
+    );
+}
+
+function QRTypeBadge({ type }) {
+    if (!type) return null;
+    return (
+        <span className="text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-md bg-[var(--primary)]/10 text-[var(--primary)]">
+            {type}
+        </span>
+    );
+}
+
+function QRResultCard({ result }) {
+    const tone = QR_TONES[result.tone] || QR_TONES.error;
+    return (
+        <div className={`rounded-2xl border-2 p-5 ${tone.box}`}>
+            <div className="flex items-start justify-between gap-3">
+                <div className={`text-xl font-bold ${tone.title}`}>{result.title}</div>
+                <div className="text-xs text-[var(--neutral-500)] whitespace-nowrap">{formatClock(result.at)}</div>
+            </div>
+
+            {(result.name || result.externalId) && (
+                <div className="mt-3 flex items-center gap-2 flex-wrap">
+                    <span className="text-lg font-semibold text-[var(--quinary)]">{result.name || "Unknown"}</span>
+                    <QRTypeBadge type={result.type} />
+                </div>
+            )}
+            {result.externalId && <div className="text-sm text-[var(--neutral-500)]">{result.externalId}</div>}
+            {result.meta && <div className="text-sm text-[var(--neutral-500)]">{result.meta}</div>}
+            <div className="mt-2 text-sm text-[var(--quinary)]">{result.message}</div>
+        </div>
+    );
+}
+
+// Review-first mode: result of POST /qr-attendance/scan/ (lookup only),
+// waiting for the operator to confirm before anything is written.
+function QRPreviewCard({ person, busy, onConfirm, onDiscard }) {
+    const isStudent = person.type === "student";
+    const blocked = isStudent ? person.is_frozen : person.is_active === false;
+    const blockedText = isStudent
+        ? "This student's account is frozen — attendance can't be marked."
+        : "This teacher is inactive — attendance can't be marked.";
+
+    const lines = isStudent
+        ? [
+              person.student_id,
+              person.father_name && `Father: ${person.father_name}`,
+              [person.class, person.board].filter(Boolean).join(" · "),
+              person.section && `Section: ${person.section}`,
+              person.group && `Group: ${person.group}`,
+          ]
+        : [person.teacher_id, person.father_name && `Father: ${person.father_name}`, person.phone];
+
+    return (
+        <div className="rounded-2xl border-2 border-[var(--primary)] bg-[var(--surface)] p-5 shadow-sm">
+            <div className="text-xs uppercase tracking-wider font-semibold text-[var(--neutral-500)] mb-2">
+                Review before marking
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xl font-bold text-[var(--quinary)]">{person.name}</span>
+                <QRTypeBadge type={person.type} />
+            </div>
+            <div className="mt-1 space-y-0.5">
+                {lines.filter(Boolean).map((line, i) => (
+                    <div key={i} className="text-sm text-[var(--neutral-500)]">
+                        {line}
+                    </div>
+                ))}
+            </div>
+
+            {blocked && (
+                <div className="mt-3 text-sm font-medium text-[var(--danger)] bg-[var(--danger)]/10 rounded-xl p-3">
+                    {blockedText}
+                </div>
+            )}
+
+            <div className="mt-4 flex gap-3">
+                <button
+                    type="button"
+                    onClick={onConfirm}
+                    disabled={busy || blocked}
+                    className="bg-[var(--primary)] hover:bg-[var(--quinary)] disabled:opacity-50 text-[var(--surface)] font-medium py-2.5 px-5 rounded-xl transition-colors cursor-pointer disabled:cursor-not-allowed"
+                >
+                    {busy ? "Marking..." : "Mark present"}
+                </button>
+                <button
+                    type="button"
+                    onClick={onDiscard}
+                    disabled={busy}
+                    className="border border-[var(--neutral-300)] text-[var(--neutral-600)] font-medium py-2.5 px-5 rounded-xl hover:bg-[var(--neutral-50)] transition-colors cursor-pointer disabled:opacity-50"
+                >
+                    Discard
+                </button>
+            </div>
+        </div>
+    );
+}
+
+function QRAttendanceTab({ token, active }) {
+    // Camera needs a secure context (HTTPS or localhost). When the app is
+    // opened over plain http://<lan-ip>, browsers block it — the hardware
+    // scanner input keeps working in that case.
+    const canUseCamera =
+        typeof window !== "undefined" && window.isSecureContext && !!navigator.mediaDevices?.getUserMedia;
+
+    const [inputMethod, setInputMethod] = useState(canUseCamera ? "camera" : "scanner");
+    const [autoMark, setAutoMark] = useState(true);
+    const [soundOn, setSoundOn] = useState(true);
+
+    const [busy, setBusy] = useState(false);
+    const [pending, setPending] = useState(null); // review-first preview
+    const [lastResult, setLastResult] = useState(null);
+    const [log, setLog] = useState([]);
+    const [serverDate, setServerDate] = useState("");
+    const [undoingKey, setUndoingKey] = useState(null);
+
+    const [manualValue, setManualValue] = useState("");
+
+    const [logSearch, setLogSearch] = useState("");
+    const [logType, setLogType] = useState("all");
+    const [logOutcome, setLogOutcome] = useState("all");
+
+    const [cameraOn, setCameraOn] = useState(false);
+    const [cameraError, setCameraError] = useState("");
+    const [devices, setDevices] = useState([]);
+    const [deviceId, setDeviceId] = useState("");
+
+    const videoRef = useRef(null);
+    const streamRef = useRef(null);
+    const detectorRef = useRef(null);
+    const scannerInputRef = useRef(null);
+
+    const busyRef = useRef(false);
+    const queueRef = useRef([]);
+    const recentRef = useRef(new Map()); // payload -> last accepted timestamp
+    const handleScanRef = useRef(null);
+    const pendingRef = useRef(null);
+
+    const feedback = useScanFeedback(soundOn);
+
+    useEffect(() => {
+        pendingRef.current = pending;
+    }, [pending]);
+
+    /* ---------------------------- logging ---------------------------- */
+
+    const pushLog = (entry) => {
+        setLog((prev) => [entry, ...prev].slice(0, QR_LOG_LIMIT));
+    };
+
+    const newKey = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    /* ------------------------- request handling ---------------------- */
+
+    const reportError = (err, payload, at) => {
+        const info = describeQRError(err);
+        setPending(null);
+        setLastResult({
+            tone: "error",
+            title: info.title,
+            message: info.message,
+            type: info.type,
+            name: info.name,
+            externalId: info.externalId,
+            at,
+        });
+        pushLog({
+            key: newKey(),
+            at,
+            payload,
+            type: info.type,
+            name: info.name || "Unknown code",
+            externalId: info.externalId || "",
+            outcome: "error",
+            message: info.message,
+        });
+        feedback("error");
+    };
+
+    // Shared by auto-mark and review-confirm. created === false means a
+    // record for today already existed — the backend then overwrites its
+    // status to PRESENT, so we flag it instead of showing plain success.
+    const recordMarkResult = (data, payload, at, meta) => {
+        const existing = data.created === false;
+        const externalId = data.type === "teacher" ? data.teacher_id : data.student_id;
+
+        if (data.date) setServerDate(data.date);
+
+        setLastResult({
+            tone: existing ? "warning" : "success",
+            title: existing ? "Already recorded today" : "Marked present",
+            message: existing
+                ? "A record for today already existed — it is now set to PRESENT."
+                : `Attendance saved for ${data.date}.`,
+            type: data.type,
+            name: data.name,
+            externalId,
+            meta,
+            at,
+        });
+        pushLog({
+            key: newKey(),
+            at,
+            payload,
+            type: data.type,
+            name: data.name,
+            externalId,
+            meta,
+            outcome: existing ? "existing" : "marked",
+            created: data.created,
+            attendanceId: data.attendance_id,
+            message: existing ? "Record already existed — set to PRESENT." : "Marked present.",
+        });
+        feedback(existing ? "warning" : "success");
+    };
+
+    const handleScan = async (raw) => {
+        const payload = (raw || "").trim();
+        if (!payload) return;
+        const at = new Date();
+
+        if (!qrKindOf(payload)) {
+            setPending(null);
+            setLastResult({
+                tone: "error",
+                title: "Invalid QR code",
+                message: "This isn't a student or teacher attendance QR code.",
+                at,
+            });
+            pushLog({
+                key: newKey(),
+                at,
+                payload,
+                type: null,
+                name: "Unknown code",
+                externalId: payload.slice(0, 24),
+                outcome: "error",
+                message: "Not an attendance QR code.",
+            });
+            feedback("error");
+            return;
+        }
+
+        try {
+            if (autoMark) {
+                const res = await api.post("/qr-attendance/mark/", { qr_data: payload }, authHeaders(token));
+                setPending(null);
+                recordMarkResult(res.data, payload, at);
+            } else {
+                const res = await api.post("/qr-attendance/scan/", { qr_data: payload }, authHeaders(token));
+                setLastResult(null);
+                setPending({ ...res.data, qr_data: payload });
+                feedback("success");
+            }
+        } catch (err) {
+            reportError(err, payload, at);
+        }
+    };
+
+    // Always points at the newest closure so the camera loop never sees
+    // stale settings (auto-mark toggle, token).
+    useEffect(() => {
+        handleScanRef.current = handleScan;
+    });
+
+    // One request at a time; anything that arrives meanwhile (a hardware
+    // scanner can fire several cards quickly) waits in line.
+    const drainQueue = async () => {
+        if (busyRef.current) return;
+        busyRef.current = true;
+        setBusy(true);
+        try {
+            while (queueRef.current.length) {
+                const next = queueRef.current.shift();
+                await handleScanRef.current(next);
+            }
+        } finally {
+            busyRef.current = false;
+            setBusy(false);
+        }
+    };
+
+    const enqueue = (payload) => {
+        queueRef.current.push(payload);
+        drainQueue();
+    };
+
+    const isRecentDuplicate = (payload, windowMs) => {
+        const now = Date.now();
+        const last = recentRef.current.get(payload);
+        if (last && now - last < windowMs) return true;
+        recentRef.current.set(payload, now);
+
+        if (recentRef.current.size > 200) {
+            for (const [key, time] of recentRef.current) {
+                if (now - time > QR_CAMERA_COOLDOWN_MS) recentRef.current.delete(key);
+            }
+        }
+        return false;
+    };
+
+    const confirmPending = async () => {
+        if (!pending || busyRef.current) return;
+        const payload = pending.qr_data;
+        const meta =
+            pending.type === "student"
+                ? [pending.class, pending.section && `Section ${pending.section}`, pending.group]
+                      .filter(Boolean)
+                      .join(" · ")
+                : undefined;
+        const at = new Date();
+
+        busyRef.current = true;
+        setBusy(true);
+        try {
+            const res = await api.post("/qr-attendance/mark/", { qr_data: payload }, authHeaders(token));
+            setPending(null);
+            recordMarkResult(res.data, payload, at, meta);
+        } catch (err) {
+            reportError(err, payload, at);
+        } finally {
+            busyRef.current = false;
+            setBusy(false);
+        }
+    };
+
+    const discardPending = () => {
+        if (pending) recentRef.current.delete(pending.qr_data); // allow an immediate re-scan
+        setPending(null);
+    };
+
+    /* ------------------------ hardware scanner ------------------------ */
+
+    const submitManual = () => {
+        const value = manualValue.trim();
+        if (!value) return;
+        setManualValue("");
+        if (!isRecentDuplicate(value, QR_SCANNER_DEBOUNCE_MS)) enqueue(value);
+        scannerInputRef.current?.focus();
+    };
+
+    /* ----------------------------- camera ----------------------------- */
+
+    const stopCamera = useCallback(() => {
+        streamRef.current?.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+        if (videoRef.current) videoRef.current.srcObject = null;
+        setCameraOn(false);
+    }, []);
+
+    const startCamera = async (preferredId) => {
+        setCameraError("");
+        if (!canUseCamera) {
+            setCameraError("Camera access needs HTTPS (or localhost). Use the scanner input instead.");
+            return;
+        }
+        stopCamera();
+
+        try {
+            const video = preferredId
+                ? { deviceId: { exact: preferredId }, width: { ideal: 1280 }, height: { ideal: 720 } }
+                : { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } };
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video });
+
+            const el = videoRef.current;
+            if (!el) {
+                stream.getTracks().forEach((track) => track.stop());
+                return;
+            }
+            streamRef.current = stream;
+            el.srcObject = stream;
+            await el.play();
+
+            // Prefer the browser's native QR detector (faster, better on
+            // small printed cards); jsQR is the fallback everywhere else.
+            detectorRef.current = null;
+            if ("BarcodeDetector" in window) {
+                try {
+                    const formats = await window.BarcodeDetector.getSupportedFormats();
+                    if (formats.includes("qr_code")) {
+                        detectorRef.current = new window.BarcodeDetector({ formats: ["qr_code"] });
+                    }
+                } catch {
+                    detectorRef.current = null;
+                }
+            }
+
+            setCameraOn(true);
+
+            // Device labels are only available after permission is granted.
+            const all = await navigator.mediaDevices.enumerateDevices();
+            setDevices(all.filter((d) => d.kind === "videoinput"));
+            const activeId = stream.getVideoTracks()[0]?.getSettings?.().deviceId;
+            if (activeId) setDeviceId(activeId);
+        } catch (err) {
+            stopCamera();
+            const name = err?.name;
+            if (name === "NotAllowedError" || name === "SecurityError") {
+                setCameraError("Camera permission was denied. Allow camera access in the browser and try again.");
+            } else if (name === "NotFoundError" || name === "OverconstrainedError") {
+                setCameraError("No matching camera was found on this device.");
+            } else if (name === "NotReadableError") {
+                setCameraError("The camera is being used by another app or tab.");
+            } else {
+                setCameraError(err?.message || "Could not start the camera.");
+            }
+        }
+    };
+
+    // Decode loop — runs only while the camera is on.
+    useEffect(() => {
+        if (!cameraOn) return undefined;
+
+        let stopped = false;
+        let rafId = 0;
+        let lastTick = 0;
+        let decoding = false;
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+
+        const decodeFrame = async (video) => {
+            if (detectorRef.current) {
+                const found = await detectorRef.current.detect(video);
+                return found?.[0]?.rawValue || null;
+            }
+            const scale = Math.min(1, QR_MAX_FRAME_WIDTH / video.videoWidth);
+            const w = Math.max(1, Math.floor(video.videoWidth * scale));
+            const h = Math.max(1, Math.floor(video.videoHeight * scale));
+            if (canvas.width !== w) canvas.width = w;
+            if (canvas.height !== h) canvas.height = h;
+            ctx.drawImage(video, 0, 0, w, h);
+            const image = ctx.getImageData(0, 0, w, h);
+            return jsQR(image.data, w, h, { inversionAttempts: "dontInvert" })?.data || null;
+        };
+
+        const tick = async (time) => {
+            if (stopped) return;
+            rafId = requestAnimationFrame(tick);
+
+            if (decoding || time - lastTick < QR_DECODE_INTERVAL_MS) return;
+            lastTick = time;
+
+            const video = videoRef.current;
+            if (!video || video.readyState < 2 || !video.videoWidth) return;
+            // Review-first mode: hold still while a preview waits for a decision.
+            if (pendingRef.current) return;
+
+            decoding = true;
+            try {
+                const value = await decodeFrame(video);
+                if (value && !busyRef.current && queueRef.current.length === 0) {
+                    if (!isRecentDuplicate(value, QR_CAMERA_COOLDOWN_MS)) enqueue(value);
+                }
+            } catch {
+                /* a bad frame is not worth surfacing */
+            } finally {
+                decoding = false;
+            }
+        };
+
+        rafId = requestAnimationFrame(tick);
+        return () => {
+            stopped = true;
+            cancelAnimationFrame(rafId);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [cameraOn]);
+
+    // Camera off when leaving the QR mode, switching input method, or unmounting.
+    useEffect(() => {
+        if (!active || inputMethod !== "camera") stopCamera();
+        if (active && inputMethod === "scanner") scannerInputRef.current?.focus();
+    }, [active, inputMethod, stopCamera]);
+
+    useEffect(() => stopCamera, [stopCamera]);
+
+    /* ------------------------------ undo ------------------------------ */
+
+    // Only offered for records this scan *created* — deleting restores the
+    // pre-scan state. (If the record already existed we can't know what it
+    // held before, so that's left to the Records tab.)
+    const undoEntry = async (entry) => {
+        const confirm = await Swal.fire({
+            title: "Undo this scan?",
+            text: `${entry.name} — the attendance record created by this scan will be deleted.`,
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonText: "Undo scan",
+            confirmButtonColor: "var(--danger)",
+            background: "var(--secondary)",
+            color: "var(--quinary)",
+        });
+        if (!confirm.isConfirmed) return;
+
+        setUndoingKey(entry.key);
+        try {
+            const path = entry.type === "teacher" ? "teacher-attendance" : "attendance";
+            await api.delete(`/${path}/${entry.attendanceId}/`, authHeaders(token));
+            recentRef.current.delete(entry.payload);
+            setLog((prev) =>
+                prev.map((e) =>
+                    e.key === entry.key ? { ...e, outcome: "undone", message: "Undone — record deleted." } : e
+                )
+            );
+        } catch (err) {
+            toast("error", await extractErrorMessage(err));
+        } finally {
+            setUndoingKey(null);
+        }
+    };
+
+    /* --------------------------- log filtering ------------------------- */
+
+    const counts = useMemo(() => {
+        const c = { marked: 0, existing: 0, error: 0, undone: 0, student: 0, teacher: 0 };
+        log.forEach((e) => {
+            c[e.outcome] = (c[e.outcome] || 0) + 1;
+            if (e.type && (e.outcome === "marked" || e.outcome === "existing")) c[e.type] += 1;
+        });
+        return c;
+    }, [log]);
+
+    const filteredLog = useMemo(() => {
+        const q = logSearch.trim().toLowerCase();
+        return log.filter((e) => {
+            if (logType !== "all" && e.type !== logType) return false;
+            if (logOutcome !== "all" && e.outcome !== logOutcome) return false;
+            if (!q) return true;
+            return e.name?.toLowerCase().includes(q) || e.externalId?.toLowerCase().includes(q);
+        });
+    }, [log, logSearch, logType, logOutcome]);
+
+    const clearLog = () => {
+        setLog([]);
+        setLastResult(null);
+        recentRef.current.clear();
+    };
+
+    /* ------------------------------ render ----------------------------- */
+
+    const segClass = (on) =>
+        `px-3 py-2 text-xs font-bold uppercase rounded-lg cursor-pointer transition-colors ${
+            on ? "bg-[var(--surface)] shadow-sm text-[var(--primary)]" : "text-[var(--neutral-500)]"
+        }`;
+
+    return (
+        <div className="grid grid-cols-1 xl:grid-cols-5 gap-5">
+            {/* ------------------------- Scanner column ------------------------- */}
+            <div className="xl:col-span-2 space-y-4">
+                <div className="bg-[var(--surface)] rounded-2xl border border-[var(--neutral-200)] shadow-sm p-4 space-y-4">
+                    <div className="flex flex-col">
+                        <label className={labelClass}>Input method</label>
+                        <div className="flex gap-1 bg-[var(--neutral-100)] rounded-xl p-1 self-start">
+                            <button type="button" onClick={() => setInputMethod("camera")} className={segClass(inputMethod === "camera")}>
+                                Camera
+                            </button>
+                            <button type="button" onClick={() => setInputMethod("scanner")} className={segClass(inputMethod === "scanner")}>
+                                Scanner / keyboard
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col">
+                        <label className={labelClass}>When a card is scanned</label>
+                        <div className="flex gap-1 bg-[var(--neutral-100)] rounded-xl p-1 self-start">
+                            <button type="button" onClick={() => setAutoMark(true)} className={segClass(autoMark)}>
+                                Mark present instantly
+                            </button>
+                            <button type="button" onClick={() => setAutoMark(false)} className={segClass(!autoMark)}>
+                                Review first
+                            </button>
+                        </div>
+                        <p className="text-xs text-[var(--neutral-400)] mt-2">
+                            {autoMark
+                                ? "One request per scan — best for busy entrances."
+                                : "Shows the student / teacher details and waits for your confirmation (two requests per card)."}
+                        </p>
+                    </div>
+
+                    <label className="flex items-center gap-2 text-sm text-[var(--neutral-600)] cursor-pointer select-none">
+                        <input
+                            type="checkbox"
+                            checked={soundOn}
+                            onChange={(e) => setSoundOn(e.target.checked)}
+                            className="accent-[var(--primary)] cursor-pointer"
+                        />
+                        Beep / vibrate on scan
+                    </label>
+                </div>
+
+                {inputMethod === "camera" ? (
+                    <div className="bg-[var(--surface)] rounded-2xl border border-[var(--neutral-200)] shadow-sm p-4 space-y-3">
+                        <div className="relative rounded-xl overflow-hidden bg-black aspect-[4/3]">
+                            <video ref={videoRef} playsInline muted className="w-full h-full object-cover" />
+                            {!cameraOn && (
+                                <div className="absolute inset-0 flex items-center justify-center text-sm text-white/70 px-6 text-center">
+                                    {canUseCamera ? "Camera is off" : "Camera isn't available on this connection"}
+                                </div>
+                            )}
+                            {cameraOn && (
+                                <div className="pointer-events-none absolute inset-8 border-2 border-white/70 rounded-2xl" />
+                            )}
+                            {busy && (
+                                <div className="absolute top-3 right-3 text-xs font-semibold bg-black/70 text-white px-3 py-1 rounded-full">
+                                    Processing...
+                                </div>
+                            )}
+                            {cameraOn && pending && (
+                                <div className="absolute bottom-3 left-3 right-3 text-xs text-center bg-black/70 text-white px-3 py-2 rounded-lg">
+                                    Confirm or discard the card on the right to keep scanning.
+                                </div>
+                            )}
+                        </div>
+
+                        {cameraError && (
+                            <div className="text-sm text-[var(--danger)] bg-[var(--danger)]/10 rounded-xl p-3">{cameraError}</div>
+                        )}
+                        {!canUseCamera && (
+                            <div className="text-xs text-[var(--neutral-500)] bg-[var(--neutral-50)] rounded-xl p-3">
+                                Browsers only allow camera access on HTTPS or localhost. Open this app over HTTPS, or switch to
+                                “Scanner / keyboard” and use a USB / Bluetooth QR scanner.
+                            </div>
+                        )}
+
+                        <div className="flex flex-wrap gap-3 items-center">
+                            {cameraOn ? (
+                                <button
+                                    type="button"
+                                    onClick={stopCamera}
+                                    className="border border-[var(--danger)] text-[var(--danger)] font-semibold py-2.5 px-4 rounded-xl hover:bg-[var(--danger)]/5 transition-colors cursor-pointer"
+                                >
+                                    Stop camera
+                                </button>
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={() => startCamera(deviceId)}
+                                    disabled={!canUseCamera}
+                                    className="bg-[var(--primary)] hover:bg-[var(--quinary)] disabled:opacity-50 text-[var(--surface)] font-medium py-2.5 px-5 rounded-xl transition-colors cursor-pointer disabled:cursor-not-allowed"
+                                >
+                                    Start camera
+                                </button>
+                            )}
+
+                            {devices.length > 1 && (
+                                <select
+                                    value={deviceId}
+                                    onChange={(e) => {
+                                        setDeviceId(e.target.value);
+                                        if (cameraOn) startCamera(e.target.value);
+                                    }}
+                                    className={`${inputClass} cursor-pointer min-w-[180px] flex-1`}
+                                >
+                                    {devices.map((d, i) => (
+                                        <option key={d.deviceId} value={d.deviceId}>
+                                            {d.label || `Camera ${i + 1}`}
+                                        </option>
+                                    ))}
+                                </select>
+                            )}
+                        </div>
+                    </div>
+                ) : (
+                    <div className="bg-[var(--surface)] rounded-2xl border border-[var(--neutral-200)] shadow-sm p-4 space-y-3">
+                        <div className="flex flex-col">
+                            <label className={labelClass}>Scan a card</label>
+                            <input
+                                ref={scannerInputRef}
+                                type="text"
+                                value={manualValue}
+                                onChange={(e) => setManualValue(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                        e.preventDefault();
+                                        submitManual();
+                                    }
+                                }}
+                                autoComplete="off"
+                                spellCheck={false}
+                                placeholder="Click here, then scan… or paste STUDENT:… / TEACHER:…"
+                                className={`${inputClass} font-mono`}
+                            />
+                        </div>
+                        <p className="text-xs text-[var(--neutral-400)]">
+                            USB and Bluetooth QR scanners type the code and press Enter. Keep this box focused while scanning — the
+                            focus returns here after every scan.
+                        </p>
+                        <button
+                            type="button"
+                            onClick={submitManual}
+                            disabled={!manualValue.trim()}
+                            className="border border-[var(--primary)] text-[var(--primary)] font-semibold py-2.5 px-4 rounded-xl hover:bg-[var(--primary)]/10 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            Submit code
+                        </button>
+                    </div>
+                )}
+
+                <p className="text-xs text-[var(--neutral-400)]">
+                    Scans always record <span className="font-semibold">today's date on the server</span>
+                    {serverDate ? ` (${serverDate})` : ""}. To mark another date, use Student / Teacher Attendance → Mark Attendance.
+                </p>
+            </div>
+
+            {/* -------------------------- Result column -------------------------- */}
+            <div className="xl:col-span-3 space-y-4">
+                <div aria-live="polite">
+                    {pending ? (
+                        <QRPreviewCard person={pending} busy={busy} onConfirm={confirmPending} onDiscard={discardPending} />
+                    ) : lastResult ? (
+                        <QRResultCard result={lastResult} />
+                    ) : (
+                        <div className="rounded-2xl border-2 border-dashed border-[var(--neutral-200)] p-8 text-center text-sm text-[var(--neutral-400)]">
+                            Ready to scan. Hold a student or teacher ID card up to the camera, or scan it with your QR scanner.
+                        </div>
+                    )}
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <StatCard label="Marked" value={counts.marked} accent="text-[var(--success)]" />
+                    <StatCard label="Already recorded" value={counts.existing} accent="text-amber-600" />
+                    <StatCard label="Failed" value={counts.error} accent="text-[var(--danger)]" />
+                    <StatCard label="Total scans" value={log.length} />
+                </div>
+
+                <div className="bg-[var(--surface)] rounded-2xl border border-[var(--neutral-200)] shadow-sm p-4">
+                    <div className="flex flex-wrap gap-3 items-end mb-3">
+                        <div className="flex flex-col min-w-[180px] flex-1">
+                            <label className={labelClass}>Search this session</label>
+                            <input
+                                type="text"
+                                placeholder="Name or ID..."
+                                value={logSearch}
+                                onChange={(e) => setLogSearch(e.target.value)}
+                                className={inputClass}
+                            />
+                        </div>
+                        <div className="flex flex-col min-w-[150px]">
+                            <label className={labelClass}>Type</label>
+                            <select value={logType} onChange={(e) => setLogType(e.target.value)} className={`${inputClass} cursor-pointer`}>
+                                <option value="all">All</option>
+                                <option value="student">Students ({counts.student})</option>
+                                <option value="teacher">Teachers ({counts.teacher})</option>
+                            </select>
+                        </div>
+                        <div className="flex flex-col min-w-[160px]">
+                            <label className={labelClass}>Outcome</label>
+                            <select
+                                value={logOutcome}
+                                onChange={(e) => setLogOutcome(e.target.value)}
+                                className={`${inputClass} cursor-pointer`}
+                            >
+                                <option value="all">All</option>
+                                {Object.entries(QR_OUTCOMES).map(([key, meta]) => (
+                                    <option key={key} value={key}>
+                                        {meta.label}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={clearLog}
+                            disabled={log.length === 0}
+                            className="border border-[var(--neutral-300)] text-[var(--neutral-600)] text-sm font-semibold py-3 px-4 rounded-xl hover:bg-[var(--neutral-50)] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            Clear log
+                        </button>
+                    </div>
+
+                    {filteredLog.length === 0 ? (
+                        <div className="text-center py-8 text-[var(--neutral-400)] text-sm">
+                            {log.length === 0 ? "Scans from this session will appear here." : "No scans match these filters."}
+                        </div>
+                    ) : (
+                        <div className="max-h-[420px] overflow-y-auto divide-y divide-[var(--neutral-100)]">
+                            {filteredLog.map((entry) => {
+                                const meta = QR_OUTCOMES[entry.outcome] || QR_OUTCOMES.error;
+                                return (
+                                    <div key={entry.key} className="flex items-center justify-between gap-3 py-3">
+                                        <div className="flex items-start gap-3 min-w-0">
+                                            <span className={`mt-1.5 h-2.5 w-2.5 rounded-full shrink-0 ${meta.dot}`} />
+                                            <div className="min-w-0">
+                                                <div
+                                                    className={`font-semibold text-sm text-[var(--quinary)] flex items-center gap-2 flex-wrap ${
+                                                        entry.outcome === "undone" ? "line-through opacity-60" : ""
+                                                    }`}
+                                                >
+                                                    <span className="truncate">{entry.name}</span>
+                                                    <QRTypeBadge type={entry.type} />
+                                                </div>
+                                                <div className="text-xs text-[var(--neutral-400)]">
+                                                    {[entry.externalId, entry.meta].filter(Boolean).join(" · ")}
+                                                </div>
+                                                <div className={`text-xs ${meta.text}`}>
+                                                    {meta.label}
+                                                    {entry.message && entry.outcome !== "marked" ? ` — ${entry.message}` : ""}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3 shrink-0">
+                                            <span className="text-xs text-[var(--neutral-400)]">{formatClock(entry.at)}</span>
+                                            {entry.outcome === "marked" && entry.created && entry.attendanceId && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => undoEntry(entry)}
+                                                    disabled={undoingKey === entry.key}
+                                                    className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-[var(--danger)] text-[var(--danger)] hover:bg-[var(--danger)]/5 cursor-pointer disabled:opacity-50"
+                                                >
+                                                    {undoingKey === entry.key ? "Undoing..." : "Undo"}
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
 
 function MarkAttendanceTab({ token, Classes, sectionOptionsFor, groupOptionsFor }) {
     const [classId, setClassId] = useState("");
