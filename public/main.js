@@ -4,6 +4,35 @@ import { fileURLToPath } from 'url';
 import { spawn, exec } from 'child_process';
 import net from 'net';
 import fs from 'fs';
+import os from 'os';
+
+// Helper to grab client's local network IPv4 address dynamically
+function getLocalIpAddress() {
+    const interfaces = os.networkInterfaces();
+    for (const name of Object.keys(interfaces)) {
+        for (const iface of interfaces[name]) {
+            if (iface.family === 'IPv4' && !iface.internal) {
+                return iface.address; // e.g., "192.168.1.50" or "10.0.0.12"
+            }
+        }
+    }
+    return '127.0.0.1';
+}
+
+app.whenReady().then(async () => {
+    const clientIp = getLocalIpAddress();
+    
+    // Start background services in production
+    startDjango();
+    startWhatsApp();
+
+    if (app.isPackaged) {
+        // Wait for Django on local loopback first
+        await waitForPort('127.0.0.1', 8000, 30000);
+    }
+
+    createWindow();
+});
 
 app.disableHardwareAcceleration();
 

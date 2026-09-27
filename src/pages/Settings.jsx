@@ -4,6 +4,7 @@ import api from '../api/axios';
 import useInstituteStore from '../store/instituteStore';
 import useAuthStore from '../store/authStore';
 import { DEFAULT_THEME, THEME_GROUPS, applyTheme, loadTheme, saveTheme, resetTheme } from '../utils/theme';
+import { QRCodeSVG } from 'qrcode.react';
 
 // One swatch row: native color picker + a synced, editable hex field.
 // A local `draft` mirrors the text input so the user can type freely;
@@ -71,6 +72,10 @@ const Settings = () => {
   const [form, setForm] = useState(emptyForm);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  const [showQR, setShowQR] = useState(false);
+  const [qrUrl, setQrUrl] = useState(null);
+  const [qrLoading, setQrLoading] = useState(false);
 
   // Existing image URLs (from server) vs newly picked files (not uploaded yet)
   const [logoUrl, setLogoUrl] = useState(null);
@@ -157,6 +162,26 @@ const Settings = () => {
     setWatermarkFile(file);
     if (watermarkPreview) URL.revokeObjectURL(watermarkPreview);
     setWatermarkPreview(URL.createObjectURL(file));
+  };
+
+  const handleConnectPhone = async () => {
+    setQrLoading(true);
+    try {
+      const res = await api.get('/core/network-info/', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      setQrUrl(res.data.url);
+      setShowQR(true);
+    } catch (error) {
+      console.error('Failed to fetch network info:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Could Not Generate QR Code',
+        text: error.response?.data?.detail || 'Could not reach the network info endpoint.',
+      });
+    } finally {
+      setQrLoading(false);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -322,6 +347,59 @@ const Settings = () => {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-8">
+
+        <section className="bg-surface border border-neutral-200 rounded-2xl p-6 shadow-sm mb-8">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <h2 className="text-sm font-bold uppercase tracking-wider text-neutral-600 mb-1">
+                Connect Your Phone
+              </h2>
+              <p className="text-xs text-neutral-500">
+                Generate a QR code that opens this portal on a phone on the same network.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleConnectPhone}
+              disabled={qrLoading}
+              className="px-5 py-3 rounded-xl text-sm font-bold uppercase tracking-wider text-white bg-primary hover:opacity-95 disabled:opacity-50 shadow-md hover:shadow-lg active:scale-[0.99] transition-all duration-200 shrink-0"
+            >
+              {qrLoading ? 'Generating...' : 'Connect Your Phone'}
+            </button>
+          </div>
+        </section>
+
+        {showQR && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            onClick={() => setShowQR(false)}
+          >
+            <div
+              className="bg-surface rounded-2xl shadow-xl max-w-sm w-full p-6 relative"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                onClick={() => setShowQR(false)}
+                className="absolute top-4 right-4 text-neutral-400 hover:text-neutral-600 text-xl leading-none"
+                aria-label="Close"
+              >
+                &times;
+              </button>
+              <h2 className="text-sm font-bold uppercase tracking-wider text-neutral-600 mb-1">
+                Connect Your Phone
+              </h2>
+              <p className="text-xs text-neutral-500 mb-5">
+                Scan this with your phone's camera, then open the link in your browser.
+              </p>
+              <div className="flex justify-center bg-white p-4 rounded-xl border border-neutral-200 mb-4">
+                {qrUrl && <QRCodeSVG value={qrUrl} size={200} />}
+              </div>
+              <p className="text-center text-xs font-mono text-neutral-500 break-all">{qrUrl}</p>
+            </div>
+          </div>
+        )}
+
         {/* Branding */}
         <section className="bg-surface border border-neutral-200 rounded-2xl p-6 shadow-sm">
           <h2 className="text-sm font-bold uppercase tracking-wider text-neutral-600 mb-5">
