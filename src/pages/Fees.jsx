@@ -23,7 +23,13 @@ const extractBlobErrorMessage = async (error, fallback = 'Something went wrong. 
     const text = typeof data.text === 'function' ? await data.text() : null;
     if (!text) return fallback;
     const parsed = JSON.parse(text);
-    return parsed.error || parsed.detail || fallback;
+    const base = parsed.error || parsed.detail || fallback;
+    // Class generation returns the names of students who have neither an
+    // individual override nor a class fee structure — show them too.
+    if (Array.isArray(parsed.students) && parsed.students.length > 0) {
+      return `${base} (${parsed.students.join(', ')})`;
+    }
+    return base;
   } catch {
     return fallback;
   }
@@ -774,6 +780,249 @@ const FeeStructureSection = ({ token, Classes }) => {
 };
 
 /* ============================================================
+   Voucher formats + hover previews
+   ============================================================ */
+
+// Mirrors VOUCHER_FORMATS in fees/views.py. The query param is
+// `voucher_format` (NOT `format` — DRF reserves that for content
+// negotiation and would 404 before the view runs). The backend
+// defaults to 'preprinted', so we do too.
+const VOUCHER_FORMATS = [
+  {
+    key: 'preprinted',
+    label: 'Pre-printed Stationery',
+    short: 'Pre-printed',
+    meta: '202 × 164 mm · 1 student per page',
+    description:
+      "Only the student details, fee table and barcode — for the institute's pre-printed voucher paper. Header, logo, notes and signature are already on the stock.",
+  },
+  {
+    key: 'complete',
+    label: 'Complete Voucher',
+    short: 'Complete',
+    meta: 'A4 · 2 students per page',
+    description:
+      'A fully self-contained voucher with institute header, logo, watermark, notes and signature line — print it on plain A4 paper.',
+  },
+];
+const DEFAULT_VOUCHER_FORMAT = 'preprinted';
+const getVoucherFormat = (key) =>
+  VOUCHER_FORMATS.find((f) => f.key === key) || VOUCHER_FORMATS[0];
+
+// Colors mirror the palette in fees/pdf_generator.py so the previews
+// look like the PDFs they represent.
+const VOUCHER_PRIMARY = '#1a3c5e';
+const VOUCHER_SECONDARY = '#2e86c1';
+const VOUCHER_DARK = '#2c3e50';
+const VOUCHER_MID = '#7f8c8d';
+
+const PREVIEW_INFO_ROWS = [
+  ['Challan No.', '1042'],
+  ['GR No.', '2021-045'],
+  ["Student's Name", 'Ali Raza'],
+  ["Father's Name", 'Imran Raza'],
+  ['Class', '9'],
+  ['Section', 'A'],
+];
+const PREVIEW_FEE_ROWS = [
+  ['Tuition Fee', '5,000'],
+  ['Exam Fee', '1,000'],
+  ['Arrears Amount', '0'],
+  ['Amount payable within due date', '6,000'],
+  ['Amount payable after due date', '6,500'],
+  ['Due Date', '10-Oct-2026'],
+];
+const PREVIEW_BARCODE = [1, 2, 1, 1, 3, 1, 2, 1, 1, 2, 3, 1, 1, 2, 1, 3, 1, 2, 1, 1, 2, 1, 3, 1];
+
+// One miniature voucher copy (Office / Student's). With `branding` it
+// is the complete voucher; without it, the pre-printed parts are drawn
+// as faint dashed ghosts so it's clear what the paper already carries.
+const MiniVoucherCopy = ({ copyLabel, branding }) => (
+  <div
+    className={`flex-1 min-w-0 p-1.5 bg-white ${
+      branding ? 'border border-neutral-400' : 'border border-dashed border-neutral-300'
+    }`}
+    style={{ color: VOUCHER_DARK }}
+  >
+    {branding ? (
+      <>
+        <div className="text-[5px] italic text-right" style={{ color: VOUCHER_MID }}>
+          Duplicate Voucher
+        </div>
+        <div className="flex items-center justify-center gap-1 mb-0.5">
+          <div
+            className="w-4 h-4 rounded-full shrink-0"
+            style={{ backgroundColor: VOUCHER_SECONDARY, opacity: 0.85 }}
+          />
+          <div className="text-center leading-tight">
+            <div className="text-[7px] font-bold" style={{ color: VOUCHER_PRIMARY }}>
+              Institute Name
+            </div>
+            <div className="text-[4px]" style={{ color: VOUCHER_MID }}>
+              Address · Phone
+            </div>
+          </div>
+        </div>
+        <div
+          className="text-[5px] font-bold text-white text-center py-0.5 mb-1"
+          style={{ backgroundColor: VOUCHER_PRIMARY }}
+        >
+          Motto · {copyLabel}
+        </div>
+      </>
+    ) : (
+      <div className="text-[5px] text-center text-neutral-300 border border-dashed border-neutral-200 py-1 mb-1">
+        Pre-printed header · {copyLabel}
+      </div>
+    )}
+
+    <div className="mb-1">
+      {PREVIEW_INFO_ROWS.map(([label, value]) => (
+        <div key={label} className="flex text-[5.5px] leading-[1.35]">
+          <span className="w-[42%] shrink-0">{label}</span>
+          <span className="font-bold truncate">: {value}</span>
+        </div>
+      ))}
+    </div>
+
+    <div className="border border-neutral-300 text-[5.5px] leading-[1.35]">
+      <div
+        className="flex justify-between px-1 py-0.5 font-bold text-white"
+        style={{ backgroundColor: VOUCHER_SECONDARY }}
+      >
+        <span>Fee Details</span>
+        <span>Oct 2026</span>
+      </div>
+      {PREVIEW_FEE_ROWS.map(([label, value]) => (
+        <div key={label} className="flex justify-between gap-1 px-1 py-px border-t border-neutral-200">
+          <span className="truncate">{label}</span>
+          <span className="font-bold shrink-0">{value}</span>
+        </div>
+      ))}
+    </div>
+
+    <div className="flex justify-center items-stretch gap-[0.5px] h-3 mt-1">
+      {PREVIEW_BARCODE.map((w, i) => (
+        <div
+          key={i}
+          style={{ width: `${w * 0.7}px`, backgroundColor: i % 2 === 0 ? '#111' : 'transparent' }}
+        />
+      ))}
+    </div>
+
+    {branding ? (
+      <>
+        <div className="text-[4px] leading-tight mt-0.5" style={{ color: VOUCHER_MID }}>
+          Kindly keep the original fee voucher safe. A fine applies if paid after the due date.
+        </div>
+        <div className="mt-2 mx-auto w-2/3 border-t border-neutral-500 text-[4.5px] text-center pt-px">
+          Receiver's Signature &amp; Stamp
+        </div>
+      </>
+    ) : (
+      <div className="text-[5px] text-center text-neutral-300 border border-dashed border-neutral-200 py-1 mt-1">
+        Pre-printed notes &amp; signature
+      </div>
+    )}
+  </div>
+);
+
+// Illustrative replica (fake sample data), not a live PDF render —
+// same approach as FormatPreviewCard in Result.jsx.
+const VoucherFormatPreviewCard = ({ format }) => {
+  const branding = format === 'complete';
+  const meta = getVoucherFormat(format);
+
+  return (
+    <div className="w-[360px] bg-surface rounded-lg shadow-xl border border-neutral-200 overflow-hidden text-left">
+      <div className="px-2 py-1.5" style={{ backgroundColor: VOUCHER_PRIMARY }}>
+        <div className="text-white text-[9px] font-bold tracking-wide uppercase">
+          {meta.label} · {meta.meta}
+        </div>
+      </div>
+      <div className="p-2 bg-neutral-100">
+        <div className="flex gap-1.5">
+          <MiniVoucherCopy copyLabel="Office Copy" branding={branding} />
+          <MiniVoucherCopy copyLabel="Student's Copy" branding={branding} />
+        </div>
+      </div>
+      <div className="px-2 py-1 bg-neutral-50 border-t border-neutral-100 text-[8px] text-neutral-500 leading-tight">
+        {meta.description}
+      </div>
+    </div>
+  );
+};
+
+// Wraps a format button so hovering (or keyboard/touch focus) reveals
+// the matching preview above it. Pure CSS — no state, same as
+// FormatPreviewTrigger in Result.jsx.
+const VoucherFormatPreviewTrigger = ({ format, children, align = 'left' }) => {
+  const alignClass =
+    align === 'left' ? 'left-0' : align === 'right' ? 'right-0' : 'left-1/2 -translate-x-1/2';
+
+  return (
+    <div className="relative group">
+      {children}
+      <div
+        className={`pointer-events-none absolute z-50 bottom-full mb-2 ${alignClass} opacity-0 invisible translate-y-1 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 group-focus-within:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 transition-all duration-150`}
+      >
+        <VoucherFormatPreviewCard format={format} />
+      </div>
+    </div>
+  );
+};
+
+// Two-option picker (Complete / Pre-printed). Used by class generate,
+// student generate, and reprint so all three offer the same choice.
+const VoucherFormatPicker = ({ value, onChange, label = 'Voucher Format' }) => {
+  const selected = getVoucherFormat(value);
+
+  return (
+    <div className="flex flex-col w-full">
+      <span className="text-xs uppercase tracking-wider text-neutral-500 font-semibold mb-1">
+        {label}
+      </span>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {VOUCHER_FORMATS.map((f, idx) => {
+          const isSelected = value === f.key;
+          return (
+            <VoucherFormatPreviewTrigger
+              key={f.key}
+              format={f.key}
+              align={idx === 0 ? 'left' : 'right'}
+            >
+              <button
+                type="button"
+                onClick={() => onChange(f.key)}
+                aria-pressed={isSelected}
+                className={`w-full text-left rounded-xl border p-3 transition-all cursor-pointer ${
+                  isSelected
+                    ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                    : 'border-neutral-300 bg-surface hover:border-primary'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`w-3.5 h-3.5 rounded-full border-2 shrink-0 ${
+                      isSelected ? 'border-primary bg-primary' : 'border-neutral-300'
+                    }`}
+                  />
+                  <span className="text-sm font-semibold text-quinary">{f.label}</span>
+                </div>
+                <p className="text-xs text-neutral-500 mt-1 ml-[22px]">{f.meta}</p>
+              </button>
+            </VoucherFormatPreviewTrigger>
+          );
+        })}
+      </div>
+      <p className="text-neutral-400 text-xs mt-2">
+        {selected.description} Hover a format to preview it.
+      </p>
+    </div>
+  );
+};
+
+/* ============================================================
    SECTION 2 — Generate Voucher
    ============================================================ */
 
@@ -783,6 +1032,8 @@ const ClassGenerateVoucherForm = ({ token, Classes }) => {
   const today = new Date();
   const [month, setMonth] = useState(String(today.getMonth() + 1));
   const [year, setYear] = useState(String(today.getFullYear()));
+
+  const [voucherFormat, setVoucherFormat] = useState(DEFAULT_VOUCHER_FORMAT);
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: "", text: "" });
@@ -796,6 +1047,7 @@ const ClassGenerateVoucherForm = ({ token, Classes }) => {
       const params = new URLSearchParams();
       if (month) params.append('month', month);
       if (year) params.append('year', year);
+      params.append('voucher_format', voucherFormat);
 
       const res = await api.post(
         `/fees/generate/${studentClass}/?${params.toString()}`,
@@ -809,7 +1061,7 @@ const ClassGenerateVoucherForm = ({ token, Classes }) => {
       const file = new Blob([res.data], { type: 'application/pdf' });
       window.open(URL.createObjectURL(file), '_blank');
 
-      setMessage({ type: "success", text: "Vouchers generated. Opening PDF in a new tab..." });
+      setMessage({ type: "success", text: `Vouchers generated (${getVoucherFormat(voucherFormat).label}). Opening PDF in a new tab...` });
     } catch (error) {
       console.error("Error generating vouchers:", error);
       const text = await extractBlobErrorMessage(error, 'Failed to generate vouchers. Please try again.');
@@ -822,7 +1074,7 @@ const ClassGenerateVoucherForm = ({ token, Classes }) => {
   return (
     <div>
       <p className="text-neutral-500 text-sm mb-6">
-        Pick a class and month to generate (or re-download) that class's fee vouchers as a PDF.
+        Pick a class, month and voucher format to generate (or re-download) that class's fee vouchers as a PDF.
       </p>
 
       <Message message={message} />
@@ -870,6 +1122,9 @@ const ClassGenerateVoucherForm = ({ token, Classes }) => {
             </Field>
           </div>
 
+          {/* Voucher format (Complete / Pre-printed) */}
+          <VoucherFormatPicker value={voucherFormat} onChange={setVoucherFormat} />
+
           <p className="text-neutral-400 text-xs">
             Regenerating for the same class and month is safe — existing vouchers and challan numbers are reused, not duplicated. Pending vouchers are refreshed to each student's latest fee structure (individual override or class); already-paid vouchers are never changed.
           </p>
@@ -881,7 +1136,7 @@ const ClassGenerateVoucherForm = ({ token, Classes }) => {
               disabled={loading || !studentClass}
               className={primaryBtnClass}
             >
-              {loading ? "Generating..." : "Generate Vouchers"}
+              {loading ? "Generating..." : `Generate ${getVoucherFormat(voucherFormat).short} Vouchers`}
             </button>
           </div>
         </form>
@@ -902,6 +1157,8 @@ const StudentGenerateVoucherForm = ({ token }) => {
   const [month, setMonth] = useState(String(today.getMonth() + 1));
   const [year, setYear] = useState(String(today.getFullYear()));
 
+  const [voucherFormat, setVoucherFormat] = useState(DEFAULT_VOUCHER_FORMAT);
+
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: "", text: "" });
 
@@ -915,6 +1172,7 @@ const StudentGenerateVoucherForm = ({ token }) => {
       const params = new URLSearchParams();
       if (month) params.append('month', month);
       if (year) params.append('year', year);
+      params.append('voucher_format', voucherFormat);
 
       const res = await api.post(
         `/fees/generate/student/${student.id}/?${params.toString()}`,
@@ -928,7 +1186,7 @@ const StudentGenerateVoucherForm = ({ token }) => {
       const file = new Blob([res.data], { type: 'application/pdf' });
       window.open(URL.createObjectURL(file), '_blank');
 
-      setMessage({ type: "success", text: "Voucher generated. Opening PDF in a new tab..." });
+      setMessage({ type: "success", text: `Voucher generated (${getVoucherFormat(voucherFormat).label}). Opening PDF in a new tab...` });
     } catch (error) {
       console.error("Error generating student voucher:", error);
       const text = await extractBlobErrorMessage(error, 'Failed to generate voucher. Please try again.');
@@ -941,7 +1199,7 @@ const StudentGenerateVoucherForm = ({ token }) => {
   return (
     <div>
       <p className="text-neutral-500 text-sm mb-6">
-        Search a student by GR No, pick a month, and generate their voucher. Their individual fee structure is used if they have one; otherwise their class's structure applies. If neither exists, generation is blocked.
+        Search a student by GR No, pick a month and voucher format, and generate their voucher. Their individual fee structure is used if they have one; otherwise their class's structure applies. If neither exists, generation is blocked.
       </p>
 
       <div className="bg-surface rounded-2xl border border-neutral-200 shadow-sm p-6 max-w-xl mb-6">
@@ -991,13 +1249,16 @@ const StudentGenerateVoucherForm = ({ token }) => {
                 </Field>
               </div>
 
+              {/* Voucher format (Complete / Pre-printed) */}
+              <VoucherFormatPicker value={voucherFormat} onChange={setVoucherFormat} />
+
               <p className="text-neutral-400 text-xs">
                 Regenerating for the same student and month is safe — the existing voucher and challan number is reused, not duplicated. If it's still pending, its amounts are refreshed to the latest fee structure; a paid voucher is never changed.
               </p>
 
               <div className="flex justify-end">
                 <button type="submit" disabled={loading} className={primaryBtnClass}>
-                  {loading ? "Generating..." : "Generate Voucher"}
+                  {loading ? "Generating..." : `Generate ${getVoucherFormat(voucherFormat).short} Voucher`}
                 </button>
               </div>
             </form>
@@ -1466,6 +1727,7 @@ const StudentSearchTab = ({ token }) => {
   const [student, setStudent] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
   const [reprintingId, setReprintingId] = useState(null);
+  const [reprintFormat, setReprintFormat] = useState(DEFAULT_VOUCHER_FORMAT);
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -1569,6 +1831,7 @@ const StudentSearchTab = ({ token }) => {
     try {
       const res = await api.get(`/fees/vouchers/${voucher.id}/reprint/`, {
         headers: { Authorization: `Bearer ${token}` },
+        params: { voucher_format: reprintFormat },
         responseType: 'blob',
       });
       const file = new Blob([res.data], { type: 'application/pdf' });
@@ -1634,6 +1897,14 @@ const StudentSearchTab = ({ token }) => {
           {student.fee_vouchers?.length === 0 ? (
             <EmptyState text="No fee vouchers have been generated for this student yet." />
           ) : (
+            <>
+            <div className="bg-surface rounded-2xl border border-neutral-200 shadow-sm p-6 max-w-xl">
+              <VoucherFormatPicker
+                label="Reprint Format"
+                value={reprintFormat}
+                onChange={setReprintFormat}
+              />
+            </div>
             <TableShell headers={['Challan No', 'Month/Year', 'Due Date', 'Status', 'Paid At', 'Action']}>
               {student.fee_vouchers.map((v) => (
                 <tr key={v.id} className="border-b border-neutral-50 last:border-0 hover:bg-neutral-50/50">
@@ -1665,15 +1936,17 @@ const StudentSearchTab = ({ token }) => {
                         type="button"
                         onClick={() => handleReprint(v)}
                         disabled={reprintingId === v.id}
+                        title={`Reprint as ${getVoucherFormat(reprintFormat).label}`}
                         className="text-xs font-semibold uppercase tracking-wide text-neutral-500 hover:text-quinary disabled:opacity-50 cursor-pointer"
                       >
-                        {reprintingId === v.id ? 'Reprinting...' : 'Reprint'}
+                        {reprintingId === v.id ? 'Reprinting...' : `Reprint (${getVoucherFormat(reprintFormat).short})`}
                       </button>
                     </div>
                   </td>
                 </tr>
               ))}
             </TableShell>
+            </>
           )}
         </div>
       )}

@@ -1,103 +1,77 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, dialog } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { spawn, exec } from 'child_process';
+import { exec, spawnSync } from 'child_process';
 import net from 'net';
 import fs from 'fs';
-import os from 'os';
-
-// Helper to grab client's local network IPv4 address dynamically
-function getLocalIpAddress() {
-    const interfaces = os.networkInterfaces();
-    for (const name of Object.keys(interfaces)) {
-        for (const iface of interfaces[name]) {
-            if (iface.family === 'IPv4' && !iface.internal) {
-                return iface.address; // e.g., "192.168.1.50" or "10.0.0.12"
-            }
-        }
-    }
-    return '127.0.0.1';
-}
-
-app.whenReady().then(async () => {
-    const clientIp = getLocalIpAddress();
-    
-    // Start background services in production
-    startDjango();
-    startWhatsApp();
-
-    if (app.isPackaged) {
-        // Wait for Django on local loopback first
-        await waitForPort('127.0.0.1', 8000, 30000);
-    }
-
-    createWindow();
-});
-
-app.disableHardwareAcceleration();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-let djangoProcess = null;
-let whatsappProcess = null;
+// Must be called before the app is ready.
+app.disableHardwareAcceleration();
+
+const DJANGO_HOST = '127.0.0.1';
+const DJANGO_PORT = 8000;
+const DJANGO_START_TIMEOUT = 90000; // PyInstaller + PyArmor + matplotlib can be slow on first run
+
+// Window titles double as handles so we can close the CMD windows on quit.
+const DJANGO_TITLE = 'Django Server';
+const WHATSAPP_TITLE = 'WhatsApp Bridge';
+const DJANGO_IMAGE = 'serve.exe';
+const WHATSAPP_IMAGE = 'whatsapp-server.exe';
+
+let mainWindow = null;
 
 
 // ============================================
-// PATH HELPERS
+// SINGLE INSTANCE LOCK
+// A second launch must never start a second set of
+// Django / WhatsApp CMD windows or a second Electron window.
+// ============================================
+
+const gotLock = app.requestSingleInstanceLock();
+
+if (!gotLock) {
+    app.quit();
+} else {
+    app.on('second-instance', () => {
+        if (mainWindow) {
+            if (mainWindow.isMinimized()) mainWindow.restore();
+            mainWindow.focus();
+        }
+    });
+
+    // ONE whenReady handler only (the old file had two -> everything started twice).
+    app.whenReady().then(main);
+}
+
+
+// ============================================
+// HELPERS
 // ============================================
 
 function getResourcesPath(...parts) {
     return path.join(process.resourcesPath, ...parts);
 }
 
-
-// ============================================
-// WAIT FOR PORT
-// ============================================
-
-function waitForPort(host, port, timeout = 30000) {
+function waitForPort(host, port, timeout) {
     return new Promise((resolve, reject) => {
-        const startTime = Date.now();
+        const start = Date.now();
+
+        const retry = () => {
+            if (Date.now() - start >= timeout) {
+                return reject(new Error(`Server did not start within ${timeout / 1000} seconds.`));
+            }
+            setTimeout(check, 500);
+        };
 
         const check = () => {
             const socket = new net.Socket();
-
             socket.setTimeout(1000);
-
-            socket.once('connect', () => {
-                socket.destroy();
-                resolve();
-            });
-
-            socket.once('error', () => {
-                socket.destroy();
-
-                if (Date.now() - startTime >= timeout) {
-                    reject(
-                        new Error(
-                            `Server did not start within ${timeout / 1000} seconds.`
-                        )
-                    );
-                } else {
-                    setTimeout(check, 500);
-                }
-            });
-
-            socket.once('timeout', () => {
-                socket.destroy();
-
-                if (Date.now() - startTime >= timeout) {
-                    reject(
-                        new Error(
-                            `Server did not start within ${timeout / 1000} seconds.`
-                        )
-                    );
-                } else {
-                    setTimeout(check, 500);
-                }
-            });
-
+            socket.once('connect', () => { socket.destroy(); resolve(); });
+            socket.once('error', () => { socket.destroy(); retry(); });
+            socket.once('timeout', () => { socket.destroy(); retry(); });
             socket.connect(port, host);
         };
 
@@ -107,315 +81,154 @@ function waitForPort(host, port, timeout = 30000) {
 
 
 // ============================================
-// START DJANGO
+// KILL HELPERS (Windows)
+// Close the CMD window (by title) AND the exe (by image name).
+// Synchronous so it finishes before Electron exits.
 // ============================================
+
+function killByTitle(title) {
+    spawnSync('taskkill', ['/FI', `WINDOWTITLE eq ${title}*`, '/T', '/F'], { windowsHide: true });
+}
+
+function killByImage(image) {
+    spawnSync('taskkill', ['/IM', image, '/T', '/F'], { windowsHide: true });
+}
+
+function stopBackgroundServices() {
+    if (process.platform !== 'win32') return;
+    console.log('Stopping Django + WhatsApp...');
+    killByTitle(DJANGO_TITLE);
+    killByTitle(WHATSAPP_TITLE);
+    killByImage(DJANGO_IMAGE);
+    killByImage(WHATSAPP_IMAGE);
+    killByTitle(DJANGO_TITLE);   // sweep any window left behind
+    killByTitle(WHATSAPP_TITLE);
+}
+
+
+// ============================================
+// START A SERVICE IN ITS OWN VISIBLE CMD WINDOW (stays open: /k)
+// `title` inside the window keeps the window title stable so
+// it can be closed on quit.
+// ============================================
+
+function startInConsole(title, exePath, cwd) {
+    console.log('============================================');
+    console.log(`STARTING ${title.toUpperCase()}`);
+    console.log('Executable:', exePath);
+    console.log('Working directory:', cwd);
+
+    if (!fs.existsSync(exePath)) {
+        console.error(`${title.toUpperCase()} EXECUTABLE NOT FOUND AT:`, exePath);
+        return;
+    }
+
+    const command = `start "${title}" cmd /k "title ${title} & "${exePath}""`;
+
+    exec(command, { cwd, windowsHide: false }, (error) => {
+        if (error) console.error(`${title} CMD ERROR:`, error);
+    });
+
+    console.log(`${title} CMD window launched.`);
+}
 
 function startDjango() {
     if (!app.isPackaged) {
-        console.log('Development mode: Django is not started by Electron.');
+        console.log('Dev mode: Django is not started by Electron.');
         return;
     }
-
-    const backendDirectory = getResourcesPath('backend');
-    const djangoExe = path.join(
-        backendDirectory,
-        'serve.exe'
-    );
-
-    console.log('============================================');
-    console.log('STARTING DJANGO');
-    console.log('============================================');
-    console.log('Django executable:', djangoExe);
-    console.log('Django working directory:', backendDirectory);
-
-    if (!fs.existsSync(djangoExe)) {
-        console.error('DJANGO EXECUTABLE NOT FOUND AT:', djangoExe);
-        return;
-    }
-
-    // Open Django in a visible CMD window.
-    const command = `start "Django Server" cmd /k "${djangoExe}"`;
-
-    djangoProcess = exec(
-        command,
-        {
-            cwd: backendDirectory,
-            windowsHide: false
-        },
-        (error) => {
-            if (error) {
-                console.error('DJANGO CMD ERROR:', error);
-            }
-        }
-    );
-
-    console.log('Django CMD window launched successfully.');
+    const dir = getResourcesPath('backend');
+    startInConsole(DJANGO_TITLE, path.join(dir, DJANGO_IMAGE), dir);
 }
-
-
-// ============================================
-// START WHATSAPP
-// ============================================
-
-
-
 
 function startWhatsApp() {
     if (!app.isPackaged) {
-        console.log('Development mode: WhatsApp bridge is not started by Electron.');
+        console.log('Dev mode: WhatsApp bridge is not started by Electron.');
         return;
     }
-
-    const whatsappDirectory = getResourcesPath('whatsapp');
-    const whatsappExe = path.join(whatsappDirectory, 'whatsapp-server.exe');
-
-    console.log('============================================');
-    console.log('STARTING WHATSAPP BRIDGE');
-    console.log('============================================');
-    console.log('Executable:', whatsappExe);
-    console.log('Working directory:', whatsappDirectory);
-
-    if (!fs.existsSync(whatsappExe)) {
-        console.error('WHATSAPP EXECUTABLE NOT FOUND AT:', whatsappExe);
-        return;
-    }
-
-    /*
-     * Launches a fresh, independent CMD terminal window titled 
-     * "WhatsApp Bridge" that stays open continuously (/k).
-     */
-    const command = `start "WhatsApp Bridge" cmd /k "${whatsappExe}"`;
-
-    whatsappProcess = exec(command, { cwd: whatsappDirectory }, (error) => {
-        if (error) {
-            console.error('WHATSAPP EXEC ERROR:', error);
-        }
-    });
-
-    console.log('WhatsApp CMD window launched successfully.');
+    const dir = getResourcesPath('whatsapp');
+    startInConsole(WHATSAPP_TITLE, path.join(dir, WHATSAPP_IMAGE), dir);
 }
+
 
 // ============================================
 // CREATE WINDOW
 // ============================================
 
 function createWindow() {
-    const mainWindow = new BrowserWindow({
+    mainWindow = new BrowserWindow({
         width: 1200,
         height: 800,
-
         title: 'Student Portal',
-
-        icon: path.join(
-            __dirname,
-            'icon.ico'
-        ),
-
+        icon: path.join(__dirname, 'icon.ico'),
         autoHideMenuBar: true,
-
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
-            backgroundThrottling: false
-        }
+            backgroundThrottling: false,
+        },
     });
 
+    mainWindow.on('closed', () => { mainWindow = null; });
+
     if (app.isPackaged) {
-        const indexPath = getResourcesPath(
-            'frontend',
-            'dist',
-            'index.html'
-        );
-
-        console.log('Loading frontend:');
-        console.log(indexPath);
-
+        const indexPath = getResourcesPath('frontend', 'dist', 'index.html');
+        console.log('Loading frontend:', indexPath);
         mainWindow.loadFile(indexPath);
     } else {
-        mainWindow.loadURL(
-            'http://localhost:5173'
-        );
+        mainWindow.loadURL('http://localhost:5173');
     }
 
-    mainWindow.webContents.on(
-        'did-fail-load',
-        (_event, errorCode, errorDescription) => {
-            console.error(
-                'Frontend failed to load:',
-                errorCode,
-                errorDescription
-            );
-        }
-    );
+    mainWindow.webContents.on('did-fail-load', (_e, code, desc) => {
+        console.error('Frontend failed to load:', code, desc);
+    });
 }
 
 
 // ============================================
-// APP READY
+// MAIN
 // ============================================
 
-app.whenReady().then(async () => {
-
-    console.log('');
-    console.log('============================================');
-    console.log('STUDENT PORTAL STARTING');
-    console.log('============================================');
-
-    console.log('Packaged:', app.isPackaged);
-    console.log('Resources:', process.resourcesPath);
-    console.log('');
-
-    // ----------------------------------------
-    // START DJANGO
-    // ----------------------------------------
-
-    startDjango();
-
-    // ----------------------------------------
-    // START WHATSAPP
-    // ----------------------------------------
-
-    startWhatsApp();
-
-    // ----------------------------------------
-    // WAIT FOR DJANGO
-    // ----------------------------------------
+async function main() {
+    console.log('STUDENT PORTAL STARTING | packaged:', app.isPackaged);
 
     if (app.isPackaged) {
-
-        try {
-
-            console.log(
-                'Waiting for Django on 127.0.0.1:8000...'
-            );
-
-            await waitForPort(
-                '127.0.0.1',
-                8000,
-                30000
-            );
-
-            console.log(
-                'Django is READY.'
-            );
-
-        } catch (error) {
-
-            console.error(
-                '============================================'
-            );
-
-            console.error(
-                'DJANGO STARTUP ERROR'
-            );
-
-            console.error(error);
-
-            console.error(
-                '============================================'
-            );
-
-        }
+        // Clear orphans from a previous crash so we never get duplicate windows
+        // or a "port 8000 already in use" failure.
+        stopBackgroundServices();
     }
 
-    // ----------------------------------------
-    // CREATE WINDOW
-    // ----------------------------------------
+    startDjango();
+    startWhatsApp();
+
+    if (app.isPackaged) {
+        try {
+            console.log(`Waiting for Django on ${DJANGO_HOST}:${DJANGO_PORT}...`);
+            await waitForPort(DJANGO_HOST, DJANGO_PORT, DJANGO_START_TIMEOUT);
+            console.log('Django is READY.');
+        } catch (err) {
+            console.error('DJANGO STARTUP ERROR:', err);
+            dialog.showErrorBox(
+                'Backend failed to start',
+                `${err.message}\n\nCheck the "${DJANGO_TITLE}" console window for the error.`
+            );
+        }
+    }
 
     createWindow();
 
-    // ----------------------------------------
-    // ACTIVATE
-    // ----------------------------------------
-
     app.on('activate', () => {
-
-        if (
-            BrowserWindow.getAllWindows().length === 0
-        ) {
-            createWindow();
-        }
-
+        if (BrowserWindow.getAllWindows().length === 0) createWindow();
     });
-
-});
-
-
-// ============================================
-// KILL PROCESS TREE
-// ============================================
-
-function killProcessTree(processObject, name) {
-
-    if (!processObject || !processObject.pid) {
-        return;
-    }
-
-    console.log(
-        `Stopping ${name}. PID: ${processObject.pid}`
-    );
-
-    try {
-
-        spawn(
-            'taskkill',
-            [
-                '/pid',
-                String(processObject.pid),
-                '/T',
-                '/F'
-            ],
-            {
-                windowsHide: true
-            }
-        );
-
-    } catch (error) {
-
-        console.error(
-            `Failed to stop ${name}:`,
-            error
-        );
-
-    }
 }
 
 
 // ============================================
-// APP QUIT
+// QUIT
 // ============================================
 
-app.on('will-quit', () => {
-
-    console.log(
-        'Electron is quitting...'
-    );
-
-    killProcessTree(
-        djangoProcess,
-        'Django'
-    );
-
-    killProcessTree(
-        whatsappProcess,
-        'WhatsApp'
-    );
-
-    djangoProcess = null;
-    whatsappProcess = null;
-
-});
-
-
-// ============================================
-// CLOSE WINDOWS
-// ============================================
+app.on('will-quit', stopBackgroundServices);
 
 app.on('window-all-closed', () => {
-
-    if (process.platform !== 'darwin') {
-        app.quit();
-    }
-
+    if (process.platform !== 'darwin') app.quit();
 });
-

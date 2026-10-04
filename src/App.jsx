@@ -24,6 +24,7 @@ import Examination from './pages/Examination'
 import Settings from './pages/Settings'
 import Teachers from './pages/Teachers'
 import IDCard from './pages/IdCard'
+import Expenses from './pages/Expenses'
 import { Routes, Route } from 'react-router'
 import { useNavigate } from 'react-router'
 
@@ -53,6 +54,8 @@ function App() {
                   <Route path='/admin/settings' element={<ProtectedRoute><ProtectedAdmin><Settings/></ProtectedAdmin></ProtectedRoute>}/>
                    <Route path='/admin/teachers' element={<ProtectedRoute><ProtectedAdmin><Teachers/></ProtectedAdmin></ProtectedRoute>}/>
                     <Route path='/admin/idcard' element={<ProtectedRoute><ProtectedAdmin><IDCard/></ProtectedAdmin></ProtectedRoute>}/>
+                    <Route path='/admin/expenses' element={<ProtectedRoute><ProtectedAdmin><Expenses/></ProtectedAdmin></ProtectedRoute>}/>
+
 
 
 

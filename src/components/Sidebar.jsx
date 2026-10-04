@@ -117,6 +117,12 @@ export default function Sidebar({ closeMobileMenu }) {
           roles: ["admin"],
           path: "/admin/idcard",
         },
+        {
+          label: "Expenses",
+          icon: HiOutlineDocumentText,
+          roles: ["admin"],
+          path: "/admin/expenses",
+        },
       ],
     },
     {
