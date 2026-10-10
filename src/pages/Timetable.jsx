@@ -51,7 +51,7 @@ const buildSubjectDays = () =>
 const getClassIdOf = (value) =>
     value && typeof value === "object" ? value.id : value;
 
-const Examination = () => {
+const Timetable = () => {
     const token = useAuthStore((state) => state.accessToken);
     const headers = { Authorization: `Bearer ${token}` };
 
@@ -356,31 +356,48 @@ const Examination = () => {
         }));
     };
 
+    // A subject row can be in one of three states (mirrors the backend's
+    // BatchTestTimetableItemSerializer):
+    //   - filled:  date + start + end all present  -> sent to the server
+    //   - empty:   date + start + end all blank    -> silently skipped
+    //   - partial: some but not all of the three   -> rejected
+    // Room is optional and never decides the state.
+    const isEntryFilled = (e) => Boolean(e.date && e.start_time && e.end_time);
+    const isEntryEmpty = (e) => !e.date && !e.start_time && !e.end_time;
+    const isEntryPartial = (e) => !isEntryFilled(e) && !isEntryEmpty(e);
+
     const validTestEntries = useMemo(
-        () =>
-            testEntries.filter(
-                (e) => e.subject && e.date && e.start_time && e.end_time
-            ),
+        () => testEntries.filter(isEntryFilled),
         [testEntries]
     );
 
-    // A class's batch entries are "complete" once every row has a subject,
-    // date, start time, and end time -- mirrors validTestEntries above but
-    // scoped to one class inside testEntriesByClass.
-    const isClassBatchComplete = useCallback(
+    const partialTestEntries = useMemo(
+        () => testEntries.filter(isEntryPartial),
+        [testEntries]
+    );
+
+    const getTestSubjectName = (subjectId) =>
+        subjects.find((item) => String(item.id) === String(subjectId))?.name ||
+        `Subject #${subjectId}`;
+
+    // A class's batch entries are "ready" when at least one subject is fully
+    // scheduled and no subject is only half-filled. Subjects left completely
+    // blank are allowed -- the backend skips them -- so a class does NOT need
+    // every subject scheduled any more.
+    const isClassBatchReady = useCallback(
         (classId) => {
             const entries = testEntriesByClass[classId] || [];
-            if (entries.length === 0) return false;
-            return entries.every(
-                (e) => e.subject && e.date && e.start_time && e.end_time
+            return (
+                entries.some(isEntryFilled) &&
+                !entries.some(isEntryPartial)
             );
         },
         [testEntriesByClass]
     );
 
-    const allBatchClassesComplete =
+    const allBatchClassesReady =
         selectedTestClassIds.length > 0 &&
-        selectedTestClassIds.every((id) => isClassBatchComplete(id));
+        selectedTestClassIds.every((id) => isClassBatchReady(id));
 
     // Classes that already have a timetable for the selected test --
     // used to disable them in the create-mode class picker so admins
@@ -481,11 +498,23 @@ const Examination = () => {
                 });
             }
 
-            if (validTestEntries.length === 0 || validTestEntries.length !== testEntries.length) {
+            if (partialTestEntries.length > 0) {
+                const names = partialTestEntries
+                    .map((entry) => getTestSubjectName(entry.subject))
+                    .join(", ");
                 return Swal.fire({
                     icon: "warning",
-                    title: "Incomplete timetable",
-                    text: "Please complete the date, start time, and end time for every subject shown.",
+                    title: "Incomplete subject",
+                    text: `Enter the date, start time and end time for ${names}, or leave all three empty.`,
+                    confirmButtonColor: "var(--danger)",
+                });
+            }
+
+            if (validTestEntries.length === 0) {
+                return Swal.fire({
+                    icon: "warning",
+                    title: "Nothing to save",
+                    text: "Schedule at least one subject (date, start time and end time).",
                     confirmButtonColor: "var(--danger)",
                 });
             }
@@ -559,13 +588,30 @@ const Examination = () => {
             });
         }
 
-        if (!allBatchClassesComplete) {
-            return Swal.fire({
-                icon: "warning",
-                title: "Incomplete timetable",
-                text: "Please complete the date, start time, and end time for every subject in every selected class.",
-                confirmButtonColor: "var(--danger)",
-            });
+        for (const classId of selectedTestClassIds) {
+            const entries = testEntriesByClass[classId] || [];
+            const cls = classes.find((c) => String(c.id) === String(classId));
+            const classLabel = cls?.display_name || cls?.name || `Class #${classId}`;
+
+            const partial = entries.filter(isEntryPartial);
+            if (partial.length > 0) {
+                const names = partial.map((entry) => getTestSubjectName(entry.subject)).join(", ");
+                return Swal.fire({
+                    icon: "warning",
+                    title: "Incomplete subject",
+                    text: `${classLabel}: enter the date, start time and end time for ${names}, or leave all three empty.`,
+                    confirmButtonColor: "var(--danger)",
+                });
+            }
+
+            if (!entries.some(isEntryFilled)) {
+                return Swal.fire({
+                    icon: "warning",
+                    title: "Nothing to save",
+                    text: `${classLabel}: schedule at least one subject, or deselect this class.`,
+                    confirmButtonColor: "var(--danger)",
+                });
+            }
         }
 
         setSavingTest(true);
@@ -574,7 +620,8 @@ const Examination = () => {
             test: Number(selectedTestId),
             timetables: selectedTestClassIds.map((classId) => ({
                 student_class: Number(classId),
-                entries: (testEntriesByClass[classId] || []).map((entry) => ({
+                // Subjects left completely blank are not sent at all.
+                entries: (testEntriesByClass[classId] || []).filter(isEntryFilled).map((entry) => ({
                     subject: Number(entry.subject),
                     date: entry.date,
                     start_time: entry.start_time,
@@ -2331,7 +2378,7 @@ const Examination = () => {
                                                                 {subject?.name || `Subject #${entry.subject}`}
                                                             </div>
                                                             <div className="text-xs text-neutral-400 mt-1">
-                                                                Configure the examination date and time for this subject.
+                                                                Set the date and time for this subject, or leave all three empty to skip it.
                                                             </div>
                                                         </div>
                                                         {!subject && (
@@ -2348,37 +2395,37 @@ const Examination = () => {
                                                     <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                                                         <div>
                                                             <label className="text-xs uppercase tracking-wider text-neutral-500 font-semibold block mb-1">
-                                                                Date *
+                                                                Date
                                                             </label>
                                                             <input
                                                                 type="date"
                                                                 value={entry.date}
                                                                 onChange={(e) => updateTestEntry(index, "date", e.target.value)}
-                                                                required
+                                                                required={isEntryPartial(entry)}
                                                                 className="w-full bg-surface text-quinary border border-neutral-300 rounded-xl p-3 outline-none focus:border-primary transition-colors text-sm"
                                                             />
                                                         </div>
                                                         <div>
                                                             <label className="text-xs uppercase tracking-wider text-neutral-500 font-semibold block mb-1">
-                                                                Start Time *
+                                                                Start Time
                                                             </label>
                                                             <input
                                                                 type="time"
                                                                 value={entry.start_time}
                                                                 onChange={(e) => updateTestEntry(index, "start_time", e.target.value)}
-                                                                required
+                                                                required={isEntryPartial(entry)}
                                                                 className="w-full bg-surface text-quinary border border-neutral-300 rounded-xl p-3 outline-none focus:border-primary transition-colors text-sm"
                                                             />
                                                         </div>
                                                         <div>
                                                             <label className="text-xs uppercase tracking-wider text-neutral-500 font-semibold block mb-1">
-                                                                End Time *
+                                                                End Time
                                                             </label>
                                                             <input
                                                                 type="time"
                                                                 value={entry.end_time}
                                                                 onChange={(e) => updateTestEntry(index, "end_time", e.target.value)}
-                                                                required
+                                                                required={isEntryPartial(entry)}
                                                                 className="w-full bg-surface text-quinary border border-neutral-300 rounded-xl p-3 outline-none focus:border-primary transition-colors text-sm"
                                                             />
                                                         </div>
@@ -2420,7 +2467,7 @@ const Examination = () => {
                                                         {classLabel}
                                                     </span>
                                                     <span className="text-xs text-neutral-400">
-                                                        {entries.filter((e) => e.subject && e.date && e.start_time && e.end_time).length} of {entries.length} subjects configured
+                                                        {entries.filter(isEntryFilled).length} of {entries.length} subjects scheduled
                                                     </span>
                                                 </div>
 
@@ -2444,7 +2491,7 @@ const Examination = () => {
                                                                             {subject?.name || `Subject #${entry.subject}`}
                                                                         </div>
                                                                         <div className="text-xs text-neutral-400 mt-1">
-                                                                            Configure the examination date and time for this subject.
+                                                                            Set the date and time for this subject, or leave all three empty to skip it.
                                                                         </div>
                                                                     </div>
                                                                     {!subject && (
@@ -2461,37 +2508,37 @@ const Examination = () => {
                                                                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                                                                     <div>
                                                                         <label className="text-xs uppercase tracking-wider text-neutral-500 font-semibold block mb-1">
-                                                                            Date *
+                                                                            Date
                                                                         </label>
                                                                         <input
                                                                             type="date"
                                                                             value={entry.date}
                                                                             onChange={(e) => updateBatchTestEntry(classId, index, "date", e.target.value)}
-                                                                            required
+                                                                            required={isEntryPartial(entry)}
                                                                             className="w-full bg-surface text-quinary border border-neutral-300 rounded-xl p-3 outline-none focus:border-primary transition-colors text-sm"
                                                                         />
                                                                     </div>
                                                                     <div>
                                                                         <label className="text-xs uppercase tracking-wider text-neutral-500 font-semibold block mb-1">
-                                                                            Start Time *
+                                                                            Start Time
                                                                         </label>
                                                                         <input
                                                                             type="time"
                                                                             value={entry.start_time}
                                                                             onChange={(e) => updateBatchTestEntry(classId, index, "start_time", e.target.value)}
-                                                                            required
+                                                                            required={isEntryPartial(entry)}
                                                                             className="w-full bg-surface text-quinary border border-neutral-300 rounded-xl p-3 outline-none focus:border-primary transition-colors text-sm"
                                                                         />
                                                                     </div>
                                                                     <div>
                                                                         <label className="text-xs uppercase tracking-wider text-neutral-500 font-semibold block mb-1">
-                                                                            End Time *
+                                                                            End Time
                                                                         </label>
                                                                         <input
                                                                             type="time"
                                                                             value={entry.end_time}
                                                                             onChange={(e) => updateBatchTestEntry(classId, index, "end_time", e.target.value)}
-                                                                            required
+                                                                            required={isEntryPartial(entry)}
                                                                             className="w-full bg-surface text-quinary border border-neutral-300 rounded-xl p-3 outline-none focus:border-primary transition-colors text-sm"
                                                                         />
                                                                     </div>
@@ -2522,7 +2569,7 @@ const Examination = () => {
                             {editingTestId && selectedTestClassId && subjectsForTestClass.length > 0 && (
                                 <div className="flex items-center justify-between max-w-4xl">
                                     <span className="text-xs text-neutral-400">
-                                        {validTestEntries.length} of {testEntries.length} subjects configured.
+                                        {validTestEntries.length} of {testEntries.length} subjects scheduled. Blank subjects are skipped.
                                     </span>
                                     <div className="flex items-center gap-3">
                                         <button
@@ -2534,7 +2581,7 @@ const Examination = () => {
                                         </button>
                                         <button
                                             type="submit"
-                                            disabled={savingTest || validTestEntries.length !== testEntries.length || testEntries.length === 0}
+                                            disabled={savingTest || validTestEntries.length === 0 || partialTestEntries.length > 0}
                                             className="bg-primary hover:bg-quinary disabled:opacity-50 text-white font-medium py-3 px-6 rounded-xl transition-all duration-300 shadow-md transform active:scale-[0.98] cursor-pointer"
                                         >
                                             {savingTest ? "Saving..." : "Update Test Timetable"}
@@ -2547,7 +2594,7 @@ const Examination = () => {
                             {!editingTestId && selectedTestClassIds.length > 0 && (
                                 <div className="flex items-center justify-between max-w-4xl">
                                     <span className="text-xs text-neutral-400">
-                                        {selectedTestClassIds.filter((id) => isClassBatchComplete(id)).length} of {selectedTestClassIds.length} classes fully configured.
+                                        {selectedTestClassIds.filter((id) => isClassBatchReady(id)).length} of {selectedTestClassIds.length} classes ready. Blank subjects are skipped.
                                     </span>
                                     <div className="flex items-center gap-3">
                                         <button
@@ -2559,7 +2606,7 @@ const Examination = () => {
                                         </button>
                                         <button
                                             type="submit"
-                                            disabled={savingTest || !allBatchClassesComplete}
+                                            disabled={savingTest || !allBatchClassesReady}
                                             className="bg-primary hover:bg-quinary disabled:opacity-50 text-white font-medium py-3 px-6 rounded-xl transition-all duration-300 shadow-md transform active:scale-[0.98] cursor-pointer"
                                         >
                                             {savingTest ? "Saving..." : `Create Test Timetable${selectedTestClassIds.length > 1 ? "s" : ""}`}
@@ -2614,4 +2661,4 @@ const Examination = () => {
     );
 };
 
-export default Examination;
+export default Timetable;

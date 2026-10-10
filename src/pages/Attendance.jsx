@@ -60,10 +60,12 @@ const STATUS_STYLES = {
     PRESENT: "bg-[var(--success)] border-[var(--success)] text-[var(--surface)] shadow-sm",
     ABSENT: "bg-[var(--danger)] border-[var(--danger)] text-[var(--surface)] shadow-sm",
 };
+const WHATSAPP_ON =
+    "bg-[var(--success)]/10 border-[var(--success)] text-[var(--success)] shadow-sm";
 const STATUS_IDLE = "bg-[var(--surface)] border-[var(--neutral-200)] text-[var(--neutral-600)] hover:bg-[var(--neutral-50)]";
 
 const inputClass =
-    "bg-[var(--surface)] text-[var(--quinary)] border border-[var(--neutral-300)] rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-sm";
+    "bg-[var(--surface)] text-[var(--quinary)] border border-[var(--neutral-300)] rounded-xl p-3 outline-none focus:border-[var(--primary)] transition-colors text-base sm:text-sm";
 const labelClass = "text-xs uppercase tracking-wider text-[var(--neutral-500)] font-semibold mb-1";
 
 const ATTENDANCE_MODES = [
@@ -152,21 +154,21 @@ const Attendance = () => {
     const setActiveTab = mode === "student" ? setActiveStudentTab : setActiveTeacherTab;
 
     return (
-        <div className="p-6 bg-[var(--secondary)] text-[var(--quinary)] min-h-screen font-sans">
-            <div className="text-3xl font-bold tracking-tight mb-2 text-[var(--quinary)]">Attendance</div>
-            <p className="text-[var(--neutral-500)] text-sm mb-6">
+        <div className="p-3 sm:p-6 bg-[var(--secondary)] text-[var(--quinary)] min-h-screen font-sans">
+            <div className="text-2xl sm:text-3xl font-bold tracking-tight mb-2 text-[var(--quinary)]">Attendance</div>
+            <p className="text-[var(--neutral-500)] text-xs sm:text-sm mb-4 sm:mb-6">
                 Mark daily attendance, browse and edit records, and review attendance analytics — for students or
                 teaching staff.
             </p>
 
             {/* Student / Teacher switch */}
-            <div className="inline-flex items-center gap-1 bg-[var(--surface)] border border-[var(--neutral-200)] rounded-xl p-1 mb-5 shadow-sm">
+            <div className="flex w-full sm:inline-flex sm:w-auto items-center gap-1 bg-[var(--surface)] border border-[var(--neutral-200)] rounded-xl p-1 mb-5 shadow-sm overflow-x-auto">
                 {ATTENDANCE_MODES.map((m) => (
                     <button
                         key={m.key}
                         type="button"
                         onClick={() => setMode(m.key)}
-                        className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+                        className={`flex-1 sm:flex-none whitespace-nowrap px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors cursor-pointer ${
                             mode === m.key
                                 ? "bg-[var(--primary)] text-[var(--surface)] shadow-sm"
                                 : "text-[var(--neutral-500)] hover:text-[var(--quinary)] hover:bg-[var(--neutral-50)]"
@@ -179,13 +181,13 @@ const Attendance = () => {
 
             {/* Student / Teacher sub-tabs */}
             {mode !== "qr" && (
-                <div className="flex flex-wrap gap-2 mb-6 border-b border-[var(--neutral-200)]">
+                <div className="flex gap-1 sm:gap-2 mb-5 sm:mb-6 border-b border-[var(--neutral-200)] overflow-x-auto">
                     {tabs.map((tab) => (
                         <button
                             key={tab.key}
                             type="button"
                             onClick={() => setActiveTab(tab.key)}
-                            className={`px-4 py-2 text-sm font-semibold rounded-t-xl transition-colors cursor-pointer ${
+                            className={`shrink-0 whitespace-nowrap px-3 sm:px-4 py-2 text-sm font-semibold rounded-t-xl transition-colors cursor-pointer ${
                                 activeTab === tab.key
                                     ? "bg-[var(--surface)] text-[var(--primary)] border border-b-0 border-[var(--neutral-200)]"
                                     : "text-[var(--neutral-500)] hover:text-[var(--quinary)]"
@@ -1089,7 +1091,7 @@ function QRAttendanceTab({ token, active }) {
 
                 <div className="bg-[var(--surface)] rounded-2xl border border-[var(--neutral-200)] shadow-sm p-4">
                     <div className="flex flex-wrap gap-3 items-end mb-3">
-                        <div className="flex flex-col min-w-[180px] flex-1">
+                        <div className="flex flex-col w-full sm:w-auto sm:min-w-[180px] flex-1">
                             <label className={labelClass}>Search this session</label>
                             <input
                                 type="text"
@@ -1099,7 +1101,7 @@ function QRAttendanceTab({ token, active }) {
                                 className={inputClass}
                             />
                         </div>
-                        <div className="flex flex-col min-w-[150px]">
+                        <div className="flex flex-col w-full sm:w-auto sm:min-w-[150px]">
                             <label className={labelClass}>Type</label>
                             <select value={logType} onChange={(e) => setLogType(e.target.value)} className={`${inputClass} cursor-pointer`}>
                                 <option value="all">All</option>
@@ -1107,7 +1109,7 @@ function QRAttendanceTab({ token, active }) {
                                 <option value="teacher">Teachers ({counts.teacher})</option>
                             </select>
                         </div>
-                        <div className="flex flex-col min-w-[160px]">
+                        <div className="flex flex-col w-full sm:w-auto sm:min-w-[160px]">
                             <label className={labelClass}>Outcome</label>
                             <select
                                 value={logOutcome}
@@ -1197,6 +1199,9 @@ function MarkAttendanceTab({ token, Classes, sectionOptionsFor, groupOptionsFor 
     const [className, setClassName] = useState("");
     const [rosterLoading, setRosterLoading] = useState(false);
     const [attendanceData, setAttendanceData] = useState({});
+    // Per-student "send WhatsApp to parent" flag. Defaults to ON for everyone;
+    // a student is only skipped when it is explicitly set to false.
+    const [whatsappData, setWhatsappData] = useState({});
     const [saving, setSaving] = useState(false);
     const [pdfLoading, setPdfLoading] = useState(false);
     const [attendanceType, setAttendanceType] = useState("class");
@@ -1214,6 +1219,7 @@ function MarkAttendanceTab({ token, Classes, sectionOptionsFor, groupOptionsFor 
         if (!classId || !token) {
             setRoster([]);
             setAttendanceData({});
+            setWhatsappData({});
             return;
         }
 
@@ -1231,10 +1237,13 @@ function MarkAttendanceTab({ token, Classes, sectionOptionsFor, groupOptionsFor 
                 // Pre-fill from already_marked/status; default unmarked
                 // students to PRESENT so a full day can be saved in one click.
                 const initial = {};
+                const initialWhatsapp = {};
                 (res.data.students || []).forEach((s) => {
                     initial[s.student_db_id] = s.status || "PRESENT";
+                    initialWhatsapp[s.student_db_id] = true; // WhatsApp ON by default
                 });
                 setAttendanceData(initial);
+                setWhatsappData(initialWhatsapp);
             })
             .catch(async (err) => toast("error", await extractErrorMessage(err)))
             .finally(() => setRosterLoading(false));
@@ -1262,6 +1271,26 @@ function MarkAttendanceTab({ token, Classes, sectionOptionsFor, groupOptionsFor 
         });
     };
 
+    const isWhatsappOn = (studentDbId) => whatsappData[studentDbId] !== false;
+
+    const toggleWhatsapp = (studentDbId) => {
+        setWhatsappData((prev) => ({ ...prev, [studentDbId]: prev[studentDbId] === false }));
+    };
+
+    const setAllWhatsapp = (value) => {
+        setWhatsappData((prev) => {
+            const next = { ...prev };
+            filteredRoster.forEach((s) => {
+                next[s.student_db_id] = value;
+            });
+            return next;
+        });
+    };
+
+    // Counts across the whole roster (not just the searched subset), because
+    // the whole roster is what gets submitted.
+    const whatsappCount = roster.filter((s) => isWhatsappOn(s.student_db_id)).length;
+
     const submitAttendance = async () => {
         if (!classId) return toast("warning", "Please select a class before saving attendance!");
         if (!date) return toast("warning", "Please select a date before saving attendance!");
@@ -1269,6 +1298,7 @@ function MarkAttendanceTab({ token, Classes, sectionOptionsFor, groupOptionsFor 
         const records = roster.map((s) => ({
             student_id: s.student_db_id,
             status: attendanceData[s.student_db_id] || "PRESENT",
+            send_whatsapp: isWhatsappOn(s.student_db_id),
         }));
 
         if (records.length === 0) return toast("warning", "There are no students to mark for this selection.");
@@ -1280,10 +1310,14 @@ function MarkAttendanceTab({ token, Classes, sectionOptionsFor, groupOptionsFor 
             if (groupId) payload.group_id = Number(groupId);
 
             const res = await api.post("/attendance/bulk/", payload, authHeaders(token));
-            setLastSummary(res.data);
+            const notified = records.filter((r) => r.send_whatsapp).length;
+            setLastSummary({ ...res.data, whatsapp: notified });
             toast(
                 "success",
-                `Created ${res.data.created}, updated ${res.data.updated} record(s) for ${date}. Parent notifications are being sent in the background.`
+                `Created ${res.data.created}, updated ${res.data.updated} record(s) for ${date}. ` +
+                    (notified > 0
+                        ? `${notified} parent WhatsApp message${notified !== 1 ? "s are" : " is"} being sent in the background.`
+                        : "No WhatsApp messages will be sent.")
             );
         } catch (err) {
             toast("error", await extractErrorMessage(err));
@@ -1340,8 +1374,8 @@ function MarkAttendanceTab({ token, Classes, sectionOptionsFor, groupOptionsFor 
 
     return (
         <div>
-            <div className="flex flex-col sm:flex-row gap-4 mb-4 items-end flex-wrap">
-                <div className="flex flex-col min-w-[200px]">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4 items-stretch sm:items-end flex-wrap">
+                <div className="flex flex-col w-full sm:w-auto sm:min-w-[200px]">
                     <label className={labelClass}>Class</label>
                     <select value={classId} onChange={(e) => setClassId(e.target.value)} className={`${inputClass} cursor-pointer`}>
                         <option value="">Select Class</option>
@@ -1353,12 +1387,12 @@ function MarkAttendanceTab({ token, Classes, sectionOptionsFor, groupOptionsFor 
                     </select>
                 </div>
 
-                <div className="flex flex-col min-w-[180px]">
+                <div className="flex flex-col w-full sm:w-auto sm:min-w-[180px]">
                     <label className={labelClass}>Date</label>
                     <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={`${inputClass} cursor-pointer`} />
                 </div>
 
-                <div className="flex flex-col min-w-[170px]">
+                <div className="flex flex-col w-full sm:w-auto sm:min-w-[170px]">
                     <label className={labelClass}>Attendance Type</label>
                     <select
                         value={attendanceType}
@@ -1371,7 +1405,7 @@ function MarkAttendanceTab({ token, Classes, sectionOptionsFor, groupOptionsFor 
                     </select>
                 </div>
 
-                <div className="flex flex-col min-w-[160px]">
+                <div className="flex flex-col w-full sm:w-auto sm:min-w-[160px]">
                     <label className={labelClass}>Section</label>
                     <select
                         value={sectionId}
@@ -1388,7 +1422,7 @@ function MarkAttendanceTab({ token, Classes, sectionOptionsFor, groupOptionsFor 
                     </select>
                 </div>
 
-                <div className="flex flex-col min-w-[160px]">
+                <div className="flex flex-col w-full sm:w-auto sm:min-w-[160px]">
                     <label className={labelClass}>Group</label>
                     <select
                         value={groupId}
@@ -1405,7 +1439,7 @@ function MarkAttendanceTab({ token, Classes, sectionOptionsFor, groupOptionsFor 
                     </select>
                 </div>
 
-                <div className="flex flex-col min-w-[220px] flex-1">
+                <div className="flex flex-col w-full sm:w-auto sm:min-w-[220px] flex-1">
                     <label className={labelClass}>Search roster</label>
                     <input
                         type="text"
@@ -1432,7 +1466,7 @@ function MarkAttendanceTab({ token, Classes, sectionOptionsFor, groupOptionsFor 
                         type="button"
                         onClick={printAttendanceSheet}
                         disabled={pdfLoading || rosterLoading}
-                        className="border border-[var(--primary)] text-[var(--primary)] font-semibold py-2.5 px-4 rounded-xl hover:bg-[var(--primary)]/10 transition-colors cursor-pointer disabled:opacity-50"
+                        className="w-full sm:w-auto border border-[var(--primary)] text-[var(--primary)] font-semibold py-2.5 px-4 rounded-xl hover:bg-[var(--primary)]/10 transition-colors cursor-pointer disabled:opacity-50"
                     >
                         {pdfLoading ? "Preparing Sheet..." : "Print Attendance Sheet"}
                     </button>
@@ -1440,7 +1474,7 @@ function MarkAttendanceTab({ token, Classes, sectionOptionsFor, groupOptionsFor 
             )}
 
             {classId && filteredRoster.length > 0 && (
-                <div className="flex justify-between items-center mb-3">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-3">
                     <div className="text-sm text-[var(--neutral-500)]">
                         {className} &middot; {filteredRoster.length} student{filteredRoster.length !== 1 ? "s" : ""}
                     </div>
@@ -1463,18 +1497,47 @@ function MarkAttendanceTab({ token, Classes, sectionOptionsFor, groupOptionsFor 
                 </div>
             )}
 
-            <div className="bg-[var(--surface)] rounded-2xl border border-[var(--neutral-200)] shadow-sm p-6 space-y-4">
+            {classId && filteredRoster.length > 0 && (
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+                    <div className="text-xs text-[var(--neutral-500)]">
+                        WhatsApp to parents:{" "}
+                        <span className="font-semibold text-[var(--quinary)]">
+                            {whatsappCount} of {roster.length}
+                        </span>{" "}
+                        selected
+                    </div>
+                    <div className="flex gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setAllWhatsapp(true)}
+                            className="flex-1 sm:flex-none text-xs font-semibold uppercase tracking-wide px-3 py-1.5 rounded-lg border border-[var(--success)] text-[var(--success)] hover:bg-[var(--success)]/5 cursor-pointer"
+                        >
+                            WhatsApp: all on
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setAllWhatsapp(false)}
+                            className="flex-1 sm:flex-none text-xs font-semibold uppercase tracking-wide px-3 py-1.5 rounded-lg border border-[var(--neutral-300)] text-[var(--neutral-600)] hover:bg-[var(--neutral-50)] cursor-pointer"
+                        >
+                            WhatsApp: all off
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            <div className="bg-[var(--surface)] rounded-2xl border border-[var(--neutral-200)] shadow-sm p-3 sm:p-6 space-y-4">
                 {rosterLoading ? (
                     <div className="text-center py-8 text-[var(--neutral-400)] text-sm">Loading roster...</div>
                 ) : classId && filteredRoster.length > 0 ? (
                     filteredRoster.map((student) => {
                         const currentStatus = attendanceData[student.student_db_id] || "PRESENT";
+                        const whatsappOn = isWhatsappOn(student.student_db_id);
                         return (
                             <div
                                 key={student.student_db_id}
                                 className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[var(--neutral-100)] pb-4 last:border-0 last:pb-0 gap-3"
                             >
-                                <div className="min-w-[220px]">
+                                <div className="min-w-0 sm:min-w-[220px]">
                                     <div className="font-semibold text-base text-[var(--quinary)]">{student.full_name}</div>
                                     <div className="text-xs text-[var(--neutral-400)]">
                                         {student.student_id}
@@ -1484,11 +1547,11 @@ function MarkAttendanceTab({ token, Classes, sectionOptionsFor, groupOptionsFor 
                                     </div>
                                 </div>
 
-                                <div className="flex items-center gap-3">
+                                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                                     <button
                                         type="button"
                                         onClick={() => markStatus(student.student_db_id, "PRESENT")}
-                                        className={`px-4 py-2 text-xs uppercase font-bold tracking-wider rounded-xl border transition-all duration-200 cursor-pointer ${
+                                        className={`flex-1 sm:flex-none px-4 py-2.5 sm:py-2 text-xs uppercase font-bold tracking-wider rounded-xl border transition-all duration-200 cursor-pointer ${
                                             currentStatus === "PRESENT" ? STATUS_STYLES.PRESENT : STATUS_IDLE
                                         }`}
                                     >
@@ -1497,11 +1560,35 @@ function MarkAttendanceTab({ token, Classes, sectionOptionsFor, groupOptionsFor 
                                     <button
                                         type="button"
                                         onClick={() => markStatus(student.student_db_id, "ABSENT")}
-                                        className={`px-4 py-2 text-xs uppercase font-bold tracking-wider rounded-xl border transition-all duration-200 cursor-pointer ${
+                                        className={`flex-1 sm:flex-none px-4 py-2.5 sm:py-2 text-xs uppercase font-bold tracking-wider rounded-xl border transition-all duration-200 cursor-pointer ${
                                             currentStatus === "ABSENT" ? STATUS_STYLES.ABSENT : STATUS_IDLE
                                         }`}
                                     >
                                         Absent
+                                    </button>
+                                    <button
+                                        type="button"
+                                        role="switch"
+                                        aria-checked={whatsappOn}
+                                        aria-label={`Send WhatsApp message to ${student.full_name}'s parent`}
+                                        title={whatsappOn ? "WhatsApp message will be sent" : "WhatsApp message will NOT be sent"}
+                                        onClick={() => toggleWhatsapp(student.student_db_id)}
+                                        className={`flex w-full sm:w-auto items-center justify-center gap-2 px-3 py-2.5 sm:py-2 text-xs uppercase font-bold tracking-wider rounded-xl border transition-all duration-200 cursor-pointer ${
+                                            whatsappOn ? WHATSAPP_ON : STATUS_IDLE
+                                        }`}
+                                    >
+                                        <span
+                                            className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                                                whatsappOn
+                                                    ? "bg-[var(--success)] border-[var(--success)] text-[var(--surface)]"
+                                                    : "bg-[var(--surface)] border-[var(--neutral-300)] text-transparent"
+                                            }`}
+                                        >
+                                            <svg viewBox="0 0 20 20" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                                <path d="M4 10.5l4 4 8-9" />
+                                            </svg>
+                                        </span>
+                                        {whatsappOn ? "Send WhatsApp" : "WhatsApp off"}
                                     </button>
                                 </div>
                             </div>
@@ -1520,7 +1607,7 @@ function MarkAttendanceTab({ token, Classes, sectionOptionsFor, groupOptionsFor 
                         type="button"
                         onClick={submitAttendance}
                         disabled={saving}
-                        className="bg-[var(--primary)] hover:bg-[var(--quinary)] disabled:opacity-50 text-[var(--surface)] font-medium py-3 px-6 rounded-xl transition-all duration-300 shadow-md transform active:scale-[0.98] cursor-pointer"
+                        className="bg-[var(--primary)] hover:bg-[var(--quinary)] disabled:opacity-50 text-[var(--surface)] font-medium w-full sm:w-auto py-3 px-6 rounded-xl transition-all duration-300 shadow-md transform active:scale-[0.98] cursor-pointer"
                     >
                         {saving ? "Processing Records..." : "Save Attendance"}
                     </button>
@@ -1529,7 +1616,8 @@ function MarkAttendanceTab({ token, Classes, sectionOptionsFor, groupOptionsFor 
 
             {lastSummary && (
                 <div className="mt-4 text-xs text-[var(--neutral-500)] bg-[var(--surface)] border border-[var(--neutral-200)] rounded-xl p-3">
-                    Last save: {lastSummary.created} created, {lastSummary.updated} updated for {className || lastSummary.class}.
+                    Last save: {lastSummary.created} created, {lastSummary.updated} updated for {className || lastSummary.class}
+                    {typeof lastSummary.whatsapp === "number" && ` · WhatsApp queued for ${lastSummary.whatsapp}`}.
                 </div>
             )}
         </div>
@@ -1619,7 +1707,7 @@ function RecordsTab({ token, Classes, Students, sectionOptionsFor, groupOptionsF
         <div>
             {/* Filters */}
             <div className="bg-[var(--surface)] rounded-2xl border border-[var(--neutral-200)] shadow-sm p-4 mb-4 flex flex-wrap gap-3 items-end">
-                <div className="flex flex-col min-w-[200px] flex-1">
+                <div className="flex flex-col w-full sm:w-auto sm:min-w-[200px] flex-1">
                     <label className={labelClass}>Search</label>
                     <input
                         type="text"
@@ -1629,7 +1717,7 @@ function RecordsTab({ token, Classes, Students, sectionOptionsFor, groupOptionsF
                         className={inputClass}
                     />
                 </div>
-                <div className="flex flex-col min-w-[160px]">
+                <div className="flex flex-col w-full sm:w-auto sm:min-w-[160px]">
                     <label className={labelClass}>Class</label>
                     <select
                         value={filters.class_id}
@@ -1648,7 +1736,7 @@ function RecordsTab({ token, Classes, Students, sectionOptionsFor, groupOptionsF
                         ))}
                     </select>
                 </div>
-                <div className="flex flex-col min-w-[140px]">
+                <div className="flex flex-col w-full sm:w-auto sm:min-w-[140px]">
                     <label className={labelClass}>Section</label>
                     <select
                         value={filters.section_id}
@@ -1664,7 +1752,7 @@ function RecordsTab({ token, Classes, Students, sectionOptionsFor, groupOptionsF
                         ))}
                     </select>
                 </div>
-                <div className="flex flex-col min-w-[140px]">
+                <div className="flex flex-col w-full sm:w-auto sm:min-w-[140px]">
                     <label className={labelClass}>Group</label>
                     <select
                         value={filters.group_id}
@@ -1680,11 +1768,11 @@ function RecordsTab({ token, Classes, Students, sectionOptionsFor, groupOptionsF
                         ))}
                     </select>
                 </div>
-                <div className="flex flex-col min-w-[150px]">
+                <div className="flex flex-col w-full sm:w-auto sm:min-w-[150px]">
                     <label className={labelClass}>Date</label>
                     <input type="date" value={filters.date} onChange={(e) => setFilter("date", e.target.value)} className={inputClass} />
                 </div>
-                <div className="flex flex-col min-w-[150px]">
+                <div className="flex flex-col w-full sm:w-auto sm:min-w-[150px]">
                     <label className={labelClass}>Month</label>
                     <input type="month" value={filters.month} onChange={(e) => setFilter("month", e.target.value)} className={inputClass} />
                 </div>
@@ -1718,7 +1806,7 @@ function RecordsTab({ token, Classes, Students, sectionOptionsFor, groupOptionsF
 
             {/* Results table */}
             <div className="bg-[var(--surface)] rounded-2xl border border-[var(--neutral-200)] shadow-sm overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full min-w-[600px] text-sm">
                     <thead>
                         <tr className="text-left text-xs uppercase tracking-wider text-[var(--neutral-500)] border-b border-[var(--neutral-100)]">
                             <th className="p-3">Student</th>
@@ -1830,7 +1918,7 @@ function QuickAddRecord({ token, Classes, Students, onCreated }) {
 
     return (
         <div className="bg-[var(--surface)] rounded-2xl border border-[var(--neutral-200)] shadow-sm p-4 mb-4 flex flex-wrap gap-3 items-end">
-            <div className="flex flex-col min-w-[180px]">
+            <div className="flex flex-col w-full sm:w-auto sm:min-w-[180px]">
                 <label className={labelClass}>Class</label>
                 <select
                     value={classId}
@@ -1848,7 +1936,7 @@ function QuickAddRecord({ token, Classes, Students, onCreated }) {
                     ))}
                 </select>
             </div>
-            <div className="flex flex-col min-w-[220px] flex-1">
+            <div className="flex flex-col w-full sm:w-auto sm:min-w-[220px] flex-1">
                 <label className={labelClass}>Student</label>
                 <select
                     value={studentId}
@@ -1864,11 +1952,11 @@ function QuickAddRecord({ token, Classes, Students, onCreated }) {
                     ))}
                 </select>
             </div>
-            <div className="flex flex-col min-w-[150px]">
+            <div className="flex flex-col w-full sm:w-auto sm:min-w-[150px]">
                 <label className={labelClass}>Date</label>
                 <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputClass} />
             </div>
-            <div className="flex flex-col min-w-[140px]">
+            <div className="flex flex-col w-full sm:w-auto sm:min-w-[140px]">
                 <label className={labelClass}>Status</label>
                 <select value={status} onChange={(e) => setStatus(e.target.value)} className={`${inputClass} cursor-pointer`}>
                     <option value="PRESENT">Present</option>
@@ -2092,7 +2180,7 @@ function StudentSummaryView({ data }) {
             {months.length > 0 && (
                 <div className="bg-[var(--surface)] rounded-2xl border border-[var(--neutral-200)] shadow-sm p-5 mb-4 overflow-x-auto">
                     <div className="text-sm font-bold mb-3">Monthly breakdown</div>
-                    <table className="w-full text-sm">
+                    <table className="w-full min-w-[600px] text-sm">
                         <thead>
                             <tr className="text-left text-xs uppercase tracking-wider text-[var(--neutral-500)] border-b border-[var(--neutral-100)]">
                                 <th className="p-2">Month</th>
@@ -2223,7 +2311,7 @@ function ClassAnalyticsTab({ token, Classes, sectionOptionsFor, groupOptionsFor 
     return (
         <div>
             <div className="flex flex-wrap gap-4 mb-4 items-end">
-                <div className="flex flex-col min-w-[200px]">
+                <div className="flex flex-col w-full sm:w-auto sm:min-w-[200px]">
                     <label className={labelClass}>Class</label>
                     <select value={classId} onChange={(e) => setClassId(e.target.value)} className={`${inputClass} cursor-pointer`}>
                         <option value="">Select Class</option>
@@ -2234,7 +2322,7 @@ function ClassAnalyticsTab({ token, Classes, sectionOptionsFor, groupOptionsFor 
                         ))}
                     </select>
                 </div>
-                <div className="flex flex-col min-w-[160px]">
+                <div className="flex flex-col w-full sm:w-auto sm:min-w-[160px]">
                     <label className={labelClass}>Section</label>
                     <select
                         value={sectionId}
@@ -2250,7 +2338,7 @@ function ClassAnalyticsTab({ token, Classes, sectionOptionsFor, groupOptionsFor 
                         ))}
                     </select>
                 </div>
-                <div className="flex flex-col min-w-[160px]">
+                <div className="flex flex-col w-full sm:w-auto sm:min-w-[160px]">
                     <label className={labelClass}>Group</label>
                     <select
                         value={groupId}
@@ -2319,7 +2407,7 @@ function ClassSummaryView({ data }) {
             </div>
 
             <div className="bg-[var(--surface)] rounded-2xl border border-[var(--neutral-200)] shadow-sm overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full min-w-[600px] text-sm">
                     <thead>
                         <tr className="text-left text-xs uppercase tracking-wider text-[var(--neutral-500)] border-b border-[var(--neutral-100)]">
                             <th className="p-3">Student</th>
@@ -2460,13 +2548,13 @@ function TeacherMarkAttendanceTab({ token, Teachers }) {
 
     return (
         <div>
-            <div className="flex flex-col sm:flex-row gap-4 mb-4 items-end flex-wrap">
-                <div className="flex flex-col min-w-[180px]">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4 items-stretch sm:items-end flex-wrap">
+                <div className="flex flex-col w-full sm:w-auto sm:min-w-[180px]">
                     <label className={labelClass}>Date</label>
                     <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={`${inputClass} cursor-pointer`} />
                 </div>
 
-                <div className="flex flex-col min-w-[220px] flex-1">
+                <div className="flex flex-col w-full sm:w-auto sm:min-w-[220px] flex-1">
                     <label className={labelClass}>Search roster</label>
                     <input
                         type="text"
@@ -2479,7 +2567,7 @@ function TeacherMarkAttendanceTab({ token, Teachers }) {
             </div>
 
             {filteredRoster.length > 0 && (
-                <div className="flex justify-between items-center mb-3">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-3">
                     <div className="text-sm text-[var(--neutral-500)]">
                         {filteredRoster.length} active teacher{filteredRoster.length !== 1 ? "s" : ""}
                     </div>
@@ -2502,7 +2590,7 @@ function TeacherMarkAttendanceTab({ token, Teachers }) {
                 </div>
             )}
 
-            <div className="bg-[var(--surface)] rounded-2xl border border-[var(--neutral-200)] shadow-sm p-6 space-y-4">
+            <div className="bg-[var(--surface)] rounded-2xl border border-[var(--neutral-200)] shadow-sm p-3 sm:p-6 space-y-4">
                 {rosterLoading ? (
                     <div className="text-center py-8 text-[var(--neutral-400)] text-sm">Loading roster...</div>
                 ) : filteredRoster.length > 0 ? (
@@ -2513,7 +2601,7 @@ function TeacherMarkAttendanceTab({ token, Teachers }) {
                                 key={teacher.id}
                                 className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[var(--neutral-100)] pb-4 last:border-0 last:pb-0 gap-3"
                             >
-                                <div className="min-w-[220px]">
+                                <div className="min-w-0 sm:min-w-[220px]">
                                     <div className="font-semibold text-base text-[var(--quinary)]">{teacher.full_name}</div>
                                     <div className="text-xs text-[var(--neutral-400)]">
                                         {teacher.teacher_id}
@@ -2522,11 +2610,11 @@ function TeacherMarkAttendanceTab({ token, Teachers }) {
                                     </div>
                                 </div>
 
-                                <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2 sm:gap-3">
                                     <button
                                         type="button"
                                         onClick={() => markStatus(teacher.id, "PRESENT")}
-                                        className={`px-4 py-2 text-xs uppercase font-bold tracking-wider rounded-xl border transition-all duration-200 cursor-pointer ${
+                                        className={`flex-1 sm:flex-none px-4 py-2.5 sm:py-2 text-xs uppercase font-bold tracking-wider rounded-xl border transition-all duration-200 cursor-pointer ${
                                             currentStatus === "PRESENT" ? STATUS_STYLES.PRESENT : STATUS_IDLE
                                         }`}
                                     >
@@ -2535,7 +2623,7 @@ function TeacherMarkAttendanceTab({ token, Teachers }) {
                                     <button
                                         type="button"
                                         onClick={() => markStatus(teacher.id, "ABSENT")}
-                                        className={`px-4 py-2 text-xs uppercase font-bold tracking-wider rounded-xl border transition-all duration-200 cursor-pointer ${
+                                        className={`flex-1 sm:flex-none px-4 py-2.5 sm:py-2 text-xs uppercase font-bold tracking-wider rounded-xl border transition-all duration-200 cursor-pointer ${
                                             currentStatus === "ABSENT" ? STATUS_STYLES.ABSENT : STATUS_IDLE
                                         }`}
                                     >
@@ -2558,7 +2646,7 @@ function TeacherMarkAttendanceTab({ token, Teachers }) {
                         type="button"
                         onClick={submitAttendance}
                         disabled={saving}
-                        className="bg-[var(--primary)] hover:bg-[var(--quinary)] disabled:opacity-50 text-[var(--surface)] font-medium py-3 px-6 rounded-xl transition-all duration-300 shadow-md transform active:scale-[0.98] cursor-pointer"
+                        className="bg-[var(--primary)] hover:bg-[var(--quinary)] disabled:opacity-50 text-[var(--surface)] font-medium w-full sm:w-auto py-3 px-6 rounded-xl transition-all duration-300 shadow-md transform active:scale-[0.98] cursor-pointer"
                     >
                         {saving ? "Processing Records..." : "Save Attendance"}
                     </button>
@@ -2670,7 +2758,7 @@ function TeacherRecordsTab({ token, Teachers }) {
         <div>
             {/* Filters */}
             <div className="bg-[var(--surface)] rounded-2xl border border-[var(--neutral-200)] shadow-sm p-4 mb-4 flex flex-wrap gap-3 items-end">
-                <div className="flex flex-col min-w-[200px] flex-1">
+                <div className="flex flex-col w-full sm:w-auto sm:min-w-[200px] flex-1">
                     <label className={labelClass}>Search (on this page)</label>
                     <input
                         type="text"
@@ -2680,7 +2768,7 @@ function TeacherRecordsTab({ token, Teachers }) {
                         className={inputClass}
                     />
                 </div>
-                <div className="flex flex-col min-w-[200px]">
+                <div className="flex flex-col w-full sm:w-auto sm:min-w-[200px]">
                     <label className={labelClass}>Teacher</label>
                     <select
                         value={filters.teacher}
@@ -2695,11 +2783,11 @@ function TeacherRecordsTab({ token, Teachers }) {
                         ))}
                     </select>
                 </div>
-                <div className="flex flex-col min-w-[150px]">
+                <div className="flex flex-col w-full sm:w-auto sm:min-w-[150px]">
                     <label className={labelClass}>Date</label>
                     <input type="date" value={filters.date} onChange={(e) => setFilter("date", e.target.value)} className={inputClass} />
                 </div>
-                <div className="flex flex-col min-w-[150px]">
+                <div className="flex flex-col w-full sm:w-auto sm:min-w-[150px]">
                     <label className={labelClass}>Status</label>
                     <select
                         value={filters.status}
@@ -2733,7 +2821,7 @@ function TeacherRecordsTab({ token, Teachers }) {
 
             {/* Results table */}
             <div className="bg-[var(--surface)] rounded-2xl border border-[var(--neutral-200)] shadow-sm overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full min-w-[600px] text-sm">
                     <thead>
                         <tr className="text-left text-xs uppercase tracking-wider text-[var(--neutral-500)] border-b border-[var(--neutral-100)]">
                             <th className="p-3">Teacher</th>
@@ -2837,7 +2925,7 @@ function TeacherQuickAddRecord({ token, Teachers, onCreated }) {
 
     return (
         <div className="bg-[var(--surface)] rounded-2xl border border-[var(--neutral-200)] shadow-sm p-4 mb-4 flex flex-wrap gap-3 items-end">
-            <div className="flex flex-col min-w-[240px] flex-1">
+            <div className="flex flex-col w-full sm:w-auto sm:min-w-[240px] flex-1">
                 <label className={labelClass}>Teacher</label>
                 <select value={teacherId} onChange={(e) => setTeacherId(e.target.value)} className={`${inputClass} cursor-pointer`}>
                     <option value="">Select teacher</option>
@@ -2848,11 +2936,11 @@ function TeacherQuickAddRecord({ token, Teachers, onCreated }) {
                     ))}
                 </select>
             </div>
-            <div className="flex flex-col min-w-[150px]">
+            <div className="flex flex-col w-full sm:w-auto sm:min-w-[150px]">
                 <label className={labelClass}>Date</label>
                 <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputClass} />
             </div>
-            <div className="flex flex-col min-w-[140px]">
+            <div className="flex flex-col w-full sm:w-auto sm:min-w-[140px]">
                 <label className={labelClass}>Status</label>
                 <select value={status} onChange={(e) => setStatus(e.target.value)} className={`${inputClass} cursor-pointer`}>
                     <option value="PRESENT">Present</option>
@@ -2955,7 +3043,7 @@ function TeacherAnalyticsTab({ token }) {
                     </div>
                 ) : (
                     <>
-                        <div className="flex flex-col min-w-[140px]">
+                        <div className="flex flex-col w-full sm:w-auto sm:min-w-[140px]">
                             <label className={labelClass}>Month</label>
                             <select value={month} onChange={(e) => setMonth(e.target.value)} className={`${inputClass} cursor-pointer`}>
                                 {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
@@ -2965,7 +3053,7 @@ function TeacherAnalyticsTab({ token }) {
                                 ))}
                             </select>
                         </div>
-                        <div className="flex flex-col min-w-[120px]">
+                        <div className="flex flex-col w-full sm:w-auto sm:min-w-[120px]">
                             <label className={labelClass}>Year</label>
                             <input
                                 type="number"
@@ -3008,7 +3096,7 @@ function TeacherDailySummaryView({ data }) {
             </div>
 
             <div className="bg-[var(--surface)] rounded-2xl border border-[var(--neutral-200)] shadow-sm overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full min-w-[600px] text-sm">
                     <thead>
                         <tr className="text-left text-xs uppercase tracking-wider text-[var(--neutral-500)] border-b border-[var(--neutral-100)]">
                             <th className="p-3">Teacher</th>
@@ -3074,7 +3162,7 @@ function TeacherMonthlySummaryView({ data }) {
             </div>
 
             <div className="bg-[var(--surface)] rounded-2xl border border-[var(--neutral-200)] shadow-sm overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full min-w-[600px] text-sm">
                     <thead>
                         <tr className="text-left text-xs uppercase tracking-wider text-[var(--neutral-500)] border-b border-[var(--neutral-100)]">
                             <th className="p-3">Teacher</th>

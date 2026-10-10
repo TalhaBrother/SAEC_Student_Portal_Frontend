@@ -92,7 +92,7 @@ export default function Sidebar({ closeMobileMenu }) {
           label: "Timetable",
           icon: HiOutlineTableCells,
           roles: ["admin"],
-          path: "/admin/examination",
+          path: "/admin/timetable",
         },
       ],
     },
